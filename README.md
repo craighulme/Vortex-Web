@@ -1,5 +1,6 @@
 Vortex2+2 is an extension for [vortex](https://vortex.towerstats.com/) to add many more features
 current features are:
+- Clean custom dark ui
 - Map loader
 - Normal mapping
 - Shadows
