@@ -1376,7 +1376,7 @@ function swordUpdate() {
         if (canPlaySounds) {
             oofSound.play()
         }
-        let sp = window.chooseSpawnPoint();
+        let sp = window.chooseSpawnPoint(window.map);
         _spawnPoint.x = sp.x;
         _spawnPoint.y = sp.y+CHAR_FOOT_OFFSET;
         _spawnPoint.z = sp.z;

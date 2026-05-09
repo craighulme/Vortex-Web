@@ -126,6 +126,7 @@
     var gamei = url.searchParams.get("VPlusGameId");
     if (gamei) {
         let map = maps[gamei]
+        window.map=map;
         let gameid = map.gameId
         if (map.SWORD_FIGHT) {
             window.SWORD_FIGHT = true;
@@ -140,6 +141,8 @@
             configurable: false
         });
         console.log(`game id set to ${gameid}`);;
+    }else{
+        window.map=false;
     }
     async function initialize() {
         if (document.location.pathname == '/home' || document.location.pathname == '/social' || document.location.pathname == '/search' || document.location.pathname == '/games/2') {
