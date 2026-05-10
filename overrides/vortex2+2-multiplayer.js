@@ -206,9 +206,9 @@ function _animateRemote(r, dt) {
 
         if (slicing) {
             let charpos = character.position;
-            let dx = (x-rx*0.5) - charpos.x;
+            let dx = (x - rx * 0.5) - charpos.x;
             let dy = y - charpos.y;
-            let dz = (z-rz*0.5) - charpos.z;
+            let dz = (z - rz * 0.5) - charpos.z;
             let distsq = (dx * dx + dy * dy + dz * dz);
             if (distsq < 7) {
                 playerSpecialValues.health -= dt * 0.5;
@@ -352,9 +352,17 @@ function _redrawHealthbar(id, health) {
 
     ctx.fillStyle = '#222';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = '#00ff00';
+    let grad = ctx.createLinearGradient(0, 0, 0, canvas.height)
+    grad.addColorStop(0, "#63b81f");
+    grad.addColorStop(0, "#4b9210");
+    grad.addColorStop(1, "#2b5806");
+    ctx.fillStyle = grad;
     ctx.fillRect(5, 5, Math.max(5, Math.min(canvas.width - 10, canvas.width * health)), canvas.height - 10);
+    ctx.font = 'small-caps bold '+(canvas.height-20)+'px sans-serif';
+    ctx.fillStyle = "white";
+    ctx.textAlign='end'
+    ctx.textBaseline='middle'
+    ctx.fillText("HEALTH", canvas.width - 10, (canvas.height - 10)*0.65);
 
     if (!hbar.sprite) {
         hbar.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
@@ -396,7 +404,7 @@ function _showHealthBar(id) {
 }
 
 function _updateBubblePositions() {
-    let bubbleOffset = window.SWORD_FIGHT?0.8:0.4; //originally 0.4
+    let bubbleOffset = window.SWORD_FIGHT ? 0.8 : 0.4; //originally 0.4
     let bubbleBase = _vortex.getCharHeight() - _vortex.getCharFootOffset() + bubbleOffset;
     for (const [id, b] of _bubbles) {
         if (!b.sprite || !b.msgs.length) { if (b.sprite) b.sprite.visible = false; continue; }
