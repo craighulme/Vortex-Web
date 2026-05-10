@@ -553,7 +553,7 @@ renderer.domElement.addEventListener('mousedown', e => {
                 if (_cursorOver(slider)) { _sliderDrag = slider; return; }
             }
         }
-        if (!playerSpecialValues.slicing && canSlice) {
+        if (window.SWORD_FIGHT&&!playerSpecialValues.slicing && canSlice) {
             playerSpecialValues.slicing = true;
             canSlice = false
             swordSlashSound.currentTime = 0;
