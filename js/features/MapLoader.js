@@ -112,7 +112,7 @@
             description: "Custom made simple pvp map by Inuk",
             creatorName: 'Inuk',
             creatorId: 1961,
-            gameId: -2,
+            gameId: -3,
 
             spawnPoints: [[10,10,10],[-10,10,10],[10,10,-10],[-10,10,-10]],
 
