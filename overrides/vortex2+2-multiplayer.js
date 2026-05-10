@@ -105,7 +105,7 @@ function _setPosY(bones, rest, name, offset, sp, dt) {
 }
 
 let swords = new Map()
-function _animateRemote(id,r, dt) {
+function _animateRemote(id, r, dt) {
     const { bones, rest } = r.meshes;
     const sp = 12;
     r.animTime += dt;
@@ -161,13 +161,10 @@ function _animateRemote(id,r, dt) {
     }
 
     if (window.SWORD_FIGHT) {
-        _setB(bones, rest, 'Right_Arm', 'x', -Math.PI * 0.5, 1, 1);
-        bones.Right_Arm.position.y = 1.5
-        bones.Right_Arm.position.z = -0.5
         let sword = swords.get(id);
-        if (!sword) {
-            console.log('no sword for id '+id+', making one now!')
-            sword=true;
+        if (!swords.has(id)) {
+            swords.set(id,false);
+            console.log('no sword for id ' + id + ', making one now!')
             fbxLoader.load(importedAssets.swordMdl, (fbx) => {
                 fbx.scale.multiplyScalar(0.005);
                 sword = fbx;
@@ -179,9 +176,10 @@ function _animateRemote(id,r, dt) {
             });
             return
         }
-        if (sword === true) {
-            return
-        }
+        if(!sword) return
+        _setB(bones, rest, 'Right_Arm', 'x', -Math.PI * 0.5, 1, 1);
+        bones.Right_Arm.position.y = 1.5
+        bones.Right_Arm.position.z = -0.5
         let g = r.meshes.grp;
         let pos = g.position;
         let ry = g.rotation.y;
@@ -361,11 +359,11 @@ function _redrawHealthbar(id, health) {
     grad.addColorStop(1, "#2b5806");
     ctx.fillStyle = grad;
     ctx.fillRect(5, 5, Math.max(5, Math.min(canvas.width - 10, canvas.width * health)), canvas.height - 10);
-    ctx.font = 'small-caps bold '+(canvas.height-20)+'px sans-serif';
+    ctx.font = 'small-caps bold ' + (canvas.height - 20) + 'px sans-serif';
     ctx.fillStyle = "white";
-    ctx.textAlign='end'
-    ctx.textBaseline='middle'
-    ctx.fillText("HEALTH", canvas.width - 10, (canvas.height - 10)*0.65);
+    ctx.textAlign = 'end'
+    ctx.textBaseline = 'middle'
+    ctx.fillText("HEALTH", canvas.width - 10, (canvas.height - 10) * 0.65);
 
     if (!hbar.sprite) {
         hbar.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
@@ -540,8 +538,8 @@ function decodeNetworkData(playerData, r) {
 
     let healthBits = (specialState >>> 0) & ((1 << 4) - 1);
     let slicingBits = (specialState >>> 4) & ((1 << 1) - 1);
-    if(!customPlayerData[playerData.id]) {
-        customPlayerData[playerData.id]={
+    if (!customPlayerData[playerData.id]) {
+        customPlayerData[playerData.id] = {
             health: 1,
             slicing: false,
         }
@@ -798,8 +796,8 @@ window._mpUpdate = function (dt) {
         if (g.rotation.y > Math.PI) g.rotation.y -= 2 * Math.PI;
         else if (g.rotation.y < -Math.PI) g.rotation.y += 2 * Math.PI;
 
-        if (!camPos) {
-            _animateRemote(key,r, dt);
+        if (camPos) {
+            _animateRemote(key, r, dt);
         }
     }
 
