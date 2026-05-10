@@ -1,5 +1,7 @@
+// Created by Enk, modified by Inuk
 (async function () {
     const url = new URL(document.URL);
+    if(url.pathname!='/search') return
     const query = url.searchParams.get("q");
     if(query) return;
     document.getElementById('results-area').style.opacity='0';
