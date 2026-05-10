@@ -585,6 +585,7 @@ function handle(d) {
         case 'join': {
             if (d.id === myId) break;
             addRemote(d.id, d.username, d.is_staff, d.is_booster);
+            _showHealthBar(d.id);
             Chat.systemPlayer(d.username, `${d.username} joined.`, false);
             break;
         }
