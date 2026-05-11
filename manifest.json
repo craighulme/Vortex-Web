@@ -32,7 +32,7 @@
       ],
       "js": [
         "js/inject/InjectMapLoader.js",
-        "js/inject/InjectOverrides.js",
+        "js/inject/InjectAssets.js",
         "js/lightMode.js"
       ],
       "run_at": "document_start"

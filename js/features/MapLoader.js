@@ -141,7 +141,7 @@
 
     var url_string = document.URL;
     var url = new URL(url_string);
-    var gamei = url.searchParams.get("VPlusGameId");
+    var gamei = url.searchParams.get("V22GameId");
     if (gamei) {
         let map = maps[gamei]
         window.map = map;
@@ -167,45 +167,54 @@
             // game buttons!
             let f = await fetch('/api/game-stats')
             let gameStats = await f.json()
-            console.log(gameStats)
-            for (let i = 0; i < maps.length; i++) {
-                let map = maps[i]
+            function waitForGamesLoaded() {
+                if (document.getElementById('games-grid').children.length > 0) {
+                    for (let i = 0; i < maps.length; i++) {
+                        let map = maps[i]
 
-                let gameId = map.gameId
+                        let gameId = map.gameId
 
-                let main = document.createElement('a');
-                main.className = 'game-card'
-                main.href = '/games/1?VPlusGameId=' + i
-                let thumb = document.createElement('div')
-                thumb.className = 'game-card-thumb'
-                main.appendChild(thumb)
-                let gcbody = document.createElement('div')
-                gcbody.className = 'game-card-body'
-                main.appendChild(gcbody)
-                let gctitle = document.createElement('div')
-                gctitle.className = 'game-card-title'
-                gcbody.appendChild(gctitle)
-                gctitle.innerHTML = map.name
-                let gcmeta = document.createElement('div')
-                gcmeta.className = 'game-card-meta'
-                gcbody.appendChild(gcmeta)
-                let active = 0
-                if (gameStats[gameId]) {
-                    active = gameStats[gameId].active
+                        let main = document.createElement('a');
+                        main.className = 'game-card'
+                        main.href = '/games/1?V22GameId=' + i
+                        let thumb = document.createElement('div')
+                        thumb.className = 'game-card-thumb'
+                        main.appendChild(thumb)
+                        let gcbody = document.createElement('div')
+                        gcbody.className = 'game-card-body'
+                        main.appendChild(gcbody)
+                        let gctitle = document.createElement('div')
+                        gctitle.className = 'game-card-title'
+                        gcbody.appendChild(gctitle)
+                        gctitle.innerHTML = map.name
+                        let gcmeta = document.createElement('div')
+                        gcmeta.className = 'game-card-meta'
+                        gcbody.appendChild(gcmeta)
+                        let active = 0
+                        if (gameStats[gameId]) {
+                            active = gameStats[gameId].active
+                        }
+                        gcmeta.innerHTML = active + ' Playing'
+                        if (map.picture) {
+                            let gcpic = document.createElement('img')
+                            gcpic.alt = map.name
+                            gcpic.src = map.picture
+                            thumb.appendChild(gcpic)
+                        }
+                        document.getElementById('games-grid').appendChild(main);
+                    };
+                    return
+                } else {
+                    setTimeout(() => {
+                        waitForGamesLoaded()
+                    }, 100);
                 }
-                gcmeta.innerHTML = active + ' Playing'
-                if (map.picture) {
-                    let gcpic = document.createElement('img')
-                    gcpic.alt = map.name
-                    gcpic.src = map.picture
-                    thumb.appendChild(gcpic)
-                }
-                document.getElementById('games-grid').appendChild(main);
-            };
+            }
+            waitForGamesLoaded();
         } else if (document.location.pathname == '/games/1') {
             var url_string = document.URL;
             var url = new URL(url_string);
-            var gamei = url.searchParams.get("VPlusGameId");
+            var gamei = url.searchParams.get("V22GameId");
             if (gamei) {
                 let f = await fetch('/api/game-stats')
                 let gameStats = await f.json()
@@ -247,7 +256,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <a class="btn-play" href="https://vortex.towerstats.com/demo?VPlusGameId=${gamei}">Play</a>
+                            <a class="btn-play" href="https://vortex.towerstats.com/games/1/play?V22GameId=${gamei}">Play</a>
                         </div>
 
                         <div class="game-description-box">
@@ -261,7 +270,7 @@
 
             var url_string = document.URL;
             var url = new URL(url_string);
-            var gamei = url.searchParams.get("VPlusGameId");
+            var gamei = url.searchParams.get("V22GameId");
             let tmap
             if (gamei) {
                 tmap = maps[gamei]

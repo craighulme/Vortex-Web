@@ -13,6 +13,11 @@ function _clonePlayerFBX() {
     if (!src) return null;
 
     const clone = src.clone(true);
+    const toRemove = [];
+    clone.traverse(o => {
+        if (o.name === "_shirtOverlay") toRemove.push(o);
+    });
+    toRemove.forEach(o => o.parent?.remove(o));
 
     const srcBones = {}, cloneBones = {};
     src.traverse(n => { if (_isBone(n)) srcBones[n.name] = n; });
@@ -163,7 +168,7 @@ function _animateRemote(id, r, dt) {
     if (window.SWORD_FIGHT) {
         let sword = swords.get(id);
         if (!swords.has(id)) {
-            swords.set(id,false);
+            swords.set(id, false);
             console.log('no sword for id ' + id + ', making one now!')
             fbxLoader.load(importedAssets.swordMdl, (fbx) => {
                 fbx.scale.multiplyScalar(0.005);
@@ -176,7 +181,7 @@ function _animateRemote(id, r, dt) {
             });
             return
         }
-        if(!sword) return
+        if (!sword) return
         _setB(bones, rest, 'Right_Arm', 'x', -Math.PI * 0.5, 1, 1);
         bones.Right_Arm.position.y = 1.5
         bones.Right_Arm.position.z = -0.5
@@ -479,11 +484,11 @@ let _reconnectAttempts = 0;
 const _MAX_RECONNECTS = 3;
 
 async function connect() {
-    const res = await fetch(`/api/ws-ticket?game_id=${window.GAME_ID || 0}&fingerprint=${encodeURIComponent(window._fingerprint || '')}`).then(r => r.ok ? r.json() : null);
+    const res = await fetch(`/api/ws-ticket?game_id=${window.GAME_ID || 0}&fingerprint=${encodeURIComponent(window._fingerprint || '')}?fp_token=`).then(r => r.ok ? r.json() : null);
     if (!res) { console.log('failed to connect'); setTimeout(connect, 4000); return; }
 
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${proto}://${location.host}/ws/game?ticket=${res.ticket}`);
+    ws = new WebSocket(`${proto}://${location.host}/ws/play?t=${res.ticket}`);
 
     ws.onopen = () => {
         console.log('websocket opened');
@@ -531,7 +536,7 @@ function encodeNetworkData(data) { //10 bits total
     };
 }
 const url = new URL(document.URL);
-const gamei = url.searchParams.get("VPlusGameId");
+const gamei = url.searchParams.get("V22GameId");
 function decodeNetworkData(playerData, r) {
     let fractional = (playerData.ry * 100) % 1;
     let specialState = Math.round(fractional * 1024);
@@ -592,6 +597,9 @@ function handle(d) {
                 addRemote(p.id, p.username, p.is_staff, p.is_booster);
                 _showHealthBar(p.id)
             }
+            if (d.shirt_id) {
+                _vortex.applyShirt(d.shirt_id ? "/assets/clothing/" + d.shirt_id + ".png" : null);
+            }
             _showHealthBar(myId);
             fetchFriendData();
             break;
@@ -611,7 +619,7 @@ function handle(d) {
             break;
         }
 
-        case 'kick_log': {
+        case 'kickbroad': {
             Chat.clearPlayerMsg(d.username);
             Chat.systemRed(`${d.username} was kicked by ${d.by}.`);
             removeRemote(d.id);
@@ -633,6 +641,11 @@ function handle(d) {
             break;
         }
 
+        case "chat_muted": {
+            Chat.system("You have been muted for " + d.minutes + " minutes by an administrator.");
+            break;
+        }
+
         case 'chat_throttled': {
             Chat.warn(`Please wait ${d.wait}s before sending another message.`);
             break;
@@ -640,6 +653,26 @@ function handle(d) {
 
         case 'chat_blocked': {
             Chat.warn(d.msg);
+            break;
+        }
+
+        case "system": {
+            Chat.system(d.msg);
+            break;
+        }
+
+        case "shirt_update": {
+            const rp = remotes.get(d.id);
+            if (rp?.meshes) {
+                _vortex.applyShirtToMesh(rp.meshes.shirtMesh, d.shirt_id ? "/assets/clothing/" + d.shirt_id + ".png" : null);
+            } else {
+                const pending = pendingPlayers.get(msg.id);
+                if (pending) pending.shirt_id = msg.shirt_id;
+            }
+            break;
+        }
+        case "screen_open": {
+            window.openScreen?.(d.screen_id, d.token);
             break;
         }
 

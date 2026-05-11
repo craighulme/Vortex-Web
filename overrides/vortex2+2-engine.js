@@ -1,12 +1,42 @@
 //Made by inuk, for https://github.com/inuk84/Vortex-2-plus-2
 console.log('VORTEX ENGINE OVERRIDDEN!')
 
+const _loadingScreen = document.createElement("div");
+_loadingScreen.id = "loadingScreen";
+const _loadingLogo = document.createElement("div");
+_loadingLogo.id = "loadingLogo";
+_loadingLogo.textContent = "VORTEX 2+2";
+const _loadingBarBg = document.createElement("div");
+_loadingBarBg.id = "loadingBarBg";
+const _loadingBarFill = document.createElement("div");
+_loadingBarFill.id = "loadingBarFill";
+const _loadingText = document.createElement("div");
+_loadingText.id = "loadingText";
+_loadingBarBg.appendChild(_loadingBarFill);
+_loadingScreen.appendChild(_loadingLogo);
+_loadingScreen.appendChild(_loadingBarBg);
+document.body.appendChild(_loadingScreen);
+
+let _worldBuilt = false;
+
+THREE.DefaultLoadingManager.onStart = function (url, loaded, total) {
+    if (_worldBuilt) return;
+    _loadingScreen.classList.remove("hidden");
+};
+THREE.DefaultLoadingManager.onProgress = function (url, loaded, total) {
+    if (_worldBuilt) return;
+    _loadingBarFill.style.width = (loaded / total) * 100 + "%";
+};
+THREE.DefaultLoadingManager.onLoad = function () { };
+
+
+
 const STUDS_PER_TILE = 4;
-
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x87CEEB, 192, 480);
+scene.fog = new THREE.FogExp2(0x87CEEB, 0.1);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 3200);
+const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 3200);
+
 let enableShadows = localStorage.getItem('enableShadows');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setClearColor(0x87CEEB);
@@ -364,6 +394,7 @@ function getBone(...names) {
 
 let character = null;
 let _spawnPoint = { x: 0, y: null, z: 0, ry: Math.PI };
+let _shirtMesh = null;
 
 const fbxLoader = new THREE.FBXLoader();
 fbxLoader.load('assets/models/player.fbx', (fbx) => {
@@ -399,7 +430,7 @@ fbxLoader.load('assets/models/player.fbx', (fbx) => {
 
     scene.add(fbx);
     character = fbx;
-
+    _shirtMesh = _buildShirtOverlay(fbx);
     renderer.shadowMap.needsUpdate = true;
 });
 
@@ -409,7 +440,7 @@ const cam = {
     distance: 25.6,
     minPitch: -1.55,
     maxPitch: 1.55,
-    minDist: 0.4,
+    minDist: 2,
     maxDist: 512,
 };
 
@@ -481,18 +512,22 @@ renderer.domElement.addEventListener('click', () => {
     if (locked) {
         const cursorOver = _cursorOver;
         let guiHandled = false;
-
         const topbarEl = document.getElementById('hud-topbar');
         const lbFriendEl = document.getElementById('lb-player-panel');
         const lbBodyEl = document.getElementById('lb-body');
+        const shopGui = document.getElementById("shopPanel");
 
-        if (chatEl && !chatEl.classList.contains('hidden') && cursorOver(chatEl)) {
-            const sendBtnEl = document.getElementById('chat-send');
-            if (sendBtnEl && cursorOver(sendBtnEl)) {
-                window.Chat?.send();
-            } else {
-                window.Chat?.activate();
+        if (shopGui && shopGui.style.display !== "none" && _cursorOver(shopGui)) {
+            for (const btn of shopGui.querySelectorAll("button")) {
+                if (_cursorOver(btn)) {
+                    btn.click();
+                    return;
+                }
             }
+            return;
+        }
+        if (window.shop) {
+            window.shop?.activate();
             return;
         }
 
@@ -539,6 +574,16 @@ renderer.domElement.addEventListener('click', () => {
             toggleShadowsCheckBox.click();
         }
 
+        if (chatEl && !chatEl.classList.contains('hidden') && cursorOver(chatEl)) {
+            const sendBtnEl = document.getElementById('chat-send');
+            if (sendBtnEl && cursorOver(sendBtnEl)) {
+                window.Chat?.send();
+            } else {
+                window.Chat?.activate();
+            }
+            return;
+        }
+
         window.Leaderboard?.closeFriendPanel();
     }
     renderer.domElement.requestPointerLock();
@@ -577,7 +622,7 @@ toggleShadows.appendChild(toggleShadowsCheckBox);
 
 
 function makeSettingsSlider(text, min, max, def, step, onchange) {
-    def=localStorage.getItem(text) ? parseFloat(localStorage.getItem(text)) : def;
+    def = localStorage.getItem(text) ? parseFloat(localStorage.getItem(text)) : def;
     const sliderContainer = document.createElement('div');
     sliderContainer.className = 'sp-row';
     let sliderLeftText = document.createElement('span');
@@ -585,23 +630,22 @@ function makeSettingsSlider(text, min, max, def, step, onchange) {
     sliderLeftText.innerText = text
     let sliderSlider = document.createElement('input');
     sliderSlider.type = "range";
-    sliderSlider.min=min;
-    sliderSlider.max=max;
-    sliderSlider.step=step;
+    sliderSlider.min = min;
+    sliderSlider.max = max;
+    sliderSlider.step = step;
     let sliderRightText = document.createElement('span');
     sliderRightText.className = 'sp-val';
-    sliderRightText.innerText=def;
-    sliderSlider.oninput=function(){
+    sliderRightText.innerText = def;
+    sliderSlider.oninput = function () {
         sliderRightText.innerText = sliderSlider.value
-        localStorage.setItem(text,sliderSlider.value);
-        onchange(sliderSlider,Number(sliderSlider.value));
+        localStorage.setItem(text, sliderSlider.value);
+        onchange(sliderSlider, Number(sliderSlider.value));
     }
     sliderContainer.appendChild(sliderLeftText);
     sliderContainer.appendChild(sliderSlider);
     sliderContainer.appendChild(sliderRightText);
     settingsPanel.appendChild(sliderContainer);
-    sliderSlider.value=def;
-    console.log(sliderSlider.value)
+    sliderSlider.value = def;
 }
 
 const oofSound = new Audio(importedAssets.oofSound)
@@ -610,12 +654,12 @@ const swordSlashSound = new Audio(importedAssets.swordSlash);
 swordSlashSound.preload = "auto";
 swordSlashSound.volume = 0.8;
 
-makeSettingsSlider('Music volume',0,1,0.9,0.1,function(slider,val){
-    sfothThemeSong.volume=val;
+makeSettingsSlider('Music volume', 0, 1, 0.9, 0.1, function (slider, val) {
+    sfothThemeSong.volume = val;
 })
-makeSettingsSlider('Sfx volume',0,1,1,0.1,function(slider,val){
-    swordSlashSound.volume=val*0.8;
-    oofSound.volume=val;
+makeSettingsSlider('Sfx volume', 0, 1, 1, 0.1, function (slider, val) {
+    swordSlashSound.volume = val * 0.8;
+    oofSound.volume = val;
 })
 
 settingsPanel.appendChild(toggleShadows);
@@ -627,7 +671,7 @@ renderer.domElement.addEventListener('mousedown', e => {
     if (e.button === 0 && locked) {
         if (settingsPanel && settingsPanel.style.display !== 'none') {
             for (const slider of settingsPanel.querySelectorAll('input[type=range]')) {
-                if (_cursorOver(slider)) { _sliderDrag = slider; _sliderDragPreciseValue=parseFloat(slider.value); return; }
+                if (_cursorOver(slider)) { _sliderDrag = slider; _sliderDragPreciseValue = parseFloat(slider.value); return; }
             }
         }
         if (window.SWORD_FIGHT && !playerSpecialValues.slicing && canSlice) {
@@ -657,8 +701,8 @@ document.addEventListener('mousemove', e => {
         cursorEl.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
         const range = parseFloat(_sliderDrag.max) - parseFloat(_sliderDrag.min);
         let v = _sliderDragPreciseValue + e.movementX * range / _sliderDrag.offsetWidth;
-        _sliderDragPreciseValue= Math.max(parseFloat(_sliderDrag.min), Math.min(parseFloat(_sliderDrag.max), v));
-        v = Math.max(parseFloat(_sliderDrag.min), Math.min(parseFloat(_sliderDrag.max), Math.round(v/_sliderDrag.step)*_sliderDrag.step));
+        _sliderDragPreciseValue = Math.max(parseFloat(_sliderDrag.min), Math.min(parseFloat(_sliderDrag.max), v));
+        v = Math.max(parseFloat(_sliderDrag.min), Math.min(parseFloat(_sliderDrag.max), Math.round(v / _sliderDrag.step) * _sliderDrag.step));
         _sliderDrag.value = v;
         _sliderDrag.dispatchEvent(new Event('input', { bubbles: true }));
         return;
@@ -672,7 +716,7 @@ document.addEventListener('mousemove', e => {
         cursorEl.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
     }
 });
-
+let camWantDist = cam.distance;
 renderer.domElement.addEventListener('wheel', e => {
     if (locked) {
         for (const id of ['chat-messages', 'lb-body']) {
@@ -685,8 +729,9 @@ renderer.domElement.addEventListener('wheel', e => {
             }
         }
     }
-    cam.distance = Math.max(cam.minDist, Math.min(cam.maxDist, cam.distance + e.deltaY * 0.015));
-    if (cam.distance < 2) {
+    camWantDist = Math.max(cam.minDist, Math.min(cam.maxDist, camWantDist * (1+e.deltaY * 0.0005)+e.deltaY * 0.01));
+    if (camWantDist < 2) {
+        camWantDist=2
         setMouseLock(true)
     } else {
         setMouseLock(shiftLock)
@@ -998,7 +1043,6 @@ function resolveBlocksV(nearby, dt) {
             if (fy < b.minY) {
                 let goal = b.minY - CHAR_HEIGHT + CHAR_FOOT_OFFSET;
                 let change = goal - character.position.y;
-                if (change > 0) grounded = true;
                 character.position.y += Math.sign(change) * Math.min(Math.abs(change), STEP_CLIMB_SPEED * dt);
                 if (velY > 0) velY = 0;
             }
@@ -1128,8 +1172,10 @@ function update(dt) {
 
     dt = Math.min(dt, 0.05);
 
-    if (keys['KeyI']) cam.distance = Math.max(cam.minDist, cam.distance - CAM_KEY_ZOOM_SPEED * dt);
-    if (keys['KeyO']) cam.distance = Math.min(cam.maxDist, cam.distance + CAM_KEY_ZOOM_SPEED * dt);
+    let cdlerp = dt*20;
+    if (keys['KeyI']) camWantDist = Math.max(cam.minDist, camWantDist * (1-CAM_KEY_ZOOM_SPEED * dt*0.05) - CAM_KEY_ZOOM_SPEED * dt*0.9);
+    if (keys['KeyO']) camWantDist = Math.min(cam.maxDist, camWantDist * (1+CAM_KEY_ZOOM_SPEED * dt*0.05) + CAM_KEY_ZOOM_SPEED * dt*0.9);
+    cam.distance=cam.distance*(1-cdlerp)+camWantDist*cdlerp;
 
     if (climbState === 'hanging') {
         const px0 = character.position.x, pz0 = character.position.z;
@@ -1389,8 +1435,9 @@ function updateCamera() {
     );
 
     let cdist = cam.distance
-    isFirstPerson = cdist < 2;
+    isFirstPerson = cdist <= 2.001;
     if (isFirstPerson) {
+        setMouseLock(true)
         cdist = 0.5;
         pivot.x -= sinYaw * 1;
         pivot.z -= cosYaw * 1;
@@ -1567,6 +1614,15 @@ window._vortex = {
             character.position.set(x, y + CHAR_FOOT_OFFSET, z);
             character.rotation.y = ry;
         }
+    },
+    applyShirt(url) {
+        _applyShirtToMesh(_shirtMesh, url);
+    },
+    applyShirtToMesh(mesh, url) {
+        _applyShirtToMesh(mesh, url);
+    },
+    buildShirtOverlay(target) {
+        return _buildShirtOverlay(target);
     },
 };
 
