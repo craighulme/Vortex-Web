@@ -123,7 +123,7 @@ const maps = [
 
         spawnPoints: [[53, 60, 0]],
 
-        VOID_DIE: true
+        VOID_DIE: true // you fall into the void and DIE... you cannot walk around that one
     }, // added by exelerantt, 5/14/26 (american date)
 ];
 
