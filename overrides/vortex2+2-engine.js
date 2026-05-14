@@ -35,7 +35,8 @@ const STUDS_PER_TILE = 4;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x87CEEB, 192, 486);
 
-const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 3200);
+let fov = 85;
+const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 3200);
 
 let enableShadows = localStorage.getItem('enableShadows');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -123,7 +124,8 @@ function flushInstances() {
 }
 
 const _dummy = new THREE.Object3D();
-
+const stud_datas = [];
+const objects = [];
 function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0) {
     const mesh = new THREE.Mesh(
         getCachedGeo(sw, sh, sd),
@@ -135,9 +137,9 @@ function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
-
+    let b;
     if (rx === 0 && ry === 0 && rz === 0) {
-        const b = {
+        b = {
             minX: x - sw / 2, maxX: x + sw / 2,
             minY: y, maxY: y + sh,
             minZ: z - sd / 2, maxZ: z + sd / 2,
@@ -150,11 +152,14 @@ function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0) {
             ry -= 45
             sx, sz = sz, -sx
         }
-        const b = buildOBB(sw, sh, sd, x, cy, z, rx, ry, rz);
+        b = buildOBB(sw, sh, sd, x, cy, z, rx, ry, rz);
         colliders.push(b);
         insertToChunks(b);
     }
-    return mesh;
+    let stud_id = stud_datas.push({ mesh: mesh, b: b }) - 1;
+    mesh.stud_id = stud_id;
+    objects.push(mesh);
+    return [mesh, stud_id];
 }
 
 
@@ -210,6 +215,59 @@ function insertToChunks(b) {
                 chunkMap.get(key).add(b);
             }
         }
+    }
+}
+
+function removeMatching_map(a, b) {
+    for (const [key, value] of a.entries()) {
+        if (JSON.stringify(value) === JSON.stringify(b)) {
+            a.delete(key);
+        }
+    }
+}
+function removeMatching_array(arr, b) {
+    for (let i = arr.length - 1; i >= 0; i--) {
+        if (JSON.stringify(arr[i]) === JSON.stringify(b)) {
+            arr.splice(i, 1);
+        }
+    }
+}
+
+function removeCollider(b) {
+    const x0 = worldToChunk(b.minX), x1 = worldToChunk(b.maxX);
+    const y0 = worldToChunk(b.minY), y1 = worldToChunk(b.maxY);
+    const z0 = worldToChunk(b.minZ), z1 = worldToChunk(b.maxZ);
+    for (let cx = x0; cx <= x1; cx++) {
+        for (let cy = y0; cy <= y1; cy++) {
+            for (let cz = z0; cz <= z1; cz++) {
+                const key = chunkKey(cx, cy, cz);
+                if (!chunkMap.has(key)) continue;
+                removeMatching_map(chunkMap.get(key), b);
+            }
+        }
+    }
+    removeMatching_array(colliders, b);
+}
+
+function removeStud(stud_id) {
+    let data = stud_datas[stud_id];
+    if (data) {
+        let mesh = data.mesh;
+        let b = data.b;
+        if (b) {
+            removeCollider(b);
+        }
+        if (mesh) {
+            scene.remove(mesh);
+        }
+
+        for (let i = 0; i < objects.length; i++) {
+            if (objects[i].stud_id == stud_id) {
+                objects.splice(i, 1);
+                break;
+            }
+        }
+        stud_datas[stud_id] = null;
     }
 }
 
@@ -398,8 +456,8 @@ let _shirtMesh = null;
 
 const fbxLoader = new THREE.FBXLoader();
 fbxLoader.load('assets/models/player.fbx', (fbx) => {
-    const helper = new THREE.SkeletonHelper(fbx.children[0]);
-    scene.add(helper);
+    //const helper = new THREE.SkeletonHelper(fbx.children[0]);
+    //scene.add(helper);
 
     fbx.position.set(0, 0, 0);
     fbx.updateMatrixWorld(true);
@@ -664,6 +722,182 @@ makeSettingsSlider('Sfx volume', 0, 1, 1, 0.1, function (slider, val) {
 
 settingsPanel.appendChild(toggleShadows);
 
+
+var raycaster = new THREE.Raycaster();
+
+function getClicked3DPoint() {
+    let mpos = new THREE.Vector3();
+    mpos.x = ((cursorX / window.innerWidth) * 2) - 1;
+    mpos.y = -(((cursorY / window.innerHeight) * 2) - 1);
+
+    raycaster.setFromCamera(mpos, camera);
+    var intersects = raycaster.intersectObjects(objects);
+
+    if (intersects.length > 0) {
+        return [intersects[0].point, intersects[0].face.normal, intersects[0].object];
+    } else {
+        return [false, false, false]
+    }
+};
+
+const BLOCK_COLORS = [
+    0x111111,  // black
+    0x555555,  // dark gray
+    0xEBEBEB,  // white
+
+    0xD83C2A,  // red
+    0xD87A3A,  // orange
+    0xD8C85A,  // yellow
+    0x3AD85A,  // green
+    0x4AC7D8,  // cyan
+    0x4A6FD8,  // blue
+
+    0xAAAAAA,  // light gray
+    0xF2D2BD,  // sand
+    0xD6B3FF,  // pink purple ish
+    0xFFB6C1,  // pink
+    0xFF7E7E,  // light red
+    0xFFC58E,  // light orange
+    0xFFF59E,  // light yellow
+    0xB8F59E,  // light green
+    0x9EF5E8,  // aqua
+    0xA5C8FF,  // light blue
+
+
+    0x222222,  // near black
+    0x4A3422,  // dark brown
+    0x3B136E,  // purple
+    0x5C224D,  // dark pink
+    0x4A0C0C,  // dark red
+    0x5A2A0A,  // brown-orange
+    0x5A5010,  // olive
+    0x1E4A1E,  // dark green
+    0x103C46,  // dark cyan
+    0x1A237A,  // dark blue
+];
+
+const MAX_BLOCKS = 500;
+
+function validPlacement(x,y,z){
+    if(myBlocks.length>=MAX_BLOCKS) return false
+    if(Math.abs(x)<10||Math.abs(z)<10) return false
+    if(Math.abs(x)>147||Math.abs(z)>147) return false
+    if(Math.abs(x)+Math.abs(z)<46) return false
+    if(y<=1.5) return false
+    return true;
+}
+
+let BlockDisplayMesh;
+let selectedBlockState = 1;
+function update_Display_Block() {
+    if (!(BlockDisplayMesh)) {
+        BlockDisplayMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(2.01, 2.01, 2.01),
+            new THREE.MeshStandardMaterial({ color: 0x123456, transparent: true, opacity: 0.5 }),
+        );
+        BlockDisplayMesh.position.y = -9999;
+        scene.add(BlockDisplayMesh);
+    }
+    let [point, normal, hit] = getClicked3DPoint();
+    if (point) {
+        let roundedPoint = point.add(normal.multiplyScalar(1));
+        roundedPoint.x = Math.round(roundedPoint.x);
+        roundedPoint.y = Math.round(roundedPoint.y);
+        roundedPoint.z = Math.round(roundedPoint.z);
+
+        if (selectedBlockState < 1) {
+            if (hit.stud_id && blocks.has(`block_${hit.position.x}_${hit.position.y}_${hit.position.z}`)) {
+                roundedPoint.copy(hit.position);
+            } else {
+                BlockDisplayMesh.position.y = -9999;
+                return
+            }
+        }
+
+
+        BlockDisplayMesh.position.x = roundedPoint.x;
+        BlockDisplayMesh.position.y = roundedPoint.y;
+        BlockDisplayMesh.position.z = roundedPoint.z;
+
+        let colhex = selectedBlockState < 1 ? 0xFF0000 : BLOCK_COLORS[selectedBlockState - 1];
+        if(!validPlacement(roundedPoint.x,roundedPoint.y,roundedPoint.z)) colhex=0xFF0000
+        let cb = (colhex % 0x100) / 255;
+        let cg = (Math.floor(colhex / 0x100) % 0x100) / 255;
+        let cr = (Math.floor(colhex / 0x10000) % 0x100) / 255;
+
+        BlockDisplayMesh.material.color.r = cr * 0.5 + 0.1;
+        BlockDisplayMesh.material.color.g = cg * 0.5 + 0.1;
+        BlockDisplayMesh.material.color.b = cb * 0.5 + 0.1;
+        BlockDisplayMesh.material.transparent = true;
+        BlockDisplayMesh.material.opacity = Math.sin(performance.now() * 0.007) * 0.1 + 0.4;
+    } else {
+        BlockDisplayMesh.position.y = -9999;
+    }
+}
+
+let toolbuttons = []
+let blockCounter;
+async function makeToolButtons() {
+    if(!window.map){
+        setTimeout(() => {
+            makeToolButtons()
+        }, 100);
+        return
+    }
+    if (window.BUILD_MODE) {
+        let toolbar = document.createElement('div');
+        toolbar.style = `
+        position: absolute;
+        bottom: 10px;
+        right: 30%;
+        width: 40%;
+        display: grid;
+        gap: 4px;
+        pointer-events: all;
+        justify-content: center;
+        grid-template-columns: repeat(10,32px);
+    `
+        for (let i = 0; i < BLOCK_COLORS.length + 1; i++) {
+            let button = document.createElement('button');
+            button.className = 'hud-btn';
+            let colhex = i == 0 ? 0xFF0000 : BLOCK_COLORS[i - 1];
+            let cb = (colhex % 0x100);
+            let cg = (Math.floor(colhex / 0x100) % 0x100);
+            let cr = (Math.floor(colhex / 0x10000) % 0x100);
+            if (i == 0) {
+                button.innerText = 'X'
+                button.style = `
+                color: rgba(${cr}, ${cg}, ${cb}, 90%) !important;
+                height: 32px;
+                flex: 1 0 8%;
+            `;
+            }
+            else {
+                button.style = `
+                background: rgba(${cr}, ${cg}, ${cb}, 90%) !important;
+                height: 32px;
+                flex: 1 0 8%;
+            `;
+            };
+
+            button.onclick = function () {
+                selectedBlockState = i;
+            }
+            toolbar.appendChild(button);
+            toolbuttons[i] = button;
+        }
+
+        blockCounter = document.createElement('p');
+        blockCounter.style="height: 32px;color: rgb(255 255 255 / 90%) !important;position: absolute;left: 30%;width: 40%;bottom: 100px;text-align: center;text-shadow: 1px 1px 5px black;";
+        blockCounter.innerText='0/'+MAX_BLOCKS;
+        toolbar.appendChild(blockCounter);
+
+        document.getElementById('hud').appendChild(toolbar);
+    }
+}
+
+makeToolButtons()
+
 let _sliderDragPreciseValue = 0;
 let canSlice = true;
 renderer.domElement.addEventListener('mousedown', e => {
@@ -685,6 +919,30 @@ renderer.domElement.addEventListener('mousedown', e => {
                     canSlice = true
                 }, 100);
             }, 500);
+        } else if (window.BUILD_MODE) {
+            for (let i = 0; i < toolbuttons.length; i++) {
+                let btn = toolbuttons[i];
+                if (_cursorOver(btn)) {
+                    btn.click();
+                    return
+                }
+            }
+            let [point, normal, hit] = getClicked3DPoint();
+            if (point) {
+                let roundedPoint = point.add(normal.multiplyScalar(1));
+                roundedPoint.x = Math.round(roundedPoint.x);
+                roundedPoint.y = Math.round(roundedPoint.y);
+                roundedPoint.z = Math.round(roundedPoint.z);
+
+                if (selectedBlockState == 0) {
+                    if (hit.stud_id) {
+                        roundedPoint.copy(hit.position);
+                    } else {
+                        return
+                    }
+                }
+                _setBlockState(myId, roundedPoint.x, roundedPoint.y, roundedPoint.z, selectedBlockState);
+            }
         }
     }
 });
@@ -729,9 +987,9 @@ renderer.domElement.addEventListener('wheel', e => {
             }
         }
     }
-    camWantDist = Math.max(cam.minDist, Math.min(cam.maxDist, camWantDist * (1+e.deltaY * 0.0005)+e.deltaY * 0.01));
+    camWantDist = Math.max(cam.minDist, Math.min(cam.maxDist, camWantDist * (1 + e.deltaY * 0.0005) + e.deltaY * 0.01));
     if (camWantDist < 2) {
-        camWantDist=2
+        camWantDist = 2
         setMouseLock(true)
     } else {
         setMouseLock(shiftLock)
@@ -1172,10 +1430,10 @@ function update(dt) {
 
     dt = Math.min(dt, 0.05);
 
-    let cdlerp = dt*20;
-    if (keys['KeyI']) camWantDist = Math.max(cam.minDist, camWantDist * (1-CAM_KEY_ZOOM_SPEED * dt*0.05) - CAM_KEY_ZOOM_SPEED * dt*0.9);
-    if (keys['KeyO']) camWantDist = Math.min(cam.maxDist, camWantDist * (1+CAM_KEY_ZOOM_SPEED * dt*0.05) + CAM_KEY_ZOOM_SPEED * dt*0.9);
-    cam.distance=cam.distance*(1-cdlerp)+camWantDist*cdlerp;
+    let cdlerp = dt * 20;
+    if (keys['KeyI']) camWantDist = Math.max(cam.minDist, camWantDist * (1 - CAM_KEY_ZOOM_SPEED * dt * 0.05) - CAM_KEY_ZOOM_SPEED * dt * 0.9);
+    if (keys['KeyO']) camWantDist = Math.min(cam.maxDist, camWantDist * (1 + CAM_KEY_ZOOM_SPEED * dt * 0.05) + CAM_KEY_ZOOM_SPEED * dt * 0.9);
+    cam.distance = cam.distance * (1 - cdlerp) + camWantDist * cdlerp;
 
     if (climbState === 'hanging') {
         const px0 = character.position.x, pz0 = character.position.z;
@@ -1419,6 +1677,8 @@ function update(dt) {
     }
 
     updateAnimations(dt, moving);
+
+    if (window.BUILD_MODE) update_Display_Block();
 }
 function updateCamera() {
     if (!character) return;

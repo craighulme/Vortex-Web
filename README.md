@@ -1,9 +1,6 @@
 Vortex2+2 is an extension for [vortex](https://vortex.towerstats.com/) to add many more features
 Please join the [Vortex2+2 & AIS discord server](https://discord.gg/3Rphp3duKR) to get early releases and sneak peaks, and submit suggestions for vortex2+2 and AIS!
 
-*This project is independently developed and is not a fork of Vortex+/VortexPro.*
-*The owner of Vortex+/VortexPro is known for harassing people and spreading misinformation about Vortex2+2*
-
 Credits:
 - Search engine originally created by enk, modified and used with permission
 
@@ -12,8 +9,9 @@ current features are:
 - Map loader
 - Normal mapping
 - Shadows
-- 2 Custom games
-- Fully functional multiplayer health and sword system
+- Custom games
+- Multiplayer health and sword system
+- Multiplayer building game
 
 **If you encounter any issues with Vortex2+2 breaking the game,**
 **please check if you have any other extentions installed and disable them.**
@@ -25,6 +23,15 @@ installation:
 3. go to chrome://extensions
 4. enable developer mode
 5. press 'load unpacked' and select the folder containing this file!
+
+Vortex2+2 Building game:
+
+![Vortex2+2 Building game](https://i.imgur.com/SooHiwI.jpeg)
+
+
+Sword fight on the heights:
+
+![Sword fight on the heights](https://media.discordapp.net/attachments/1497640288687100115/1502972700874899556/image.png?ex=6a06ede7&is=6a059c67&hm=a74ea0a22261862d10508df7a5e77764839d42ed480882d742e39d35c1ca3dc8&=&format=webp&quality=lossless)
 
 
 If you like vortex2+2 please consider starring this github and sharing this with your friends!

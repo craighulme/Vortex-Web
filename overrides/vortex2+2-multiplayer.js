@@ -15,7 +15,7 @@ function _clonePlayerFBX() {
     const clone = src.clone(true);
     const toRemove = [];
     clone.traverse(o => {
-        if (o.name === "_shirtOverlay") toRemove.push(o);
+        if (o.name === "ShirtOverlay") toRemove.push(o);
     });
     toRemove.forEach(o => o.parent?.remove(o));
 
@@ -81,7 +81,7 @@ function makeRemote(username, id, shirtUrl) {
     grp.traverse(n => { if (_isBone(n)) bones[n.name] = n; });
     const rest = _vortex.getAnimRest();
     const shirtMesh = _vortex.buildShirtOverlay(grp);
-    if (shirtMesh && shirtUrl) {
+    if (shirtMesh) {
         _vortex.applyShirtToMesh(shirtMesh, shirtUrl);
     }
     return { grp, bones, rest, shirtMesh };
@@ -516,18 +516,87 @@ async function connect() {
 }
 
 let specialReplicatedNumber = 0
+let blockChangeBuffer = [];
+let myBlocks = [];
+function saveBlocks() {
+    let stringed = JSON.stringify(myBlocks);
+    localStorage.setItem('blocks', stringed);
+}
+function loadBlocks() {
+    let stringed = localStorage.getItem('blocks');
+    if (stringed) {
+        let savedBlokcs = JSON.parse(stringed);
+        for (let i = 0; i < savedBlokcs.length; i++) {
+            let b = savedBlokcs[i];
+            let sp = b.split(',');
+            _setBlockState(myId?myId:-1, sp[0], sp[1], sp[2], sp[3])
+        }
+    }
+}
+let encodeFrame = 0;
 function encodeNetworkData(data) { //10 bits total
-    let healthBits = Math.round(Math.min(Math.max(0, playerSpecialValues.health * 15), 15)); //4 bits (0-3)
-    let slicingBits = playerSpecialValues.slicing ? 16 : 0; //1 bit (4-4)
-    //5-8 are currently unused
+    let ry = data.ry;
+    encodeFrame++;
+    if (window.SWORD_FIGHT) {
+        let healthBits = Math.round(Math.min(Math.max(0, playerSpecialValues.health * 15), 15)); //4 bits (0-3)
+        let slicingBits = playerSpecialValues.slicing ? 16 : 0; //1 bit (4-4)
+        //5-8 are currently unused
 
-    let syncNormalData = 512; //1 bit (9-9) for now, always use the regular old vortex data.
+        let syncNormalData = 512; //1 bit (9-9) for now, always use the regular old vortex data.
 
-    specialReplicatedNumber = healthBits + slicingBits + syncNormalData
+        specialReplicatedNumber = healthBits + slicingBits + syncNormalData
 
-    let ryBase = Math.round(data.ry * 100) / 100;
+        let ryBase = Math.round(data.ry * 100) / 100;
+        ry = ryBase + (specialReplicatedNumber / 1024) * 0.01;
+    } else if (window.BUILD_MODE) {
+        if (blocks.size > 0 && encodeFrame % 4 == 0) {
+            let a = null;
+            let b = null;
+            blocks.forEach(block => {
+                if (block.owner == myId && (!a || block.last_sync < b.last_sync)) {
+                    a = `block_${block.x}_${block.y}_${block.z}`;
+                    b = block;
+                }
+            });
+            if (b) {
+                b.last_sync = encodeFrame;
+                blocks.set(a, b);
+                let anim = data.anim;
+                blockChangeBuffer.splice(0, 1)
+                return {
+                    type: data.type,
+                    x: b.y,
+                    y: b.z,
+                    z: b.state,
+                    ry: b.x,
+                    anim,
+                };
+            }
 
-    let ry = ryBase + (specialReplicatedNumber / 1024) * 0.01;
+        } else if (blockChangeBuffer.length > 0 && encodeFrame % 4 < 3) {
+            let bchange = blockChangeBuffer[0];
+
+            let bx = bchange[0];
+            let by = bchange[1];
+            let bz = bchange[2];
+            let bstate = bchange[3];
+            let anim = data.anim;
+            blockChangeBuffer.splice(0, 1)
+            return {
+                type: data.type,
+                x: by,
+                y: bz,
+                z: bstate,
+                ry: bx,
+                anim,
+            };
+        }
+        specialReplicatedNumber = 512
+
+        let ryBase = Math.round(data.ry * 100) / 100;
+        ry = ryBase + (specialReplicatedNumber / 1024) * 0.01;
+    }
+
     let anim = data.anim;
     return {
         type: data.type,
@@ -538,38 +607,137 @@ function encodeNetworkData(data) { //10 bits total
         anim,
     };
 }
+
+
+const blocks = new Map();
+let canPlace = false;
+//inuk's custom building system!
+function _setBlockState(userid, x, y, z, state) {
+    if(!canPlace) return
+    if (!validPlacement(x, y, z)) return
+    let blockKeyName = `block_${x}_${y}_${z}`
+    if (state == 0) {
+        if (blocks.has(blockKeyName)) {
+            let blockData = blocks.get(blockKeyName);
+            if (blockData.owner == userid || blockData.owner == -1) {
+                removeStud(blockData.stud_id);
+                blocks.delete(blockKeyName);
+            }
+        }
+    } else if (!blocks.has(blockKeyName)) {
+        let [mesh, stud_id] = addStud(2, 2, 2, BLOCK_COLORS[state - 1], x, y - 1, z);
+        blocks.set(blockKeyName, { owner: userid, stud_id: stud_id, last_sync: 0, x, y, z, state });
+    } else {
+        let blockData = blocks.get(blockKeyName);
+        if (blockData.owner == userid || blockData.owner == -1) {
+            removeStud(blockData.stud_id);
+            let [mesh, stud_id] = addStud(2, 2, 2, BLOCK_COLORS[state - 1], x, y - 1, z);
+            blocks.set(blockKeyName, { owner: userid, stud_id: stud_id, last_sync: 0, x, y, z, state });
+        }
+    }
+    if (userid == myId || userid == -1) {
+        if (state > 0) {
+            myBlocks.push(`${x},${y},${z},${state}`);
+        } else {
+            for (let i = 0; i < myBlocks.length; i++) {
+                if (myBlocks[i].startsWith(`${x},${y},${z}`)) {
+                    myBlocks.splice(i, 1);
+                    break;
+                }
+            }
+        }
+        saveBlocks();
+        blockChangeBuffer.push([x, y, z, state]);
+        blockCounter.innerText = myBlocks.length + '/' + MAX_BLOCKS;
+        if (myBlocks.length >= MAX_BLOCKS) {
+            blockCounter.style.color = 'rgb(255 0 0 / 90%)'
+        } else {
+            blockCounter.style.color = 'rgb(255 255 255 / 90%)'
+        }
+    }
+}
+
+function removeBlocks(userid) {
+    blocks.forEach(b => {
+        if (b.owner == userid) {
+            removeStud(b.stud_id);
+            blocks.delete(`block_${b.x}_${b.y}_${b.z}`);
+        }
+    });
+}
+
+
 const url = new URL(document.URL);
 const gamei = url.searchParams.get("V22GameId");
 function decodeNetworkData(playerData, r) {
     let fractional = (playerData.ry * 100) % 1;
     let specialState = Math.round(fractional * 1024);
 
-    let healthBits = (specialState >>> 0) & ((1 << 4) - 1);
-    let slicingBits = (specialState >>> 4) & ((1 << 1) - 1);
-    if (!customPlayerData[playerData.id]) {
-        customPlayerData[playerData.id] = {
-            health: 1,
-            slicing: false,
+    if (window.SWORD_FIGHT) {
+        let healthBits = (specialState >>> 0) & ((1 << 4) - 1);
+        let slicingBits = (specialState >>> 4) & ((1 << 1) - 1);
+        if (!customPlayerData[playerData.id]) {
+            customPlayerData[playerData.id] = {
+                health: 1,
+                slicing: false,
+            }
         }
-    }
-    if (customPlayerData[playerData.id]) {
-        customPlayerData[playerData.id].health = healthBits / 15;
-        customPlayerData[playerData.id].slicing = (slicingBits > 0);
+        if (customPlayerData[playerData.id]) {
+            customPlayerData[playerData.id].health = healthBits / 15;
+            customPlayerData[playerData.id].slicing = (slicingBits > 0);
+        } else {
+            customPlayerData[playerData.id] = {
+                health: healthBits / 15,
+                slicing: (slicingBits > 0),
+            }
+        }
+
+
+        let syncNormalData = (specialState & 512) !== 0;
+        if (!gamei) {
+            syncNormalData = true;
+        }
+        if (syncNormalData) {
+            r.tPos.set(playerData.x, playerData.y, playerData.z);
+            r.tRy = Math.round(playerData.ry * 100) / 100;
+            r.anim = playerData.anim;
+            r.seen = performance.now();
+            if (r.meshes && !r.meshes.grp.visible) {
+                r.meshes.grp.position.copy(r.tPos);
+                r.meshes.grp.rotation.y = playerData.ry;
+                r.meshes.grp.visible = true;
+            }
+        } else {
+            //I'm planning on using the xyz fields to replicate even more data in the future, not sure what tho
+        }
+    } else if (window.BUILD_MODE) {
+        let syncNormalData = (specialState & 512) !== 0;
+        if (!gamei) {
+            syncNormalData = true;
+        }
+        if (syncNormalData) {
+            r.tPos.set(playerData.x, playerData.y, playerData.z);
+            r.tRy = Math.round(playerData.ry * 100) / 100;
+            r.anim = playerData.anim;
+            r.seen = performance.now();
+            if (r.meshes && !r.meshes.grp.visible) {
+                r.meshes.grp.position.copy(r.tPos);
+                r.meshes.grp.rotation.y = playerData.ry;
+                r.meshes.grp.visible = true;
+            }
+        } else {
+            let x_block = Math.round(playerData.ry);
+            let y_block = Math.round(playerData.x);
+            let z_block = Math.round(playerData.y);
+            let state_block = Math.round(playerData.z);
+            let fraction_1 = playerData.x - y_block;
+            let fraction_2 = playerData.y - z_block;
+            let fraction_3 = playerData.z - state_block;
+            _setBlockState(playerData.id, x_block, y_block, z_block, state_block);
+        }
     } else {
-        customPlayerData[playerData.id] = {
-            health: healthBits / 15,
-            slicing: (slicingBits > 0),
-        }
-    }
-
-
-    let syncNormalData = (specialState & 512) !== 0;
-    if (!gamei) {
-        syncNormalData = true;
-    }
-    if (syncNormalData) {
         r.tPos.set(playerData.x, playerData.y, playerData.z);
-        r.tRy = Math.round(playerData.ry * 100) / 100;
+        r.tRy = playerData.ry;
         r.anim = playerData.anim;
         r.seen = performance.now();
         if (r.meshes && !r.meshes.grp.visible) {
@@ -577,9 +745,8 @@ function decodeNetworkData(playerData, r) {
             r.meshes.grp.rotation.y = playerData.ry;
             r.meshes.grp.visible = true;
         }
-    } else {
-        //I'm planning on using the xyz fields to replicate even more data in the future, like skin colors or cosmetics!
     }
+
 }
 
 function handle(d) {
@@ -600,11 +767,13 @@ function handle(d) {
                 addRemote(p.id, p.username, p.is_staff, p.is_booster, p.shirt_id);
                 _showHealthBar(p.id)
             }
-            if (d.shirt_id) {
-                _vortex.applyShirt(d.shirt_id ? "/assets/clothing/" + d.shirt_id + ".png" : null);
-            }
+            _vortex.applyShirt(d.shirt_id ? "/assets/clothing/" + d.shirt_id + ".png" : null);
             _showHealthBar(myId);
             fetchFriendData();
+            if (window.BUILD_MODE) {
+                canPlace=true;
+                loadBlocks();
+            }
             break;
         }
 
@@ -619,6 +788,7 @@ function handle(d) {
         case 'leave': {
             Chat.systemPlayer(d.username, `${d.username} left.`, false);
             removeRemote(d.id);
+            if (window.BUILD_MODE) removeBlocks(d.id)
             break;
         }
 

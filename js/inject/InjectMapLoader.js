@@ -5,7 +5,7 @@
 
   const script = document.createElement('script');
   script.src = scriptURL;
-  script.defer = true;
+  script.async = true;
   script.type = 'text/javascript';
   document.documentElement.appendChild(script);
 })();

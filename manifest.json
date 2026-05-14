@@ -10,7 +10,6 @@
     "128": "img/icon/128.png"
   },
   "host_permissions": [
-    "https://pastebin.com/*",
     "https://vortex.towerstats.com/"
   ],
   "permissions": [
