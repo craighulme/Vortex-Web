@@ -6,8 +6,9 @@ const importedAssets = {
     swordMdl: chrome.runtime.getURL("mdl/swordMdl.fbx"),
 
     swordSlash: chrome.runtime.getURL("sounds/swordSlash.mp3"),
-
+    placeBlock: chrome.runtime.getURL("sounds/placeBlock.mp3"),
     sfothSong: chrome.runtime.getURL("sounds/sfothSong.mp3"),
+    buildSong: chrome.runtime.getURL("sounds/buildSong.mp3"),
 
     oofSound: chrome.runtime.getURL("sounds/oof.mp3")
 };

@@ -123,6 +123,11 @@ function flushInstances() {
     }
 }
 
+const colliders = [];
+
+const CHUNK_SIZE = 4;
+const chunkMap = new Map();
+
 const _dummy = new THREE.Object3D();
 const stud_datas = [];
 const objects = [];
@@ -156,7 +161,7 @@ function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0) {
         colliders.push(b);
         insertToChunks(b);
     }
-    let stud_id = stud_datas.push({ mesh: mesh, b: b }) - 1;
+    let stud_id = stud_datas.push({ mesh, b }) - 1;
     mesh.stud_id = stud_id;
     objects.push(mesh);
     return [mesh, stud_id];
@@ -194,11 +199,6 @@ const ground = new THREE.Mesh(
 );
 ground.receiveShadow = true;
 scene.add(ground);
-
-const colliders = [];
-
-const CHUNK_SIZE = 4;
-const chunkMap = new Map();
 
 function chunkKey(cx, cy, cz) { return `${cx},${cy},${cz}`; }
 function worldToChunk(x) { return Math.floor(x / CHUNK_SIZE); }
@@ -509,9 +509,9 @@ function setMouseLock(sl) {
     mouseLock = sl;
     crosshair.style.display = mouseLock ? 'block' : 'none';
     cursorEl.style.display = mouseLock ? 'none' : 'block';
+    cursorX = window.innerWidth / 2;
+    cursorY = window.innerHeight / 2;
     if (!mouseLock) {
-        cursorX = window.innerWidth / 2;
-        cursorY = window.innerHeight / 2;
         cursorEl.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
         if (character) {
             character.rotation.y = ((character.rotation.y % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -556,11 +556,11 @@ function _cursorOver(el) {
     return cursorX >= r.left && cursorX <= r.right && cursorY >= r.top && cursorY <= r.bottom;
 }
 
-const sfothThemeSong = new Audio(importedAssets.sfothSong);
-sfothThemeSong.loop = true;
-sfothThemeSong.preload = "auto";
-sfothThemeSong.volume = 0.9;
-sfothThemeSong.addEventListener('ended', function () {
+const gameSong = new Audio(window.SWORD_FIGHT ? importedAssets.sfothSong : (importedAssets.buildSong));
+gameSong.loop = true;
+gameSong.preload = "auto";
+gameSong.volume = 0.9;
+gameSong.addEventListener('ended', function () {
     this.currentTime = 0;
     this.play();
 }, false);
@@ -573,20 +573,14 @@ renderer.domElement.addEventListener('click', () => {
         const topbarEl = document.getElementById('hud-topbar');
         const lbFriendEl = document.getElementById('lb-player-panel');
         const lbBodyEl = document.getElementById('lb-body');
-        const shopGui = document.getElementById("shopPanel");
+        const getButton = document.getElementById("pm-get");
+        const cancelButton = document.getElementById('pm-cancel')
 
-        if (shopGui && shopGui.style.display !== "none" && _cursorOver(shopGui)) {
-            for (const btn of shopGui.querySelectorAll("button")) {
-                if (_cursorOver(btn)) {
-                    btn.click();
-                    return;
-                }
-            }
-            return;
+        if (getButton && _cursorOver(getButton)){
+            getButton.click();
         }
-        if (window.shop) {
-            window.shop?.activate();
-            return;
+        if (cancelButton && _cursorOver(cancelButton)){
+            cancelButton.click();
         }
 
         if (cursorOver(topbarEl)) {
@@ -650,8 +644,8 @@ let canPlaySounds = false;
 overlay.addEventListener('click', () => {
     if (leaveButton.matches(':hover')) { return }
     canPlaySounds = true;
-    if (window.SWORD_FIGHT) {
-        sfothThemeSong.play();
+    if (window.SWORD_FIGHT||window.BUILD_MODE) {
+        gameSong.play();
     }
     renderer.domElement.requestPointerLock();
 });
@@ -704,19 +698,20 @@ function makeSettingsSlider(text, min, max, def, step, onchange) {
     sliderContainer.appendChild(sliderRightText);
     settingsPanel.appendChild(sliderContainer);
     sliderSlider.value = def;
+    onchange(sliderSlider, def);
 }
 
 const oofSound = new Audio(importedAssets.oofSound)
 
-const swordSlashSound = new Audio(importedAssets.swordSlash);
-swordSlashSound.preload = "auto";
-swordSlashSound.volume = 0.8;
+const primaryActionSound = new Audio(window.SWORD_FIGHT?importedAssets.swordSlash:(importedAssets.placeBlock));
+primaryActionSound.preload = "auto";
+primaryActionSound.volume = 0.8;
 
 makeSettingsSlider('Music volume', 0, 1, 0.9, 0.1, function (slider, val) {
-    sfothThemeSong.volume = val;
+    gameSong.volume = val;
 })
 makeSettingsSlider('Sfx volume', 0, 1, 1, 0.1, function (slider, val) {
-    swordSlashSound.volume = val * 0.8;
+    primaryActionSound.volume = val * 0.8;
     oofSound.volume = val;
 })
 
@@ -776,7 +771,7 @@ const BLOCK_COLORS = [
     0x1A237A,  // dark blue
 ];
 
-const MAX_BLOCKS = 500;
+const MAX_BLOCKS = 2000;
 
 function validPlacement(x,y,z){
     if(myBlocks.length>=MAX_BLOCKS) return false
@@ -911,8 +906,8 @@ renderer.domElement.addEventListener('mousedown', e => {
         if (window.SWORD_FIGHT && !playerSpecialValues.slicing && canSlice) {
             playerSpecialValues.slicing = true;
             canSlice = false
-            swordSlashSound.currentTime = 0;
-            swordSlashSound.play();
+            primaryActionSound.currentTime = 0;
+            primaryActionSound.play();
             setTimeout(() => {
                 playerSpecialValues.slicing = false;
                 setTimeout(() => {
@@ -1718,8 +1713,7 @@ function updateCamera() {
     camera.lookAt(pivot);
 }
 
-sfothThemeSong.preload = "auto";
-sfothThemeSong.volume = 1;
+gameSong.preload = "auto";
 let sword;
 let loadingSword = false;
 let died = false;

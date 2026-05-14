@@ -523,13 +523,14 @@ function saveBlocks() {
     localStorage.setItem('blocks', stringed);
 }
 function loadBlocks() {
+    console.log('loading saved blocks...')
     let stringed = localStorage.getItem('blocks');
     if (stringed) {
         let savedBlokcs = JSON.parse(stringed);
         for (let i = 0; i < savedBlokcs.length; i++) {
             let b = savedBlokcs[i];
             let sp = b.split(',');
-            _setBlockState(myId?myId:-1, sp[0], sp[1], sp[2], sp[3])
+            _setBlockState(myId ? myId : -1, parseFloat(sp[0]), parseFloat(sp[1]), parseFloat(sp[2]), parseFloat(sp[3]))
         }
     }
 }
@@ -613,29 +614,35 @@ const blocks = new Map();
 let canPlace = false;
 //inuk's custom building system!
 function _setBlockState(userid, x, y, z, state) {
-    if(!canPlace) return
+    if (!canPlace) return
     if (!validPlacement(x, y, z)) return
     let blockKeyName = `block_${x}_${y}_${z}`
+    let changed = false;
     if (state == 0) {
         if (blocks.has(blockKeyName)) {
             let blockData = blocks.get(blockKeyName);
             if (blockData.owner == userid || blockData.owner == -1) {
+                changed = true;
                 removeStud(blockData.stud_id);
                 blocks.delete(blockKeyName);
             }
         }
     } else if (!blocks.has(blockKeyName)) {
+        changed = true;
         let [mesh, stud_id] = addStud(2, 2, 2, BLOCK_COLORS[state - 1], x, y - 1, z);
         blocks.set(blockKeyName, { owner: userid, stud_id: stud_id, last_sync: 0, x, y, z, state });
     } else {
         let blockData = blocks.get(blockKeyName);
         if (blockData.owner == userid || blockData.owner == -1) {
-            removeStud(blockData.stud_id);
-            let [mesh, stud_id] = addStud(2, 2, 2, BLOCK_COLORS[state - 1], x, y - 1, z);
-            blocks.set(blockKeyName, { owner: userid, stud_id: stud_id, last_sync: 0, x, y, z, state });
+            if (blockData.state != state) {
+                changed = true;
+                removeStud(blockData.stud_id);
+                let [mesh, stud_id] = addStud(2, 2, 2, BLOCK_COLORS[state - 1], x, y - 1, z);
+                blocks.set(blockKeyName, { owner: userid, stud_id: stud_id, last_sync: 0, x, y, z, state });
+            }
         }
     }
-    if (userid == myId || userid == -1) {
+    if ((userid == myId || userid == -1) && changed) {
         if (state > 0) {
             myBlocks.push(`${x},${y},${z},${state}`);
         } else {
@@ -653,6 +660,10 @@ function _setBlockState(userid, x, y, z, state) {
             blockCounter.style.color = 'rgb(255 0 0 / 90%)'
         } else {
             blockCounter.style.color = 'rgb(255 255 255 / 90%)'
+        }
+        if(canPlaySounds){
+            primaryActionSound.currentTime = 0;
+            primaryActionSound.play();
         }
     }
 }
@@ -771,8 +782,12 @@ function handle(d) {
             _showHealthBar(myId);
             fetchFriendData();
             if (window.BUILD_MODE) {
-                canPlace=true;
-                loadBlocks();
+                canPlace = true;
+                if (document.readyState == 'complete') {
+                    loadBlocks();
+                } else {
+                    document.onload = loadBlocks;
+                }
             }
             break;
         }

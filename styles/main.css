@@ -127,7 +127,7 @@ input {
 
 /* profile page */
 strong,
-span,
+span:not(.msg-name),
 .join-date-label {
     color: var(--textcol1) !important;
 }
