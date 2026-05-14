@@ -1,6 +1,8 @@
 //Made by inuk
 //this script is responsible for loading custom maps and games
 
+// Dear inuk, please make sure to port the icon urls.
+
 let mapsLoaded = []
 
 async function loadMapUrl(name, url) {
@@ -47,8 +49,8 @@ const maps = [
     {
         name: "Crossroads",
         url: "https://pastebin.com/raw/5sRJkYLN",
-        picture: "https://static.wikitide.net/arsenalwiki/d/df/Crossroads.png",
-        bannerpicture: "https://i.imgur.com/pUkDxcY.jpeg",
+        picture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/icons/crossroads.png",
+        bannerpicture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/banners/crossroads.jpeg",
         description: "Classic Roblox Crossroads map!",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -62,8 +64,8 @@ const maps = [
     {
         name: "Sword Fights on the Heights",
         url: "https://pastebin.com/raw/DRyzkQ7s",
-        picture: "https://tr.rbxcdn.com/180DAY-4884ac5cad0006f5c02e2a7ef0903a41/256/256/Image/Webp/noFilter",
-        bannerpicture: "https://static.wikia.nocookie.net/roblox/images/8/84/Sword_Fight_on_the_Heights_Original_Thumbnail.png/revision/latest?cb=20170114113709",
+        picture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/icons/sfoth.webp",
+        bannerpicture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/banners/sfoth.webp",
         description: "Classic Roblox Sword Fights on the Heights map, with sword system made by Inuk!",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -80,8 +82,8 @@ const maps = [
     {
         name: "Sword pvp baseplate",
         url: "https://pastebin.com/raw/5Kf08aWP",
-        picture: "https://i.imgur.com/18tY4J2.png",
-        bannerpicture: "https://i.imgur.com/mu68Bvp.png",
+        picture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/icons/swordfightingbaseplate.png",
+        bannerpicture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/banners/swordfightingbaseplate.png",
         description: "Custom made simple pvp map by Inuk",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -97,8 +99,8 @@ const maps = [
     {
         name: "Vortex2+2 Building game",
         url: "https://pastebin.com/raw/pJY1RC43",
-        picture: "https://i.imgur.com/tow9wq7.png",
-        bannerpicture: "https://i.imgur.com/SooHiwI.jpeg",
+        picture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/icons/swordfightingbaseplate.png",
+        bannerpicture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/banners/buildingplace.jpeg",
         description: "Custom made game building game with autosave and multiplayer support!",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -114,8 +116,8 @@ const maps = [
     {
         name: "PARTY.exe",
         url: "https://pastebin.com/raw/uWkAURvH",
-        picture: "https://tr.rbxcdn.com/180DAY-0e38f156d98eb9095dc7c652caf2afcb/352/352/Image/Png/noFilter",
-        bannerpicture: "https://tr.rbxcdn.com/180DAY-b87e0753f91e85fd11c55391517d676c/768/432/Image/Webp/noFilter",
+        picture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/icons/party-exe.png",
+        bannerpicture: "https://github.com/exelerantt/Vortex2plus2Addon/blob/main/img/games/website/banners/party-exe.webp",
         description: "Simple testing game made by exelerantt to test out his vortex 2+2 addon.",
         creatorName: "exelerantt",
         creatorId: 2162,
