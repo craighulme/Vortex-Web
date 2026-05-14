@@ -3,6 +3,9 @@ Please join the [Vortex2+2 & AIS discord server](https://discord.gg/3Rphp3duKR) 
 
 Credits:
 - Search engine originally created by enk, modified and used with permission
+- SFOTH by Shedletsky (obivously)
+- Party.exe map by 8DSK
+- Fencing map by Stickmasterluke
 
 current features are:
 - Clean custom dark ui

@@ -127,6 +127,21 @@ const maps = [
 
         VOID_DIE: true // you fall into the void and DIE... you cannot walk around that one
     }, // added by exelerantt, 5/14/26 (american date)
+
+    // {
+    //     name: "Fencing",
+    //     url: "https://pastebin.com/raw/w5WkxXK0",
+
+    //     creatorName: "exelerantt",
+    //     creatorId: 2162,
+    //     gameId: -12109643,
+
+    //     spawnPoints: [[-130.71, 56.29, 152.89], [-130.71, 56.29, 5.89]],
+
+    //     VOID_DIE: true,
+    //     SWORD_FIGHT: true
+    // } // added by exelerantt, 5/14/26 (american date)
+    // pretty laggy and buggy for some reason :\
 ];
 
 function defSpawnPoint() {
