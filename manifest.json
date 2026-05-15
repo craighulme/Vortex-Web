@@ -51,12 +51,13 @@
         "js/*",
         "settings/*",
         "overrides/*",
-        "img/textures/*",
+        "img/*",
         "mdl/*",
-        "sounds/*"
+        "sounds/*",
+        "files/*"
       ],
       "matches": [
-        "https://vortex.towerstats.com/*"
+        "<all_urls>"
       ]
     }
   ],
