@@ -1,9 +1,11 @@
 //Made by inuk
 //this script is responsible for loading custom maps and games
 
+// Dear inuk, please make sure to port the icon urls.
+
 let mapsLoaded = []
 
-async function loadMapUrl(name, url) {
+async function loadMapUrl(name, url, REMOVE_BASEPLATE) {
     console.log("Loading map:", name, url);
     let f = await fetch('https://cors.io/?url=' + url)
     let r = await f.json()
@@ -15,6 +17,115 @@ async function loadMapUrl(name, url) {
         let mesh, _ = addStud(v.S[0], v.S[1], v.S[2], Number('0x' + v.C), v.P[0], v.P[1] - v.S[1] * 0.5, v.P[2], v.R[0] * deg2rad, v.R[1] * deg2rad, v.R[2] * deg2rad)
         mapsLoaded[name][i] = mesh
     }
+
+    // gonna admit some of this is vibe coded
+    // as in the way i got this, i did not copy and paste !!!
+
+    try {
+        scene.traverse(obj => {
+            if (obj.isMesh || obj.type === 'Mesh' || obj.isGridHelper) {
+                let width = 0;
+                let length = 0;
+
+                if (obj.geometry) {
+                    if (!obj.geometry.boundingBox) {
+                        obj.geometry.computeBoundingBox();
+                    }
+                    const box = obj.geometry.boundingBox;
+                    if (box) {
+                        width = (box.max.x - box.min.x) * obj.scale.x;
+                        length = (box.max.z - box.min.z) * obj.scale.z;
+                    }
+                }
+
+                if (width === 0 || length === 0) {
+                    width = obj.scale.x;
+                    length = obj.scale.z;
+                }
+
+                if (width >= 100 && length >= 100) {
+                    if (obj.name !== "Player" && !obj.isBone && obj.type !== 'Bone') {
+                        obj.visible = !REMOVE_BASEPLATE;
+
+                        if (obj.geometry) obj.geometry.dispose();
+                        if (obj.material) {
+                            if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                            else obj.material.dispose();
+                        }
+                    }
+                }
+            }
+        });
+    } catch (err) {
+        // no i dont wanna hear you anymore
+    }
+
+    gameSong = new Audio(window.SWORD_FIGHT && importedAssets.sfothSong || importedAssets.buildSong);
+    primaryActionSound = new Audio(window.SWORD_FIGHT && importedAssets.swordSlash || importedAssets.placeBlock);
+}
+
+async function loadMapData(name, asset, REMOVE_BASEPLATE) {
+    console.log("Loading map:", name, asset);
+    let f = await fetch(importedAssets.mapdata[asset])
+    let r = await f.text()
+
+    let mapData = JSON.parse(r)
+    let deg2rad = 0.0174532925;
+    mapsLoaded[name] = []
+    for (let i = 0; i < mapData.length; i++) {
+        let v = mapData[i]
+        let mesh, _ = addStud(v.S[0], v.S[1], v.S[2], Number('0x' + v.C), v.P[0], v.P[1] - v.S[1] * 0.5, v.P[2], v.R[0] * deg2rad, v.R[1] * deg2rad, v.R[2] * deg2rad)
+        mapsLoaded[name][i] = mesh
+    }
+
+    if (REMOVE_BASEPLATE) {
+        // gonna admit some of this is made by ai
+        // as in the way i got this, i did not copy and paste !!!
+
+        try { 
+            scene.traverse(obj => {
+                if (obj.isMesh || obj.type === 'Mesh' || obj.isGridHelper) {
+                    let width = 0;
+                    let length = 0;
+
+                    if (obj.geometry) {
+                        if (!obj.geometry.boundingBox) {
+                            obj.geometry.computeBoundingBox();
+                        }
+                        const box = obj.geometry.boundingBox;
+                        if (box) {
+                            width = (box.max.x - box.min.x) * obj.scale.x;
+                            length = (box.max.z - box.min.z) * obj.scale.z;
+                        }
+                    }
+
+                    if (width === 0 || length === 0) {
+                        width = obj.scale.x;
+                        length = obj.scale.z;
+                    }
+
+                    // Target the large floor baseplate
+                    if (width >= 100 && length >= 100) {
+                        if (obj.name !== "Player" && !obj.isBone && obj.type !== 'Bone') {
+                            scene.remove(obj);
+                            obj.visible = false;
+                            
+                            if (obj.geometry) obj.geometry.dispose();
+                            if (obj.material) {
+                                if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                                else obj.material.dispose();
+                            }
+                        }
+                    }
+                }
+            });
+        } catch(err) {
+            // no i dont wanna hear you anymore
+        }
+    }
+
+    gameSong = new Audio(window.SWORD_FIGHT && importedAssets.sfothSong ||     importedAssets.buildSong);
+    primaryActionSound = new Audio(window.SWORD_FIGHT && importedAssets.swordSlash || importedAssets.placeBlock);
 }
 
 function loadMapRaw(name, r) {
@@ -46,9 +157,9 @@ function unloadMap(name) {
 const maps = [
     {
         name: "Crossroads",
-        url: "https://pastebin.com/raw/5sRJkYLN",
-        picture: "https://static.wikitide.net/arsenalwiki/d/df/Crossroads.png",
-        bannerpicture: "https://i.imgur.com/pUkDxcY.jpeg",
+        url: "window._importedAssets.Crossroads",
+        picture: "window._importedAssets.crossroads",
+        bannerpicture: "window._importedAssets.crossroads",
         description: "Classic Roblox Crossroads map!",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -61,9 +172,9 @@ const maps = [
 
     {
         name: "Sword Fights on the Heights",
-        url: "https://pastebin.com/raw/DRyzkQ7s",
-        picture: "https://tr.rbxcdn.com/180DAY-4884ac5cad0006f5c02e2a7ef0903a41/256/256/Image/Webp/noFilter",
-        bannerpicture: "https://static.wikia.nocookie.net/roblox/images/8/84/Sword_Fight_on_the_Heights_Original_Thumbnail.png/revision/latest?cb=20170114113709",
+        url: "window._importedAssets.SFOTH",
+        picture: "window._importedAssets.sfoth",
+        bannerpicture: "window._importedAssets.sfoth",
         description: "Classic Roblox Sword Fights on the Heights map, with sword system made by Inuk!",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -79,9 +190,9 @@ const maps = [
 
     {
         name: "Sword pvp baseplate",
-        url: "https://pastebin.com/raw/5Kf08aWP",
-        picture: "https://i.imgur.com/18tY4J2.png",
-        bannerpicture: "https://i.imgur.com/mu68Bvp.png",
+        url: "window._importedAssets.SFBaseplate",
+        picture: "window._importedAssets.swordfightingbaseplate",
+        bannerpicture: "window._importedAssets.swordfightingbaseplate",
         description: "Custom made simple pvp map by Inuk",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -96,9 +207,9 @@ const maps = [
 
     {
         name: "Vortex2+2 Building game",
-        url: "https://pastebin.com/raw/pJY1RC43",
-        picture: "https://i.imgur.com/tow9wq7.png",
-        bannerpicture: "https://i.imgur.com/SooHiwI.jpeg",
+        url: "window._importedAssets.BuildingPlace",
+        picture: "window._importedAssets.buildingplace",
+        bannerpicture: "window._importedAssets.buildingplace",
         description: "Custom made game building game with autosave and multiplayer support!",
         creatorName: 'Inuk',
         creatorId: 1961,
@@ -166,6 +277,9 @@ window.chooseSpawnPoint = chooseSpawnPoint;
         if (map.BUILD_MODE) {
             window.BUILD_MODE = true;
         }
+        if (map.REMOVE_BASEPLATE) {
+            window.REMOVE_BASEPLATE = true;
+        }
         const s = document.createElement("script");
         Object.defineProperty(window, "GAME_ID", {
             value: gameid,
@@ -217,6 +331,12 @@ async function initialize() {
                     }
                     gcmeta.innerHTML = active + ' Playing'
                     if (map.picture) {
+                        while (!window.importedAssets) { let el = document.getElementById("_importedAssets"); if (el) window.importedAssets = JSON.parse(el.content); else await new Promise(r => setTimeout(r, 50)); }
+
+                        if (map.picture.startsWith("window.")) {
+                            map.picture = importedAssets.imgdata.icons[map.picture.split(".")[2]]
+                        }
+
                         let gcpic = document.createElement('img')
                         gcpic.alt = map.name
                         gcpic.src = map.picture
@@ -246,6 +366,13 @@ async function initialize() {
             let creatorName = map.creatorName
             let creatorId = map.creatorId
             let picture = map.bannerpicture
+            
+            while (!window.importedAssets) { let el = document.getElementById("_importedAssets"); if (el) window.importedAssets = JSON.parse(el.content); else await new Promise(r => setTimeout(r, 50)); }
+
+            if (picture.startsWith("window.")) {
+                picture = importedAssets.imgdata.banners[picture.split(".")[2]]
+            }
+
             if (gameStats[gameId]) {
                 active = gameStats[gameId].active
                 visits = gameStats[gameId].visits
@@ -385,7 +512,11 @@ async function initialize() {
                     btn.innerHTML = map.name + '(Not loaded)'
                     loaded = false
                 } else {
-                    loadMapUrl(map.name, map.url);
+                    if (map.url.startsWith("window.")) {
+                        loadMapData(map.name, map.url.split(".")[2], map.REMOVE_BASEPLATE)
+                    } else {
+                        loadMapUrl(map.name, map.url, map.REMOVE_BASEPLATE)
+                    }
                     let spawn = window.chooseSpawnPoint(map)
                     window._vortex.setSpawn(spawn.x, spawn.y, spawn.z, 0);
                     btn.innerHTML = map.name + '(Loaded)'
