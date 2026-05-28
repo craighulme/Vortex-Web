@@ -225,8 +225,8 @@ const maps = [
     {
         name: "PARTY.exe",
         url: "window._importedAssets.PARTYexe",
-        picture: "https://raw.githubusercontent.com/exelerantt/Vortex2plus2Addon/refs/heads/main/img/games/website/icons/party-exe.png",
-        bannerpicture: "https://raw.githubusercontent.com/exelerantt/Vortex2plus2Addon/refs/heads/main/img/games/website/banners/party-exe.webp",
+        picture: "window._importedAssets.partyexe",
+        bannerpicture: "window._importedAssets.partyexe",
         description: "Simple testing game made by exelerantt to test out his vortex 2+2 addon.",
         creatorName: "exelerantt",
         creatorId: 2162,
@@ -235,8 +235,8 @@ const maps = [
     {
         name: "Baseplate",
         url: "",
-        picture: "https://tr.rbxcdn.com/180DAY-0023459e3957978e242c1d270dafbae2/352/352/Image/Png/noFilter",
-        bannerpicture: "https://tr.rbxcdn.com/180DAY-1d29750b06e247dc4ad9dbf2b4aaa10e/768/432/Image/Png/noFilter",
+        picture: "window._importedAssets.baseplate",
+        bannerpicture: "window._importedAssets.baseplate",
         description: "Just your average baseplate.",
         creatorName: "exelerantt",
         creatorId: 2162,
@@ -303,10 +303,10 @@ async function initialize() {
         let f = await fetch('/api/game-stats')
         let gameStats = await f.json()
         async function waitForGamesLoaded() {
+            console.log('waiting')
             if (document.getElementById('games-grid').children.length > 0) {
                 for (let i = 0; i < maps.length; i++) {
                     let map = maps[i]
-
                     let gameId = map.gameId
 
                     let main = document.createElement('a');
@@ -343,6 +343,7 @@ async function initialize() {
                         thumb.appendChild(gcpic)
                     }
                     document.getElementById('games-grid').appendChild(main);
+                    console.log('a')
                 };
                 return
             } else {
