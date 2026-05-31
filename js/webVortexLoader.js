@@ -43,6 +43,32 @@ const importedAssets = {
     }
 };
 
+const overrides = new Map([
+    ["three.min.js", "overrides/libs/three.module.js"],
+    ["FBXLoader.js", "overrides/libs/FBXLoader2.js"],
+    ["inflate.min.js", "overrides/libs/inflate.min.js"],
+
+    ["inline_1.js", "overrides/inline_1.js"],
+
+    ["notifications.js", "overrides/notifications.js"],
+    ["leaderboard.js", "overrides/leaderboard.js"],
+    ["chat.js", "overrides/chat.js"],
+    ["avatar.js","overrides/avatar.js"],
+    ["parts.js", "overrides/demoparts.js"],
+    ["social.js", "overrides/social.js"],
+
+    ["vortex-engine.js", "overrides/vortex2+2-engine.js"],
+    ["multiplayer.js", "overrides/vortex2+2-multiplayer.js"]
+]);
+
+function replaceUrl(src) {
+    if (!src) return null;
+    const file = src.split("/").pop();
+    const target = overrides.get(file);
+    if (!target) return src;
+    return chrome.runtime.getURL(target);
+}
+
 var url_string = document.URL;
 var url = new URL(url_string);
 var play = url.searchParams.get("Play");
@@ -50,14 +76,28 @@ if (play) {
     console.log('play')
 
     async function init() {
-        const html = await fetch(
+        let html = await fetch(
             chrome.runtime.getURL("overrides/play.html")
         ).then(r => r.text());
+
+        html = html.replace(
+            /<script\s+[^>]*src=["']([^"']+)["'][^>]*>/g, //crazy
+            (match, src) => {
+                const file = src.split("/").pop();
+                const override = overrides.get(file);
+
+                if (!override) return match;
+
+                const newSrc = chrome.runtime.getURL(override);
+
+                return match.replace(src, newSrc);
+            }
+        );
+
         document.open();
         document.write(html);
         document.close();
 
-        //import assets moved to here
         const meta = document.createElement("meta");
         meta.id = "_importedAssets";
         meta.name = "_importedAssets";

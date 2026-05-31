@@ -1,18 +1,15 @@
 //Made by inuk
 //this script is responsible for loading custom maps and games
 
-// Dear inuk, please make sure to port the icon urls.
-
 let mapsLoaded = []
-
+const deg2rad = 0.0174532925;
 async function loadMapUrl(name, url, yoff) {
-    console.log("Loading map:", name, url);
-    if(!yoff) yoff=0
+    console.log("Loading map from url:", name, url);
+    if (!yoff) yoff = 0
     if (!url) return
     let f = await fetch(url)
     let mapData = await f.json()
-    let deg2rad = 0.0174532925;
-    mapsLoaded[name] = []
+    mapsLoaded[name] = {studs:[],meshes:[]}
     for (let i = 0; i < mapData.length; i++) {
         let v = mapData[i]
         //{"Rotation":[0.0,0.0,0.0],"Type":"Part","Position":[94,0.5,20],"Color":"4a7c59","Transparency":0,"Shape":"Block","Size":[340,2,240]}
@@ -22,20 +19,45 @@ async function loadMapUrl(name, url, yoff) {
         let c = v.C ? v.C : v.Color;
         let transp = v.Tr ? v.Tr : v.Transparency;
         let sh = v.Sh ? v.Sh : v.Shape;
-        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5 + yoff, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp)
-        mapsLoaded[name][i] = [mesh, stud_id]
+        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5 + yoff, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp, true)
+        mapsLoaded[name].studs.push(stud_id);
+        mapsLoaded[name].meshes.push(mesh);
     }
+    const geometries = new Map();
+    const materials = new Map();
+    for (let i = 0; i < mapsLoaded[name].meshes.length; i++) {
+        let mesh = mapsLoaded[name].meshes[i];
+        let key = mesh.material.uuid;
+        mesh.updateMatrix();
+        const geo = mesh.geometry.clone();
+        geo.applyMatrix4(mesh.matrix);
+
+        if (!materials.has(key)) {
+            materials.set(key, mesh.material);
+            geometries.set(key, [geo]);
+        } else {
+            geometries.set(key, [...geometries.get(key), geo]);
+        }
+    }
+    mapsLoaded[name].meshes=[];
+    geometries.forEach((value, key) => {
+        const merged = THREE.BufferGeometryUtils.mergeGeometries(value);
+        const mergedMesh = new THREE.Mesh(merged, materials.get(key));
+        mergedMesh.castShadow=true;
+        mergedMesh.receiveShadow=true;
+        scene.add(mergedMesh);
+        objects.push(mergedMesh);
+        mapsLoaded[name].meshes=[...mapsLoaded[name].meshes,mergedMesh];
+    })
 }
 
 async function loadMapData(name, asset, yoff) {
     console.log("Loading map:", name, asset);
-    if(!yoff) yoff=0
+    if (!yoff) yoff = 0
     let f = await fetch(importedAssets.mapdata[asset])
     let r = await f.text()
-
     let mapData = JSON.parse(r)
-    let deg2rad = 0.0174532925;
-    mapsLoaded[name] = []
+    mapsLoaded[name] = {studs:[],meshes:[]}
     for (let i = 0; i < mapData.length; i++) {
         let v = mapData[i]
         let s = v.Size ? v.Size : v.S;
@@ -44,15 +66,40 @@ async function loadMapData(name, asset, yoff) {
         let c = v.C ? v.C : v.Color;
         let transp = v.Tr ? v.Tr : v.Transparency;
         let sh = v.Sh ? v.Sh : v.Shape;
-        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5 + yoff, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp)
+        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5 + yoff, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp, true)
         mapsLoaded[name][i] = [mesh, stud_id]
     }
+    const geometries = new Map();
+    const materials = new Map();
+    for (let i = 0; i < mapsLoaded[name].meshes.length; i++) {
+        let mesh = mapsLoaded[name].meshes[i];
+        let key = mesh.material.uuid;
+        mesh.updateMatrix();
+        const geo = mesh.geometry.clone();
+        geo.applyMatrix4(mesh.matrix);
+
+        if (!materials.has(key)) {
+            materials.set(key, mesh.material);
+            geometries.set(key, [geo]);
+        } else {
+            geometries.set(key, [...geometries.get(key), geo]);
+        }
+    }
+    mapsLoaded[name].meshes=[];
+    geometries.forEach((value, key) => {
+        const merged = THREE.BufferGeometryUtils.mergeGeometries(value);
+        const mergedMesh = new THREE.Mesh(merged, materials.get(key));
+        mergedMesh.castShadow=true;
+        mergedMesh.receiveShadow=true;
+        scene.add(mergedMesh);
+        objects.push(mergedMesh);
+        mapsLoaded[name].meshes=[...mapsLoaded[name].meshes,mergedMesh];
+    })
 }
 
 function loadMapRaw(name, r) {
     let mapData = JSON.parse(r)
-    let deg2rad = 0.0174532925;
-    mapsLoaded[name] = []
+    mapsLoaded[name] = {studs:[],meshes:[]}
     for (let i = 0; i < mapData.length; i++) {
         let v = mapData[i]
         let s = v.Size ? v.Size : v.S;
@@ -61,17 +108,48 @@ function loadMapRaw(name, r) {
         let c = v.C ? v.C : v.Color;
         let transp = v.Tr ? v.Tr : v.Transparency;
         let sh = v.Sh ? v.Sh : v.Shape;
-        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp)
+        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp, true)
         mapsLoaded[name][i] = [mesh, stud_id]
     }
+    const geometries = new Map();
+    const materials = new Map();
+    for (let i = 0; i < mapsLoaded[name].meshes.length; i++) {
+        let mesh = mapsLoaded[name].meshes[i];
+        let key = mesh.material.uuid;
+        mesh.updateMatrix();
+        const geo = mesh.geometry.clone();
+        geo.applyMatrix4(mesh.matrix);
+
+        if (!materials.has(key)) {
+            materials.set(key, mesh.material);
+            geometries.set(key, [geo]);
+        } else {
+            geometries.set(key, [...geometries.get(key), geo]);
+        }
+    }
+    mapsLoaded[name].meshes=[];
+    geometries.forEach((value, key) => {
+        const merged = THREE.BufferGeometryUtils.mergeGeometries(value);
+        const mergedMesh = new THREE.Mesh(merged, materials.get(key));
+        mergedMesh.castShadow=true;
+        mergedMesh.receiveShadow=true;
+        scene.add(mergedMesh);
+        objects.push(mergedMesh);
+        mapsLoaded[name].meshes=[...mapsLoaded[name].meshes,mergedMesh];
+    })
 }
 
 function unloadMap(name) {
     if (mapsLoaded[name]) {
         console.log('unloading')
-        for (let i = 0; i < mapsLoaded[name].length; i++) {
-            let [mesh, stud_id] = mapsLoaded[name][i]
+        for (let i = 0; i < mapsLoaded[name].studs.length; i++) {
+            let stud_id = mapsLoaded[name].studs[i]
             removeStud(stud_id);
+        }
+        for (let i = 0; i < mapsLoaded[name].meshes.length; i++) {
+            let mesh = mapsLoaded[name].meshes[i];
+            removeMatching_array(objects,mesh);
+            scene.remove(mesh);
         }
     }
 }
@@ -273,6 +351,7 @@ async function initialize() {
     var play = url.searchParams.get("Play");
     await importMapAssets();
     if (document.location.pathname == '/home' || document.location.pathname == '/social' || document.location.pathname == '/search' || document.location.pathname == '/games/2') {
+        console.log('setting up game buttons')
         // game buttons!
         let f = await fetch('/api/game-stats')
         let gameStats = await f.json()
@@ -317,7 +396,6 @@ async function initialize() {
                         thumb.appendChild(gcpic)
                     }
                     document.getElementById('games-grid').appendChild(main);
-                    console.log('a')
                 };
                 return
             } else {
@@ -421,9 +499,9 @@ async function initialize() {
                 if (tmap.skyColor) {
                     scene.fog = new THREE.Fog(tmap.skyColor, 192, 480);
                     renderer.setClearColor(tmap.skyColor);
-                    backLight.color=new THREE.Color(tmap.skyColor);
-                    scene.fog.color=new THREE.Color(tmap.skyColor);
-                    ambient.color=new THREE.Color(tmap.skyColor);
+                    backLight.color = new THREE.Color(tmap.skyColor);
+                    scene.fog.color = new THREE.Color(tmap.skyColor);
+                    ambient.color = new THREE.Color(tmap.skyColor);
                 }
             }
         }
@@ -500,9 +578,9 @@ async function initialize() {
                     loaded = false
                 } else {
                     if (map.url && map.url.startsWith("window.")) {
-                        loadMapData(map.name, map.url.split(".")[2],map.yoff)
+                        loadMapData(map.name, map.url.split(".")[2], map.yoff)
                     } else {
-                        loadMapUrl(map.name, map.url,map.yoff)
+                        loadMapUrl(map.name, map.url, map.yoff)
                     }
                     let spawn = window.chooseSpawnPoint(map)
                     window._vortex.setSpawn(spawn.x, spawn.y, spawn.z, 0);
@@ -542,7 +620,7 @@ async function initialize() {
 
         // custom url loader button
         const loadBtn = document.createElement('button');
-        loadBtn.textContent = "Load URL";
+        loadBtn.textContent = "Load URL/JSON";
         collapsibles[ci] = loadBtn;
         ci++;
 

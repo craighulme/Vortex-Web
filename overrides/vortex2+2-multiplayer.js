@@ -238,7 +238,7 @@ const _healthbars = new Map();
 
 const B_PAD = 18;
 const B_R = 12;
-const B_FONT = '30px system-ui,sans-serif';
+const B_FONT = '600 30px system-ui,sans-serif';
 const B_LINE = 38;
 const B_TRI = 12;
 const B_GAP = 6;
@@ -287,7 +287,7 @@ function _redrawBubble(id) {
         const bw = msgW[i];
         const bx = (CW - bw) / 2;
 
-        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillStyle = 'rgba(233, 233, 233, 0.95)';
         ctx.beginPath();
         ctx.moveTo(bx + B_R, y);
         ctx.lineTo(bx + bw - B_R, y);
@@ -306,7 +306,7 @@ function _redrawBubble(id) {
         ctx.closePath();
         ctx.fill();
 
-        ctx.fillStyle = '#111';
+        ctx.fillStyle = '#000000';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         for (let j = 0; j < lines.length; j++) {
@@ -317,7 +317,7 @@ function _redrawBubble(id) {
     }
 
     if (!b.sprite) {
-        b.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
+        b.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: true, transparent: true }));
         _vortex.scene.add(b.sprite);
     }
     b.sprite.material.map?.dispose();
@@ -361,12 +361,12 @@ function _redrawHealthbar(id, health) {
 
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#222';
+    ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    let grad = ctx.createLinearGradient(0, 0, 0, canvas.height)
-    grad.addColorStop(0, "#63b81f");
-    grad.addColorStop(0, "#4b9210");
-    grad.addColorStop(1, "#2b5806");
+    let grad = ctx.createLinearGradient(0, 5, 0, canvas.height-10)
+    grad.addColorStop(0, "#3f8d00");
+    grad.addColorStop(0.7, "#214602");
+    grad.addColorStop(1, "#0b1a00");
     ctx.fillStyle = grad;
     ctx.fillRect(5, 5, Math.max(5, Math.min(canvas.width - 10, canvas.width * health)), canvas.height - 10);
     ctx.font = 'small-caps bold ' + (canvas.height - 20) + 'px sans-serif';
@@ -376,7 +376,7 @@ function _redrawHealthbar(id, health) {
     ctx.fillText("HEALTH", canvas.width - 10, (canvas.height - 10) * 0.65);
 
     if (!hbar.sprite) {
-        hbar.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, transparent: true }));
+        hbar.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: true, transparent: false }));
         _vortex.scene.add(hbar.sprite);
     }
 
@@ -796,12 +796,12 @@ function handle(d) {
             if (d.id === myId) break;
             addRemote(d.id, d.username, d.is_staff, d.is_booster, d.shirt_id);
             _showHealthBar(d.id);
-            Chat.systemPlayer(d.username, `${d.username} joined.`, false);
+            Chat.systemPlayer(d.username, `${d.username} joined.`);
             break;
         }
 
         case 'leave': {
-            Chat.systemPlayer(d.username, `${d.username} left.`, false);
+            Chat.systemPlayer(d.username, `${d.username} left.`);
             removeRemote(d.id);
             if (window.BUILD_MODE) removeBlocks(d.id)
             break;

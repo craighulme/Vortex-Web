@@ -1,18 +1,15 @@
 //Made by inuk, for https://github.com/inuk84/Vortex-2-plus-2
 console.log('VORTEX ENGINE OVERRIDDEN!')
 
-import * as THRE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import * as BufferGeometryUtils
-from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js";
-import { FBXLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/FBXLoader.js";
+import * as THRE from "./libs/three.module.js";
+import * as BufferGeometryUtils from "./libs/BufferGeometryUtils.js";
+import { FBXLoader } from "./libs/FBXLoader.js";
 
 const THREE = {
     ...THRE,
-    FBXLoader : FBXLoader
+    FBXLoader : FBXLoader,
+    BufferGeometryUtils: BufferGeometryUtils,
 };
-
-// expose globally for old scripts
-window.THREE = THREE;
 
 const _loadingScreen = document.createElement("div");
 _loadingScreen.id = "loadingScreen";
@@ -51,7 +48,6 @@ THREE.DefaultLoadingManager.onLoad = function () { };
 const STUDS_PER_TILE = 4;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x87CEEB, 192, 486);
-window.scene=scene;
 
 let fov = 85;
 const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 3200);
@@ -65,9 +61,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.antialias = false;
 renderer.powerPreference = "high-performance";
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
-renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMapping = THREE.AgXToneMapping;
 document.getElementById("scene").appendChild(renderer.domElement);
-window.renderer=renderer;
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -76,24 +71,23 @@ window.addEventListener('resize', () => {
 
 const ambient = new THREE.AmbientLight(0xffffff, 0.45);
 scene.add(ambient);
-window.ambient=ambient;
 
 const sun = new THREE.DirectionalLight(0xffffff, 3);
-sun.position.set(1600, 3200, 1600);
 sun.castShadow = enableShadows === 'yes';
-sun.shadow.mapSize.width = 5000;
-sun.shadow.mapSize.height = 5000;
-sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 19600;
-sun.shadow.camera.left = -256;
-sun.shadow.camera.right = 256;
-sun.shadow.camera.top = 256;
-sun.shadow.camera.bottom = -256;
+sun.shadow.mapSize.width = 4000;
+sun.shadow.mapSize.height = 4000;
+sun.shadow.camera.near = 0.1;
+const s = 350;
+sun.shadow.camera.far = 2*s;
+sun.shadow.camera.left = -s;
+sun.shadow.camera.right = s;
+sun.shadow.camera.top = s;
+sun.shadow.camera.bottom = -s;
 sun.shadow.autoUpdate = true;
 sun.shadow.bias = -0.000002;
 scene.add(sun);
 const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
-backLight.position.set(-1600, 5000, -1600);
+backLight.position.set(-160, 500, -160);
 backLight.castShadow=false;
 window.backLight=backLight;
 scene.add(backLight);
@@ -147,20 +141,28 @@ function makeCube(width, height, depth) {
 }
 
 function makeQuadSphere(radius, subs) {
-    const geometry = new THREE.BoxGeometry(radius, radius, radius, subs, subs, subs);
+    const geometry = new THREE.BoxGeometry(1, 1, 1, subs, subs, subs);
     const pos = geometry.attributes.position;
     const normal = new THREE.Float32BufferAttribute(pos.count * 3, 3);
-    const v = new THREE.Vector3();
+    const uv = geometry.attributes.uv;
+    const posVec = new THREE.Vector3();
+    const uvVec = new THREE.Vector2();
+    const halfU = 0.5;
+    const halfV = 0.5;
     for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i);
-        v.normalize().multiplyScalar(radius);
-        pos.setXYZ(i, v.x, v.y, v.z);
-        normal.setXYZ(i, v.x / radius, v.y / radius, v.z / radius);
+        posVec.fromBufferAttribute(pos, i);
+        const len = posVec.length();
+        const scale = 1///len; //apparently in roblox balls don't have correct uvs?
+        uvVec.fromBufferAttribute(uv, i);
+        uv.setXY(i, halfU + (uvVec.x-halfU) * scale, halfV + (uvVec.y-halfV) * scale);
+        posVec.normalize().multiplyScalar(radius);
+        pos.setXYZ(i, posVec.x, posVec.y, posVec.z);
+        normal.setXYZ(i, posVec.x / radius, posVec.y / radius, posVec.z / radius);
     }
     geometry.setAttribute("normal", normal);
+    uv.needsUpdate = true;
     return geometry;
 }
-
 function makeWedge(width, height, depth) {
     const shape = new THREE.Shape();
     const hw = width * 0.5;
@@ -175,6 +177,7 @@ function makeWedge(width, height, depth) {
     };
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
     geometry.center();
+    geometry=geometry.toNonIndexed();
     return geometry;
 }
 
@@ -239,7 +242,7 @@ function getCachedGeo(sw, sh, sd, shape = "Block") {
     } else if (shape == "Cylinder") {
         const radi = Math.min(sh, sd);
         const key = `${shape},${radi},${sw}`;
-        if (!geoCache.has(key)) geoCache.set(key, new THREE.CylinderGeometry(radi * 0.5, radi * 0.5, sw, 20, 1));
+        if (!geoCache.has(key)) geoCache.set(key, new THREE.CylinderGeometry(radi * 0.5, radi * 0.5, sw, 20, 1).toNonIndexed());
         return geoCache.get(key);
     } else if (shape == "Wedge") {
         const key = `${shape},${sw},${sh},${sd}`;
@@ -259,6 +262,7 @@ function getCachedMats(sw, sh, sd, color, shape = "Block", transparency = 0) {
         const key = `c${color}t${transparency}`;
         if (matCache.has(key)) return matCache.get(key);
         const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency });
+        if(transparency>0.7) m.castShadow=false;
         const mats = m(1 / STUDS_PER_TILE, 1 / STUDS_PER_TILE);
         matCache.set(key, mats);
         return mats;
@@ -267,6 +271,7 @@ function getCachedMats(sw, sh, sd, color, shape = "Block", transparency = 0) {
         const key = `s${shape},r${radi},c${color}t${transparency}`;
         if (matCache.has(key)) return matCache.get(key);
         const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency });
+        if(transparency>0.7) m.castShadow=false;
         const mats = m(radi / STUDS_PER_TILE, radi / STUDS_PER_TILE);
         matCache.set(key, mats);
         return mats;
@@ -276,6 +281,7 @@ function getCachedMats(sw, sh, sd, color, shape = "Block", transparency = 0) {
         const key = `s${shape},r${radi},l${cylen},c${color}t${transparency}`;
         if (matCache.has(key)) return matCache.get(key);
         const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency });
+        if(transparency>0.7) m.castShadow=false;
         let uh = radi * Math.PI / STUDS_PER_TILE;
         if (radi > 0.5) {
             uh = Math.round(uh);
@@ -298,7 +304,7 @@ const chunkMap = new Map();
 const _dummy = new THREE.Object3D();
 const stud_datas = [];
 const objects = [];
-function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Block", transparency = 0) {
+function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Block", transparency = 0, staticMesh = false) {
         const mesh = new THREE.Mesh(
             getCachedGeo(sw, sh, sd, shape),
             getCachedMats(sw, sh, sd, color, shape, transparency)
@@ -325,8 +331,13 @@ function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Bl
         mesh.matrixAutoUpdate = false;
         mesh.frustumCulled = true;
         mesh.updateMatrix();
-        scene.add(mesh);
+        if(!staticMesh) scene.add(mesh);
         let b;
+        if(shape=="Ball"){
+            sw*=0.7;
+            sh*=0.7;
+            sd*=0.7;
+        }
         if (rx === 0 && ry === 0 && rz === 0) {
             b = {
                 minX: x - sw / 2, maxX: x + sw / 2,
@@ -345,13 +356,12 @@ function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Bl
             colliders.push(b);
             insertToChunks(b);
         }
-        let stud_id = stud_datas.push({ mesh, b }) - 1;
+        const m = staticMesh ? (null) : (mesh);
+        let stud_id = stud_datas.push({ m , b }) - 1;
         mesh.stud_id = stud_id;
-        objects.push(mesh);
+        if(!staticMesh) objects.push(mesh);
         return [mesh, stud_id];
 }
-
-window.addStud=addStud;
 
 
 function buildOBB(sw, sh, sd, cx, cy, cz, rx, ry, rz) {
@@ -412,6 +422,7 @@ function removeMatching_array(arr, b) {
     }
 }
 
+
 function removeCollider(b) {
     const x0 = worldToChunk(b.minX), x1 = worldToChunk(b.maxX);
     const y0 = worldToChunk(b.minY), y1 = worldToChunk(b.maxY);
@@ -431,7 +442,7 @@ function removeCollider(b) {
 function removeStud(stud_id) {
     let data = stud_datas[stud_id];
     if (data) {
-        let mesh = data.mesh;
+        let mesh = data.m;
         let b = data.b;
         if (b) {
             removeCollider(b);
@@ -449,7 +460,6 @@ function removeStud(stud_id) {
         stud_datas[stud_id] = null;
     }
 }
-window.removeStud = removeStud;
 
 const _nearbySet = new Set();
 
@@ -468,12 +478,13 @@ function getNearbyColliders(px, py, pz) {
 }
 
 const G = 1.6;
+window.G=G;
 
 let CHAR_STAND_Y = 3.68;
 const WALK_SPEED = 16;
 const JUMP_POWER = 50;
 const GRAVITY = -196.2;
-const ROT_SPEED = 14;
+const ROT_SPEED = 10;
 const STEP_HEIGHT = 1.4;
 const STEP_CLIMB_SPEED = 32;
 
@@ -635,7 +646,6 @@ let _spawnPoint = { x: 0, y: null, z: 0, ry: Math.PI };
 let _shirtMesh = null;
 
 const fbxLoader = new THREE.FBXLoader();
-window.fbxLoader = fbxLoader;
 fbxLoader.load('assets/models/player.fbx', (fbx) => {
     //const helper = new THREE.SkeletonHelper(fbx.children[0]);
     //scene.add(helper);
@@ -736,7 +746,6 @@ function _cursorOver(el) {
     const r = el.getBoundingClientRect();
     return cursorX >= r.left && cursorX <= r.right && cursorY >= r.top && cursorY <= r.bottom;
 }
-window._cursorOver=_cursorOver;
 
 
 const chatEl = document.getElementById('chat-window');
@@ -931,9 +940,7 @@ const BLOCK_COLORS = [
     0x103C46,  // dark cyan
     0x1A237A,  // dark blue
 ];
-window.BLOCK_COLORS=BLOCK_COLORS;
 const MAX_BLOCKS = 2000;
-window.MAX_BLOCKS=MAX_BLOCKS;
 
 function validPlacement(x, y, z) {
     if (myBlocks.length >= MAX_BLOCKS) return false
@@ -943,7 +950,7 @@ function validPlacement(x, y, z) {
     if (y <= 1.5) return false
     return true;
 }
-window.validPlacement=validPlacement;
+
 
 let BlockDisplayMesh;
 let selectedBlockState = 1;
@@ -995,7 +1002,6 @@ function update_Display_Block() {
 
 let toolbuttons = []
 let blockCounter;
-window.blockCounter=undefined;
 async function makeToolButtons() {
     if (!window.map) {
         setTimeout(() => {
@@ -1707,8 +1713,8 @@ function update(dt) {
     const moveInput = new THREE.Vector3();
     if (keys['KeyW'] || keys['ArrowUp']) moveInput.z -= 1;
     if (keys['KeyS'] || keys['ArrowDown']) moveInput.z += 1;
-    if (keys['KeyA'] || keys['ArrowLeft']) moveInput.x -= 1;
-    if (keys['KeyD'] || keys['ArrowRight']) moveInput.x += 1;
+    if (keys['KeyA']) moveInput.x -= 1;
+    if (keys['KeyD']) moveInput.x += 1;
 
     const moving = moveInput.lengthSq() > 0;
     let velX = 0, velZ = 0;
@@ -1848,8 +1854,11 @@ function update(dt) {
 
     if (window.BUILD_MODE) update_Display_Block();
 }
-function updateCamera() {
+function updateCamera(dt) {
     if (!character) return;
+
+    if(keys['ArrowLeft']) cam.yaw+=dt*2;
+    if(keys['ArrowRight']) cam.yaw-=dt*2;
 
     const sinYaw = Math.sin(cam.yaw);
     const cosYaw = Math.cos(cam.yaw);
@@ -1885,7 +1894,6 @@ function updateCamera() {
     );
     camera.lookAt(pivot);
 }
-window.canPlaySounds = false;
 let sword;
 let loadingSword = false;
 let died = false;
@@ -1969,7 +1977,7 @@ function loop(now) {
 
     update(dt);
     swordUpdate(dt);
-    updateCamera();
+    updateCamera(dt);
 
     if (charDebugMesh && character) {
         const fy = character.position.y - CHAR_FOOT_OFFSET;
@@ -1979,8 +1987,9 @@ function loop(now) {
     updateDebugMeshes();
 
     window._mpUpdate?.(dt);
-    sun.position.set(camera.position.x + 1000, camera.position.y + 2000, camera.position.z + 1000);
-    sun.target.position.copy(camera.position);
+
+    sun.position.set(camera.position.x+50, camera.position.y+100, camera.position.z+50);
+    sun.target=camera;
     sun.updateMatrixWorld();
     sun.target.updateMatrixWorld();
     sun.shadow.camera.updateProjectionMatrix();
@@ -2062,7 +2071,7 @@ window._vortex = {
     getAnimRest: () => anim.rest,
     keys,
     setSens(mult) {
-        CAM_H_SENS = 0.002 * Math.PI * mult;
+        CAM_H_SENS = 0.0015 * Math.PI * mult;
         CAM_V_SENS = 0.0015 * Math.PI * mult;
     },
     requestLock() { renderer.domElement.requestPointerLock(); },
@@ -2087,5 +2096,29 @@ window._vortex = {
     },
 };
 
+
+window.THREE = THREE;
+window.FBXLoader=FBXLoader;
+window.fbxLoader = fbxLoader;
+
+window.addStud=addStud;
+window.removeStud = removeStud;
+window.removeMatching_array=removeMatching_array;
+
+window.scene=scene;
+window.ambient=ambient;
+window.renderer=renderer;
+window.objects=objects;
+window.camera=camera;
+window.cam=cam;
+
+window._cursorOver=_cursorOver;
+
+window.clickSound=clickSound;
+window.canPlaySounds = false;
+
+window.BLOCK_COLORS=BLOCK_COLORS;
+window.MAX_BLOCKS=MAX_BLOCKS;
+window.validPlacement=validPlacement;
 
 requestAnimationFrame(loop);

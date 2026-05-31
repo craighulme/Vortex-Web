@@ -6,9 +6,9 @@ if (lightMode==='true') {
     lightModeToggle.click();
     (async function () {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-        const tabId = tabs[0];
+        const tab = tabs[0];
         chrome.scripting.executeScript({
-            target: { tabId: tabId.id },
+            target: { tabId: tab.id },
             func: () => {
                 localStorage.setItem("theme", 'light');
                 document.documentElement.setAttribute('theme', 'light');

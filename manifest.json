@@ -44,7 +44,7 @@
     },
     {
       "matches": ["https://vortex.towerstats.com/*"],
-      "js": ["js/oldVersion.js","js/lightMode.js"],
+      "js": ["js/webVortexLoader.js","js/lightMode.js"],
       "run_at": "document_start"
     }
   ],
