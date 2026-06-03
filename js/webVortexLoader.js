@@ -3,6 +3,7 @@ const importedAssets = {
     studNormal: chrome.runtime.getURL("img/textures/studNormal.png"),
 
     swordMdl: chrome.runtime.getURL("files/meshes/swordMdl.fbx"),
+    playerMdl: chrome.runtime.getURL("files/meshes/player.fbx"),
 
     swordSlash: chrome.runtime.getURL("files/sounds/swordSlash.mp3"),
     placeBlock: chrome.runtime.getURL("files/sounds/placeBlock.mp3"),
@@ -19,7 +20,8 @@ const importedAssets = {
             sfoth: chrome.runtime.getURL("img/games/website/banners/sfoth.webp"),
             swordfightingbaseplate: chrome.runtime.getURL("img/games/website/banners/swordfightingbaseplate.png"),
             baseplate: chrome.runtime.getURL("img/games/website/banners/baseplate.png"),
-            Glasshouses: chrome.runtime.getURL("img/games/website/banners/Glasshouses.webp")
+            Glasshouses: chrome.runtime.getURL("img/games/website/banners/Glasshouses.webp"),
+            NDS: chrome.runtime.getURL("img/games/website/banners/NDS.png")
         },
 
         icons: {
@@ -29,7 +31,8 @@ const importedAssets = {
             sfoth: chrome.runtime.getURL("img/games/website/icons/sfoth.webp"),
             swordfightingbaseplate: chrome.runtime.getURL("img/games/website/icons/swordfightingbaseplate.png"),
             baseplate: chrome.runtime.getURL("img/games/website/icons/baseplate.png"),
-            Glasshouses: chrome.runtime.getURL("img/games/website/icons/Glasshouses.webp")
+            Glasshouses: chrome.runtime.getURL("img/games/website/icons/Glasshouses.webp"),
+            NDS: chrome.runtime.getURL("img/games/website/icons/NDS.png")
         }
     },
     mapdata: {
@@ -40,6 +43,7 @@ const importedAssets = {
         SFOTH: chrome.runtime.getURL("files/mapdata/SFOTH.json"),
         Baseplate: chrome.runtime.getURL("files/mapdata/Baseplate.json"),
         Glasshouses: chrome.runtime.getURL("files/mapdata/Glasshouses.json"),
+        NDS: chrome.runtime.getURL("files/mapdata/NDS.json")
     }
 };
 
@@ -53,7 +57,7 @@ const overrides = new Map([
     ["notifications.js", "overrides/notifications.js"],
     ["leaderboard.js", "overrides/leaderboard.js"],
     ["chat.js", "overrides/chat.js"],
-    ["avatar.js","overrides/avatar.js"],
+    ["avatar.js", "overrides/avatar.js"],
     ["parts.js", "overrides/demoparts.js"],
     ["social.js", "overrides/social.js"],
 
@@ -106,6 +110,47 @@ if (play) {
     }
     init();
 } else {
+    if (url.searchParams.get("V22GameId")) {
+        const warn = document.createElement('div');
+        warn.innerHTML = `
+            <h2>vortex2+2 warning</h2>
+            <br>
+            <p>vortex2+2 multiplayer does not work anymore,breaking lots of things,<br>and there's nothing I can currently do about it.<br>the old vortex Websocket server that 2+2 used for multiplayer have been removed,<br>and I don't think it'll ever come back again.</p>
+            <br>
+            <br>
+        `;
+        warn.style = `
+            position: absolute;
+            left: 0;
+            width: 100%;
+            top: 0;
+            height: 100%;
+            background-color: rgba(0.1,0.1,0.1,0.8);
+            align-content: center;
+            text-align: center;
+            padding: 20px;
+            border: solid 5px black;
+            backdrop-filter: blur(3px);
+            z-index: 10;
+        `
+        const closebtn = document.createElement('button');
+        closebtn.style = `
+            padding: 10px;
+            background-color: rgb(255,100,100) !important;
+        `;
+        closebtn.innerHTML = 'close';
+        warn.appendChild(closebtn);
+        closebtn.onclick = function () {
+            warn.remove();
+        }
+        var observer = new MutationObserver(function () {
+            if (document.body) {
+                document.body.appendChild(warn);
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.documentElement, { childList: true });
+    }
     const meta = document.createElement("meta");
     meta.id = "_importedAssets";
     meta.name = "_importedAssets";

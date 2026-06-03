@@ -14,7 +14,7 @@
     notifEl.innerHTML = `
     <div class="notif-avatar">${username[0].toUpperCase().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
     <div class="notif-body">
-    <div class="notif-title">' + username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>
+    <div class="notif-title">${username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
     <div class="notif-sub">wants to be your friend</div>
     <div class="notif-actions">
     <button class="notif-btn notif-accept">Accept</button>
@@ -84,7 +84,7 @@
     <div class="notif-avatar notif-avatar-success">✓</div>
     <div class="notif-body">
     <div class="notif-title">You\'re friends!</div>
-    <div class="notif-sub">You and ' + username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + ' are now friends.</div>
+    <div class="notif-sub">You and ${username.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')} are now friends.</div>
     </div>
     `;
     notifContainer.appendChild(notifEl);
@@ -95,7 +95,7 @@
     notifEl.className = 'notif notif-success';
     notifEl.innerHTML = `
     <div class="notif-body">
-    <div class="notif-title">' + message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>
+    <div class="notif-title">${message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
     </div>
     `;
     notifContainer.appendChild(notifEl);

@@ -1,5 +1,5 @@
 //Made by Inuk
-if(typeof COLORS == 'undefined'){
+if (typeof COLORS == 'undefined') {
     const COLORS = ['#1a1a1a', '#2563EB', '#16A34A', '#9333EA', '#D97706', '#DC2626', '#0891B2'];
 }
 function avatarColor(u) {
@@ -363,7 +363,7 @@ function _redrawHealthbar(id, health) {
 
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    let grad = ctx.createLinearGradient(0, 5, 0, canvas.height-10)
+    let grad = ctx.createLinearGradient(0, 5, 0, canvas.height - 10)
     grad.addColorStop(0, "#3f8d00");
     grad.addColorStop(0.7, "#214602");
     grad.addColorStop(1, "#0b1a00");
@@ -488,6 +488,7 @@ async function fetchFriendData() {
 let _reconnectAttempts = 0;
 const _MAX_RECONNECTS = 3;
 async function connect() {
+    return
     const res = await fetch(`/api/ws-ticket?game_id=${window.GAME_ID || 0}&fingerprint=${encodeURIComponent(window._fingerprint || '')}`).then(r => r.ok ? r.json() : null);
     if (!res) { console.log('failed to connect'); setTimeout(connect, 4000); return; }
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -554,7 +555,7 @@ function encodeNetworkData(data) { //10 bits total
             let a = null;
             let b = null;
             blocks.forEach(block => {
-                if (block.owner == myId && (!a || block.last_sync < b.last_sync)) {
+                if ((block.owner == myId || block.owner == -1) && (!a || block.last_sync < b.last_sync)) {
                     a = `block_${block.x}_${block.y}_${block.z}`;
                     b = block;
                 }
@@ -611,7 +612,7 @@ function encodeNetworkData(data) { //10 bits total
 
 
 const blocks = new Map();
-let canPlace = false;
+let canPlace = true;
 //inuk's custom building system!
 function _setBlockState(userid, x, y, z, state) {
     if (!canPlace) return
@@ -661,12 +662,19 @@ function _setBlockState(userid, x, y, z, state) {
         } else {
             blockCounter.style.color = 'rgb(255 255 255 / 90%)'
         }
-        if(canPlaySounds){
+        if (canPlaySounds) {
             clickSound.currentTime = 0;
             clickSound.play();
         }
     }
 }
+
+let intv = setInterval(() => {
+    if(typeof validPlacement!='undefined' && typeof blockCounter!='undefined'){
+        clearInterval(intv);
+        loadBlocks();
+    }
+}, 10);
 
 function removeBlocks(userid) {
     blocks.forEach(b => {

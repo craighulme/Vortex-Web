@@ -7,7 +7,7 @@ import { FBXLoader } from "./libs/FBXLoader.js";
 
 const THREE = {
     ...THRE,
-    FBXLoader : FBXLoader,
+    FBXLoader: FBXLoader,
     BufferGeometryUtils: BufferGeometryUtils,
 };
 
@@ -78,7 +78,7 @@ sun.shadow.mapSize.width = 4000;
 sun.shadow.mapSize.height = 4000;
 sun.shadow.camera.near = 0.1;
 const s = 350;
-sun.shadow.camera.far = 2*s;
+sun.shadow.camera.far = 2 * s;
 sun.shadow.camera.left = -s;
 sun.shadow.camera.right = s;
 sun.shadow.camera.top = s;
@@ -88,8 +88,8 @@ sun.shadow.bias = -0.000002;
 scene.add(sun);
 const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
 backLight.position.set(-160, 500, -160);
-backLight.castShadow=false;
-window.backLight=backLight;
+backLight.castShadow = false;
+window.backLight = backLight;
 scene.add(backLight);
 
 const tlLoader = new THREE.TextureLoader();
@@ -154,7 +154,7 @@ function makeQuadSphere(radius, subs) {
         const len = posVec.length();
         const scale = 1///len; //apparently in roblox balls don't have correct uvs?
         uvVec.fromBufferAttribute(uv, i);
-        uv.setXY(i, halfU + (uvVec.x-halfU) * scale, halfV + (uvVec.y-halfV) * scale);
+        uv.setXY(i, halfU + (uvVec.x - halfU) * scale, halfV + (uvVec.y - halfV) * scale);
         posVec.normalize().multiplyScalar(radius);
         pos.setXYZ(i, posVec.x, posVec.y, posVec.z);
         normal.setXYZ(i, posVec.x / radius, posVec.y / radius, posVec.z / radius);
@@ -162,6 +162,74 @@ function makeQuadSphere(radius, subs) {
     geometry.setAttribute("normal", normal);
     uv.needsUpdate = true;
     return geometry;
+}
+function makeCylinder(radiusTop, radiusBottom, height, radialSegs, heightSegs) {
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const indices = [];
+    const halfH = height / 2;
+    for (let y = 0; y <= heightSegs; y++) {
+        const t = y / heightSegs;
+        const r = radiusTop + (radiusBottom - radiusTop) * t;
+        const posY = halfH - t * height;
+        const slope = (radiusBottom - radiusTop) / height;
+        for (let x = 0; x <= radialSegs; x++) {
+            const theta = (x / radialSegs) * Math.PI * 2;
+            const sin = Math.sin(theta);
+            const cos = Math.cos(theta);
+            positions.push(cos * r, posY, sin * r);
+            const nx = cos;
+            const ny = slope;
+            const nz = sin;
+            const nLen = Math.sqrt(nx*nx + ny*ny + nz*nz);
+            normals.push(nx/nLen, ny/nLen, nz/nLen);
+            uvs.push((x / radialSegs) * Math.PI * 2 * Math.max(radiusTop, radiusBottom), t * height);
+        }
+    }
+    const ringVerts = radialSegs + 1;
+    for (let y = 0; y < heightSegs; y++) {
+        for (let x = 0; x < radialSegs; x++) {
+            const a = y * ringVerts + x;
+            const b = a + ringVerts;
+            const c = b + 1;
+            const d = a + 1;
+            indices.push(a, d, b);
+            indices.push(b, d, c);
+        }
+    }
+    function addCap(radius, posY, normalY) {
+        const centerIdx = positions.length / 3;
+        positions.push(0, posY, 0);
+        normals.push(0, normalY, 0);
+        uvs.push(0, 0);
+        for (let x = 0; x <= radialSegs; x++) {
+            const theta = (x / radialSegs) * Math.PI * 2;
+            const sin = Math.sin(theta);
+            const cos = Math.cos(theta);
+            positions.push(cos * radius, posY, sin * radius);
+            normals.push(0, normalY, 0);
+            uvs.push(cos * radius, sin * radius);
+        }
+        for (let x = 0; x < radialSegs; x++) {
+            const a = centerIdx;
+            const b = centerIdx + 1 + x;
+            const c = centerIdx + 1 + x + 1;
+            if (normalY > 0) {
+                indices.push(a, c, b);
+            } else {
+                indices.push(a, b, c);
+            }
+        }
+    }
+    addCap(radiusTop,    halfH,  1);
+    addCap(radiusBottom, -halfH, -1);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    return geometry.toNonIndexed();
 }
 function makeWedge(width, height, depth) {
     const shape = new THREE.Shape();
@@ -177,7 +245,6 @@ function makeWedge(width, height, depth) {
     };
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
     geometry.center();
-    geometry=geometry.toNonIndexed();
     return geometry;
 }
 
@@ -242,7 +309,12 @@ function getCachedGeo(sw, sh, sd, shape = "Block") {
     } else if (shape == "Cylinder") {
         const radi = Math.min(sh, sd);
         const key = `${shape},${radi},${sw}`;
-        if (!geoCache.has(key)) geoCache.set(key, new THREE.CylinderGeometry(radi * 0.5, radi * 0.5, sw, 20, 1).toNonIndexed());
+        if (!geoCache.has(key)) geoCache.set(key, makeCylinder(radi*0.5,radi*0.5,sw,20,1));
+        return geoCache.get(key);
+    } else if (shape == "Cylinder2") {
+        const radi = Math.min(sw, sd);
+        const key = `${shape},${radi},${sh}`;
+        if (!geoCache.has(key)) geoCache.set(key, makeCylinder(radi*0.5,radi*0.5,sh,20,1));
         return geoCache.get(key);
     } else if (shape == "Wedge") {
         const key = `${shape},${sw},${sh},${sd}`;
@@ -258,11 +330,11 @@ function getCachedGeo(sw, sh, sd, shape = "Block") {
 }
 
 function getCachedMats(sw, sh, sd, color, shape = "Block", transparency = 0) {
-    if (shape == "Block" || shape == "Wedge" || shape == "CornerWedge") {
+    if (shape == "Block" || shape == "Wedge" || shape == "CornerWedge" || shape == "Cylinder" || shape == "Cylinder2") {
         const key = `c${color}t${transparency}`;
         if (matCache.has(key)) return matCache.get(key);
-        const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency });
-        if(transparency>0.7) m.castShadow=false;
+        const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency, fog: true });
+        if (transparency > 0.7) m.castShadow = false;
         const mats = m(1 / STUDS_PER_TILE, 1 / STUDS_PER_TILE);
         matCache.set(key, mats);
         return mats;
@@ -270,27 +342,9 @@ function getCachedMats(sw, sh, sd, color, shape = "Block", transparency = 0) {
         const radi = Math.min(sw, sh, sd);
         const key = `s${shape},r${radi},c${color}t${transparency}`;
         if (matCache.has(key)) return matCache.get(key);
-        const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency });
-        if(transparency>0.7) m.castShadow=false;
+        const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency, fog: true });
+        if (transparency > 0.7) m.castShadow = false;
         const mats = m(radi / STUDS_PER_TILE, radi / STUDS_PER_TILE);
-        matCache.set(key, mats);
-        return mats;
-    } else if (shape == "Cylinder") {
-        const radi = Math.min(sh, sd);
-        const cylen = sw;
-        const key = `s${shape},r${radi},l${cylen},c${color}t${transparency}`;
-        if (matCache.has(key)) return matCache.get(key);
-        const m = (rx, ry) => new THREE.MeshPhongMaterial({ color: color, map: studTex(rx, ry), normalMap: studNormalTex(rx, ry), shininess: 80, transparent: transparency > 0, opacity: 1 - transparency });
-        if(transparency>0.7) m.castShadow=false;
-        let uh = radi * Math.PI / STUDS_PER_TILE;
-        if (radi > 0.5) {
-            uh = Math.round(uh);
-        }
-        const mats = [
-            m(uh, cylen / STUDS_PER_TILE),
-            m(radi / STUDS_PER_TILE, radi / STUDS_PER_TILE),
-            m(radi / STUDS_PER_TILE, radi / STUDS_PER_TILE)
-        ];
         matCache.set(key, mats);
         return mats;
     }
@@ -304,40 +358,41 @@ const chunkMap = new Map();
 const _dummy = new THREE.Object3D();
 const stud_datas = [];
 const objects = [];
-function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Block", transparency = 0, staticMesh = false) {
-        const mesh = new THREE.Mesh(
-            getCachedGeo(sw, sh, sd, shape),
-            getCachedMats(sw, sh, sd, color, shape, transparency)
-        );
-        const cy = y + sh / 2;
-        mesh.rotation.order = 'YXZ';
-        if (shape == "Cylinder") {
-            mesh.position.set(x, cy, z);
-            mesh.rotation.set(rx, ry, rz + Math.PI * 0.5);
-        } else if (shape == "Wedge") {
-            mesh.position.set(x, cy, z);
-            mesh.rotation.set(rx, ry, rz);
-            mesh.rotateOnAxis(new THREE.Vector3(0, 1, 0), - Math.PI * 0.5)
-        } else if (shape == "CornerWedge") {
-            mesh.position.set(x, cy, z);
-            mesh.rotation.set(rx, ry, rz);
-            mesh.rotateOnAxis(new THREE.Vector3(0, 1, 0), - Math.PI * 0.5)
-        } else {
-            mesh.position.set(x, cy, z);
-            mesh.rotation.set(rx, ry, rz);
-        }
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.matrixAutoUpdate = false;
-        mesh.frustumCulled = true;
-        mesh.updateMatrix();
-        if(!staticMesh) scene.add(mesh);
-        let b;
-        if(shape=="Ball"){
-            sw*=0.7;
-            sh*=0.7;
-            sd*=0.7;
-        }
+function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Block", transparency = 0, staticMesh = false, canCollide = true) {
+    const mesh = new THREE.Mesh(
+        getCachedGeo(sw, sh, sd, shape),
+        getCachedMats(sw, sh, sd, color, shape, transparency)
+    );
+    const cy = y + sh / 2;
+    mesh.rotation.order = 'YXZ';
+    if (shape == "Cylinder") {
+        mesh.position.set(x, cy, z);
+        mesh.rotation.set(rx, ry, rz + Math.PI * 0.5);
+    } else if (shape == "Wedge") {
+        mesh.position.set(x, cy, z);
+        mesh.rotation.set(rx, ry, rz);
+        mesh.rotateOnAxis(new THREE.Vector3(0, 1, 0), - Math.PI * 0.5)
+    } else if (shape == "CornerWedge") {
+        mesh.position.set(x, cy, z);
+        mesh.rotation.set(rx, ry, rz);
+        mesh.rotateOnAxis(new THREE.Vector3(0, 1, 0), - Math.PI * 0.5)
+    } else {
+        mesh.position.set(x, cy, z);
+        mesh.rotation.set(rx, ry, rz);
+    }
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.matrixAutoUpdate = false;
+    mesh.frustumCulled = true;
+    mesh.updateMatrix();
+    if (!staticMesh) scene.add(mesh);
+    let b;
+    if (shape == "Ball") {
+        sw *= 0.7;
+        sh *= 0.7;
+        sd *= 0.7;
+    }
+    if (canCollide) {
         if (rx === 0 && ry === 0 && rz === 0) {
             b = {
                 minX: x - sw / 2, maxX: x + sw / 2,
@@ -356,11 +411,12 @@ function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Bl
             colliders.push(b);
             insertToChunks(b);
         }
-        const m = staticMesh ? (null) : (mesh);
-        let stud_id = stud_datas.push({ m , b }) - 1;
-        mesh.stud_id = stud_id;
-        if(!staticMesh) objects.push(mesh);
-        return [mesh, stud_id];
+    }
+    const m = staticMesh ? (null) : (mesh);
+    let stud_id = stud_datas.push({ m, b }) - 1;
+    mesh.stud_id = stud_id;
+    if (!staticMesh && canCollide) objects.push(mesh);
+    return [mesh, stud_id];
 }
 
 
@@ -478,7 +534,7 @@ function getNearbyColliders(px, py, pz) {
 }
 
 const G = 1.6;
-window.G=G;
+window.G = G;
 
 let CHAR_STAND_Y = 3.68;
 const WALK_SPEED = 16;
@@ -646,7 +702,7 @@ let _spawnPoint = { x: 0, y: null, z: 0, ry: Math.PI };
 let _shirtMesh = null;
 
 const fbxLoader = new THREE.FBXLoader();
-fbxLoader.load('assets/models/player.fbx', (fbx) => {
+fbxLoader.load(importedAssets.playerMdl, (fbx) => {
     //const helper = new THREE.SkeletonHelper(fbx.children[0]);
     //scene.add(helper);
 
@@ -679,6 +735,7 @@ fbxLoader.load('assets/models/player.fbx', (fbx) => {
 
     scene.add(fbx);
     character = fbx;
+    window.character = character;
     _shirtMesh = _buildShirtOverlay(fbx);
     renderer.shadowMap.needsUpdate = true;
 });
@@ -1053,7 +1110,7 @@ async function makeToolButtons() {
         }
 
         blockCounter = document.createElement('p');
-        window.blockCounter=blockCounter;
+        window.blockCounter = blockCounter;
         blockCounter.style = "height: 32px;color: rgb(255 255 255 / 90%) !important;position: absolute;left: 30%;width: 40%;bottom: 100px;text-align: center;text-shadow: 1px 1px 5px black;";
         blockCounter.innerText = '0/' + MAX_BLOCKS;
         toolbar.appendChild(blockCounter);
@@ -1107,7 +1164,7 @@ renderer.domElement.addEventListener('mousedown', e => {
                         return
                     }
                 }
-                _setBlockState(myId, roundedPoint.x, roundedPoint.y, roundedPoint.z, selectedBlockState);
+                _setBlockState(-1, roundedPoint.x, roundedPoint.y, roundedPoint.z, selectedBlockState);
             }
         }
     }
@@ -1857,8 +1914,8 @@ function update(dt) {
 function updateCamera(dt) {
     if (!character) return;
 
-    if(keys['ArrowLeft']) cam.yaw+=dt*2;
-    if(keys['ArrowRight']) cam.yaw-=dt*2;
+    if (keys['ArrowLeft']) cam.yaw += dt * 2;
+    if (keys['ArrowRight']) cam.yaw -= dt * 2;
 
     const sinYaw = Math.sin(cam.yaw);
     const cosYaw = Math.cos(cam.yaw);
@@ -1988,8 +2045,8 @@ function loop(now) {
 
     window._mpUpdate?.(dt);
 
-    sun.position.set(camera.position.x+50, camera.position.y+100, camera.position.z+50);
-    sun.target=camera;
+    sun.position.set(camera.position.x + 50, camera.position.y + 100, camera.position.z + 50);
+    sun.target = camera;
     sun.updateMatrixWorld();
     sun.target.updateMatrixWorld();
     sun.shadow.camera.updateProjectionMatrix();
@@ -2025,7 +2082,6 @@ async function loadMapVortex(path, tx = 0, ty = 0, tz = 0) {
     }
 }
 
-console.log(window.SWORD_FIGHT)
 let gameSong;
 let gameSongVolume = 0.9;
 makeSettingsSlider('Music volume', 0, 1, 0.9, 0.1, function (slider, val) {
@@ -2079,6 +2135,7 @@ window._vortex = {
     getCamera: () => camera,
     getCharBubbleBase: () => character ? character.position.y + CHAR_HEIGHT - CHAR_FOOT_OFFSET + 0.4 : 0,
     setSpawn(x, y, z, ry = Math.PI) {
+        console.log(`set spawn to: ${x} ${y} ${z}`)
         _spawnPoint = { x, y, z, ry };
         if (character) {
             character.position.set(x, y + CHAR_FOOT_OFFSET, z);
@@ -2098,27 +2155,27 @@ window._vortex = {
 
 
 window.THREE = THREE;
-window.FBXLoader=FBXLoader;
+window.FBXLoader = FBXLoader;
 window.fbxLoader = fbxLoader;
 
-window.addStud=addStud;
+window.addStud = addStud;
 window.removeStud = removeStud;
-window.removeMatching_array=removeMatching_array;
+window.removeMatching_array = removeMatching_array;
 
-window.scene=scene;
-window.ambient=ambient;
-window.renderer=renderer;
-window.objects=objects;
-window.camera=camera;
-window.cam=cam;
+window.scene = scene;
+window.ambient = ambient;
+window.renderer = renderer;
+window.objects = objects;
+window.camera = camera;
+window.cam = cam;
 
-window._cursorOver=_cursorOver;
+window._cursorOver = _cursorOver;
 
-window.clickSound=clickSound;
+window.clickSound = clickSound;
 window.canPlaySounds = false;
 
-window.BLOCK_COLORS=BLOCK_COLORS;
-window.MAX_BLOCKS=MAX_BLOCKS;
-window.validPlacement=validPlacement;
+window.BLOCK_COLORS = BLOCK_COLORS;
+window.MAX_BLOCKS = MAX_BLOCKS;
+window.validPlacement = validPlacement;
 
 requestAnimationFrame(loop);

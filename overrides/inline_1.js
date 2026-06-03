@@ -30,7 +30,7 @@ function _setPadColor(pad, hex) {
     if (!pad.mesh) return;
     if (Array.isArray(pad.mesh.material)) {
         for (const m of pad.mesh.material) m.color.setHex(hex);
-    }else{
+    } else {
         pad.mesh.material.color.setHex(hex);
     }
 }
@@ -181,9 +181,9 @@ async function _handlePadStep(pad) {
 let didVortexThings = false;
 
 setInterval(() => {
-    if(!didVortexThings){
+    if (!didVortexThings && window._vortex) {
         window._vortex.setSens(savedSens);
-        didVortexThings=true;
+        didVortexThings = true;
     }
     const ch = window._vortex?.getCharacter?.();
     if (!ch || !window.SHIRT_PADS || _promptOpen || _currentItemId === undefined) return;
@@ -198,3 +198,53 @@ setInterval(() => {
         if (hit) _handlePadStep(hit);
     }
 }, 100);
+
+
+let fcountg = 0;
+function postMessageAndWait(type, payload1, payload2) {
+    return new Promise((resolve) => {
+        const fcount = fcountg;
+        function handler(event) {
+            if (event.source !== window) return;
+            if (event.data?.type !== (type + fcount) + "Response") return;
+
+            window.removeEventListener("message", handler);
+
+            const payload = event.data.payload;
+
+            const res = new Response(payload.body, {
+                status: payload.status,
+                statusText: payload.statusText,
+                headers: new Headers(payload.headers),
+                url: payload.url,
+                type: payload.type,
+            });
+            res.json = function(){
+                return payload.bodyJson;
+            }
+            res.text = function(){
+                return res.body;
+            }
+
+            resolve(res);
+        }
+
+        window.addEventListener("message", handler);
+
+        window.postMessage({
+            type: type + fcount,
+            payload1,
+            payload2
+        }, "*");
+        fcountg++;
+    });
+}
+
+const oldFetch = fetch;
+fetch = function(a,b){
+    if((typeof a == 'string')&&a.startsWith('http')){
+        return postMessageAndWait('fetch',a,b)
+    }else{
+        return oldFetch(a,b)
+    }
+}

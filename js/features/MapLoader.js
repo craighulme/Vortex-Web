@@ -3,23 +3,31 @@
 
 let mapsLoaded = []
 const deg2rad = 0.0174532925;
-async function loadMapUrl(name, url, yoff) {
-    console.log("Loading map from url:", name, url);
-    if (!yoff) yoff = 0
-    if (!url) return
-    let f = await fetch(url)
-    let mapData = await f.json()
+function loadMapRaw(name, r, tx=0, ty=1.6, tz=0) {
+    let mapData = typeof r == "string" ? JSON.parse(r) : r;
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (let i = 0; i < mapData.length; i++) {
+        let v = mapData[i]
+        const [px, py, pz] = v.P ? v.P : v.Position;
+        minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+        minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+        minZ = Math.min(minZ, pz); maxZ = Math.max(maxZ, pz);
+    }
+    const ox = tx - (minX + maxX) / 2;
+    const oy = ty - minY;
+    const oz = tz - (minZ + maxZ) / 2;
     mapsLoaded[name] = {studs:[],meshes:[]}
     for (let i = 0; i < mapData.length; i++) {
         let v = mapData[i]
-        //{"Rotation":[0.0,0.0,0.0],"Type":"Part","Position":[94,0.5,20],"Color":"4a7c59","Transparency":0,"Shape":"Block","Size":[340,2,240]}
         let s = v.Size ? v.Size : v.S;
         let p = v.P ? v.P : v.Position;
         let r = v.R ? v.R : v.Rotation;
         let c = v.C ? v.C : v.Color;
         let transp = v.Tr ? v.Tr : v.Transparency;
         let sh = v.Sh ? v.Sh : v.Shape;
-        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5 + yoff, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp, true)
+        let canCollide = !v.CantCollide;
+        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0] + ox, p[1] - s[1] * 0.5 + oy, p[2] + oz, r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp, true, canCollide)
         mapsLoaded[name].studs.push(stud_id);
         mapsLoaded[name].meshes.push(mesh);
     }
@@ -49,94 +57,22 @@ async function loadMapUrl(name, url, yoff) {
         objects.push(mergedMesh);
         mapsLoaded[name].meshes=[...mapsLoaded[name].meshes,mergedMesh];
     })
+    mapsLoaded[name].translation = [ox+tx,oy+ty,oz+tz];
+}
+async function loadMapUrl(name, url, tx=0, ty=1.6, tz=0) {
+    console.log("Loading map from url:", name, url);
+    if (!url) return
+    let f = await fetch(url)
+    let mapData = await f.json()
+    loadMapRaw(name,mapData,tx,ty,tz);
 }
 
-async function loadMapData(name, asset, yoff) {
+async function loadMapData(name, asset, tx=0, ty=1.6, tz=0) {
     console.log("Loading map:", name, asset);
-    if (!yoff) yoff = 0
     let f = await fetch(importedAssets.mapdata[asset])
     let r = await f.text()
     let mapData = JSON.parse(r)
-    mapsLoaded[name] = {studs:[],meshes:[]}
-    for (let i = 0; i < mapData.length; i++) {
-        let v = mapData[i]
-        let s = v.Size ? v.Size : v.S;
-        let p = v.P ? v.P : v.Position;
-        let r = v.R ? v.R : v.Rotation;
-        let c = v.C ? v.C : v.Color;
-        let transp = v.Tr ? v.Tr : v.Transparency;
-        let sh = v.Sh ? v.Sh : v.Shape;
-        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5 + yoff, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp, true)
-        mapsLoaded[name][i] = [mesh, stud_id]
-    }
-    const geometries = new Map();
-    const materials = new Map();
-    for (let i = 0; i < mapsLoaded[name].meshes.length; i++) {
-        let mesh = mapsLoaded[name].meshes[i];
-        let key = mesh.material.uuid;
-        mesh.updateMatrix();
-        const geo = mesh.geometry.clone();
-        geo.applyMatrix4(mesh.matrix);
-
-        if (!materials.has(key)) {
-            materials.set(key, mesh.material);
-            geometries.set(key, [geo]);
-        } else {
-            geometries.set(key, [...geometries.get(key), geo]);
-        }
-    }
-    mapsLoaded[name].meshes=[];
-    geometries.forEach((value, key) => {
-        const merged = THREE.BufferGeometryUtils.mergeGeometries(value);
-        const mergedMesh = new THREE.Mesh(merged, materials.get(key));
-        mergedMesh.castShadow=true;
-        mergedMesh.receiveShadow=true;
-        scene.add(mergedMesh);
-        objects.push(mergedMesh);
-        mapsLoaded[name].meshes=[...mapsLoaded[name].meshes,mergedMesh];
-    })
-}
-
-function loadMapRaw(name, r) {
-    let mapData = JSON.parse(r)
-    mapsLoaded[name] = {studs:[],meshes:[]}
-    for (let i = 0; i < mapData.length; i++) {
-        let v = mapData[i]
-        let s = v.Size ? v.Size : v.S;
-        let p = v.P ? v.P : v.Position;
-        let r = v.R ? v.R : v.Rotation;
-        let c = v.C ? v.C : v.Color;
-        let transp = v.Tr ? v.Tr : v.Transparency;
-        let sh = v.Sh ? v.Sh : v.Shape;
-        let [mesh, stud_id] = addStud(s[0], s[1], s[2], Number('0x' + c), p[0], p[1] - s[1] * 0.5, p[2], r[0] * deg2rad, r[1] * deg2rad, r[2] * deg2rad, sh, transp, true)
-        mapsLoaded[name][i] = [mesh, stud_id]
-    }
-    const geometries = new Map();
-    const materials = new Map();
-    for (let i = 0; i < mapsLoaded[name].meshes.length; i++) {
-        let mesh = mapsLoaded[name].meshes[i];
-        let key = mesh.material.uuid;
-        mesh.updateMatrix();
-        const geo = mesh.geometry.clone();
-        geo.applyMatrix4(mesh.matrix);
-
-        if (!materials.has(key)) {
-            materials.set(key, mesh.material);
-            geometries.set(key, [geo]);
-        } else {
-            geometries.set(key, [...geometries.get(key), geo]);
-        }
-    }
-    mapsLoaded[name].meshes=[];
-    geometries.forEach((value, key) => {
-        const merged = THREE.BufferGeometryUtils.mergeGeometries(value);
-        const mergedMesh = new THREE.Mesh(merged, materials.get(key));
-        mergedMesh.castShadow=true;
-        mergedMesh.receiveShadow=true;
-        scene.add(mergedMesh);
-        objects.push(mergedMesh);
-        mapsLoaded[name].meshes=[...mapsLoaded[name].meshes,mergedMesh];
-    })
+    loadMapRaw(name,mapData,tx,ty,tz);
 }
 
 function unloadMap(name) {
@@ -165,7 +101,7 @@ const maps = [
         creatorId: 1961,
         gameId: -1,
 
-        spawnPoints: [[330, 100, 27]],
+        spawnPoints: [[17, 100, 0]],
 
         SWORD_FIGHT: true,
 
@@ -182,7 +118,7 @@ const maps = [
         creatorId: 1961,
         gameId: -2,
 
-        spawnPoints: [[-882.333740234375, 14.200042724609375, 1286.9000244140626], [-1151.333740234375, 506.2000732421875, 872.9000244140625], [-1150.333740234375, 633.4000244140625, 855.9000244140625], [-1081.333740234375, 689.8001098632813, 1322.9000244140626], [-1150.333740234375, 633.4000244140625, 847.9000244140625], [-1320.333740234375, 275.80010986328127, 1015.9000244140625], [-874.333740234375, 14.200042724609375, 1286.9000244140626], [-1222.333740234375, 155.800048828125, 1376.9000244140626], [-1298.333740234375, 40.60003662109375, 1349.9000244140626], [-1418.333740234375, 272.2000427246094, 1107.9000244140626], [-1204.333740234375, 505.4000549316406, 1161.9000244140626], [-1281.333740234375, 286.6000671386719, 1240.9000244140626], [-1180.333740234375, 247.0000457763672, 1135.9000244140626], [-1180.333740234375, 247.0000457763672, 1187.9000244140626], [-1232.333740234375, 247.0000457763672, 1187.9000244140626], [-1232.333740234375, 247.0000457763672, 1135.9000244140626], [-1206.333740234375, 247.0000457763672, 1359.9000244140626], [-1052.333740234375, 136.6000518798828, 1302.9000244140626], [-1217.333740234375, 247.0000457763672, 1013.9000244140625], [-1328.333740234375, 275.8000793457031, 1007.9000244140625], [-1410.333740234375, 339.4000549316406, 1016.9000244140625], [-1103.333740234375, 339.4000549316406, 1073.9000244140626], [-1143.333740234375, 339.4000549316406, 1277.9000244140626], [-1083.333740234375, 136.60003662109376, 1331.9000244140626], [-1121.333740234375, 339.4000549316406, 1014.9000244140625], [-1185.333740234375, 40.60003662109375, 1275.9000244140626], [-1678.333740234375, 386.2000427246094, 1210.9000244140626], [-1678.333740234375, 386.2000427246094, 1273.9000244140626], [-1416.333740234375, 57.4000244140625, 1399.9000244140626], [-1059.333740234375, 218.20004272460938, 1220.9000244140626]],
+        spawnPoints: [[172.28240966796876,368.3000183105469,-1657.9500732421876],[132.28240966796876,368.3000183105469,-1453.9500732421876],[-44.71759796142578,304.7000732421875,-1715.9500732421876],[71.28240203857422,534.300048828125,-1569.9500732421876],[-142.71759033203126,301.1000061035156,-1623.9500732421876],[-5.717597961425781,315.5000305175781,-1490.9500732421876],[223.28240966796876,165.50001525878907,-1428.9500732421876],[58.28240203857422,275.9000244140625,-1717.9500732421876],[-402.71759033203127,415.1000061035156,-1520.9500732421876],[-402.71759033203127,415.1000061035156,-1457.9500732421876],[-52.71759796142578,304.7000427246094,-1723.9500732421876],[192.28240966796876,165.5,-1399.9500732421876],[69.28240203857422,275.9000244140625,-1371.9500732421876],[-134.71759033203126,368.3000183105469,-1714.9500732421876],[125.28240203857422,662.2999877929688,-1875.9500732421876],[401.28240966796877,43.100006103515628,-1444.9500732421876],[124.28240203857422,535.1000366210938,-1858.9500732421876],[393.28240966796877,43.100006103515628,-1444.9500732421876],[194.28240966796876,718.7000732421875,-1408.9500732421876],[53.28240203857422,184.70001220703126,-1354.9500732421876],[-22.71759796142578,69.5,-1381.9500732421876],[125.28240203857422,662.2999877929688,-1883.9500732421876],[43.28240203857422,275.9000244140625,-1543.9500732421876],[43.28240203857422,275.9000244140625,-1595.9500732421876],[95.28240203857422,275.9000244140625,-1543.9500732421876],[-140.71759033203126,86.29998779296875,-1331.9500732421876],[90.28240203857422,69.5,-1455.9500732421876],[216.28240966796876,247.10000610351563,-1510.9500732421876],[154.28240966796876,368.3000183105469,-1716.9500732421876],[95.28240203857422,275.9000244140625,-1595.9500732421876]],
 
         skyColor: 0xFFB540,
 
@@ -240,8 +176,6 @@ const maps = [
         creatorId: 6837,
         gameId: -7,
 
-        yoff: 4,
-
         SWORD_FIGHT: true,
         REMOVE_BASEPLATE: true,
     },
@@ -271,6 +205,20 @@ const maps = [
 
         REMOVE_BASEPLATE: true,
     },
+
+    {
+        name: "NDS",
+        url: "window._importedAssets.NDS",
+        picture: "window._importedAssets.NDS",
+        bannerpicture: "window._importedAssets.NDS",
+        description: "Just your average natural disaster survival.",
+        creatorName: "inuk",
+        creatorId: 1961,
+        gameId: -8,
+        spawnPoints: [[-1602.02, 177.215, 367.537]],
+        ty:-11,
+        REMOVE_BASEPLATE: true,
+    },
 ];
 
 function defSpawnPoint() {
@@ -285,6 +233,13 @@ function chooseSpawnPoint(m) {
     let cx = entry[0]
     let cy = entry[1]
     let cz = entry[2]
+    let mn = m.name;
+    let mloaded = mapsLoaded[mn]
+    if(mloaded){
+        cx+=mloaded.translation[0]
+        cy+=mloaded.translation[1]
+        cz+=mloaded.translation[2]
+    }
     return { x: cx, y: cy, z: cz }
 }
 
@@ -337,7 +292,6 @@ async function importMapAssets() {
                 }
             }
             if (map.url.startsWith("window.")) {
-                console.log(importedAssets.mapdata[map.url.split(".")[2]])
                 maps[i].url = importedAssets.mapdata[map.url.split(".")[2]]
             }
         }
@@ -482,11 +436,9 @@ async function initialize() {
         if (gamei) {
             tmap = maps[gamei]
             if (tmap.gameId != 1) {
+                await loadMapUrl(tmap.name, tmap.url, tmap.tx ? tmap.tx : 0, tmap.ty ? tmap.ty : 1.6, tmap.tz ? tmap.tz : 0)
                 let spawn = window.chooseSpawnPoint(tmap)
                 window._vortex.setSpawn(spawn.x, spawn.y, spawn.z, 0);
-
-                loadMapUrl(tmap.name, tmap.url, tmap.yoff)
-
                 if (!tmap.REMOVE_BASEPLATE) {
                     const ground = new THREE.Mesh(
                         getCachedGeo(320, 3.2, 320),
@@ -571,16 +523,16 @@ async function initialize() {
                 btn.innerHTML = map.name + '(Loaded)'
                 loaded = true
             }
-            btn.onclick = () => {
+            btn.onclick = async function(){
                 if (loaded) {
                     unloadMap(map.name)
                     btn.innerHTML = map.name + '(Not loaded)'
                     loaded = false
                 } else {
                     if (map.url && map.url.startsWith("window.")) {
-                        loadMapData(map.name, map.url.split(".")[2], map.yoff)
+                        await loadMapData(map.name, map.url.split(".")[2])
                     } else {
-                        loadMapUrl(map.name, map.url, map.yoff)
+                        await loadMapUrl(map.name, map.url)
                     }
                     let spawn = window.chooseSpawnPoint(map)
                     window._vortex.setSpawn(spawn.x, spawn.y, spawn.z, 0);
@@ -656,7 +608,6 @@ async function initialize() {
             collapsibles[i].style.display = 'none'
         }
 
-        console.log('loading');
         // finally, add the gui to the page
         document.body.appendChild(panel);
     }

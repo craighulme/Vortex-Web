@@ -30,7 +30,8 @@
         "styles/main.css"
       ],
       "js": [
-        "js/inject/InjectMapLoader.js"
+        "js/inject/InjectMapLoader.js",
+        "js/features/fetchCSPBypass.js"
       ],
       "run_at": "document_idle"
     },
