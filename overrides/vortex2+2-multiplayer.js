@@ -8,6 +8,37 @@ function avatarColor(u) {
 }
 
 function _isBone(n) { return n.isBone || n.type === 'Bone'; }
+function _boneAlias(name) { return String(name || "").replace(/\s+/g, "_"); }
+const NATIVE_CHARACTER_FOOT_OFFSET = 2.0;
+
+function _nativeFootOffset() {
+    const offset = Number(localStorage.getItem("v22NativeFootOffset"));
+    return Number.isFinite(offset) && Math.abs(offset) < 10 ? offset : NATIVE_CHARACTER_FOOT_OFFSET;
+}
+
+function _sceneFootOffset() {
+    const offset = Number(_vortex.getCharFootOffset?.());
+    return Number.isFinite(offset) ? offset : _nativeFootOffset();
+}
+
+function _nativeYToSceneY(y) {
+    return Number(y) - _nativeFootOffset() + _sceneFootOffset();
+}
+
+function _sceneYToNativeY(y) {
+    return Number(y) - _sceneFootOffset() + _nativeFootOffset();
+}
+
+function _normalizeAvatarFields(data = {}) {
+    const colors = Array.isArray(data.body_colors) ? data.body_colors : (Array.isArray(data.bodyColors) ? data.bodyColors : []);
+    return {
+        shirt_id: Number(data.shirt_id ?? data.shirtId ?? 0) || 0,
+        pant_id: Number(data.pant_id ?? data.pantId ?? 0) || 0,
+        body_type: String(data.body_type ?? data.bodyType ?? "male").toLowerCase() === "female" ? "female" : "male",
+        body_colors: _safeBodyColors(colors),
+        face_id: Number(data.face_id ?? data.faceId ?? 0) || 0
+    };
+}
 
 function _clonePlayerFBX() {
     const src = _vortex.getCharacter();
@@ -16,13 +47,32 @@ function _clonePlayerFBX() {
     const clone = src.clone(true);
     const toRemove = [];
     clone.traverse(o => {
-        if (o.name === "ShirtOverlay") toRemove.push(o);
+        if (/Overlay$/.test(o.name || "")) toRemove.push(o);
     });
     toRemove.forEach(o => o.parent?.remove(o));
 
+    clone.traverse(o => {
+        if (!o.isMesh) return;
+        if (Array.isArray(o.material)) {
+            o.material = o.material.map(m => m?.clone ? m.clone() : m);
+        } else if (o.material?.clone) {
+            o.material = o.material.clone();
+        }
+        delete o.userData.v22ClonedBodyMaterials;
+        delete o.userData.v22ClonedBodyMaterial;
+    });
+
     const srcBones = {}, cloneBones = {};
-    src.traverse(n => { if (_isBone(n)) srcBones[n.name] = n; });
-    clone.traverse(n => { if (_isBone(n)) cloneBones[n.name] = n; });
+    src.traverse(n => {
+        if (!_isBone(n)) return;
+        srcBones[n.name] = n;
+        srcBones[_boneAlias(n.name)] = n;
+    });
+    clone.traverse(n => {
+        if (!_isBone(n)) return;
+        cloneBones[n.name] = n;
+        cloneBones[_boneAlias(n.name)] = n;
+    });
 
     const srcMeshes = [], cloneMeshes = [];
     src.traverse(m => { if (m.isSkinnedMesh) srcMeshes.push(m); });
@@ -30,15 +80,16 @@ function _clonePlayerFBX() {
     srcMeshes.forEach((srcM, i) => {
         const cloneM = cloneMeshes[i];
         if (!cloneM) return;
-        const newBones = srcM.skeleton.bones.map(b => cloneBones[b.name] || b);
+        const newBones = srcM.skeleton.bones.map(b => cloneBones[b.name] || cloneBones[_boneAlias(b.name)] || b);
         cloneM.skeleton = new THREE.Skeleton(newBones, srcM.skeleton.boneInverses.map(m => m.clone()));
         cloneM.bind(cloneM.skeleton, srcM.bindMatrix.clone());
     });
 
     const rest = _vortex.getAnimRest();
     clone.traverse(n => {
-        if (!_isBone(n) || !rest[n.name]) return;
-        const r = rest[n.name];
+        if (!_isBone(n)) return;
+        const r = rest[n.name] || rest[_boneAlias(n.name)];
+        if (!r) return;
         n.rotation.set(r.x, r.y, r.z);
         n.position.y = r.py;
     });
@@ -68,7 +119,7 @@ function _makeNameLabel(username) {
     return spr;
 }
 
-function makeRemote(username, id, shirtUrl) {
+function makeRemote(username, id, avatar) {
     const grp = _clonePlayerFBX();
     if (!grp) return null;
 
@@ -79,13 +130,18 @@ function makeRemote(username, id, shirtUrl) {
     grp.add(spr);
 
     const bones = {};
-    grp.traverse(n => { if (_isBone(n)) bones[n.name] = n; });
+    grp.traverse(n => {
+        if (!_isBone(n)) return;
+        bones[n.name] = n;
+        bones[_boneAlias(n.name)] = n;
+    });
     const rest = _vortex.getAnimRest();
     const shirtMesh = _vortex.buildShirtOverlay(grp);
-    if (shirtMesh) {
-        _vortex.applyShirtToMesh(shirtMesh, shirtUrl);
-    }
-    return { grp, bones, rest, shirtMesh };
+    const pantsMesh = _vortex.buildPantsOverlay?.(grp);
+    const faceMesh = _vortex.buildFaceOverlay?.(grp);
+    const meshes = { grp, bones, rest, shirtMesh, pantsMesh, faceMesh };
+    _vortex.applyAvatarToMeshes?.(meshes, avatar);
+    return meshes;
 }
 
 function disposeRemote(m) {
@@ -644,7 +700,7 @@ function _parseMovementRecord(buffer, offset, hasPacketType) {
     if (!_textOk(name)) return null;
 
     const foffNoNul = nameOff + nameLen;
-    const offsets = [foffNoNul + 1, foffNoNul, foffNoNul + 2];
+    const offsets = [foffNoNul + 1, foffNoNul + 2, foffNoNul];
     let best = null;
     for (const foff of offsets) {
         if (foff + 18 > view.byteLength) continue;
@@ -654,37 +710,91 @@ function _parseMovementRecord(buffer, offset, hasPacketType) {
         const yaw = view.getFloat32(foff + 12, true);
         if (![x, y, z, yaw].every(Number.isFinite)) continue;
         if (Math.abs(x) > 1000000 || Math.abs(y) > 1000000 || Math.abs(z) > 1000000) continue;
+        const hasModernTail = foff + 63 <= view.byteLength && view.getUint8(foff + 22) === 1;
+        const avatar = _readPacketAvatar(view, foff);
+        if (hasModernTail && !avatar.valid) continue;
         const rec = {
             id, game, name, x, y, z, yaw,
             state0: view.getUint8(foff + 16),
             state1: view.getUint8(foff + 17),
             animTime: foff + 22 <= view.byteLength ? view.getFloat32(foff + 18, true) : 0,
-            shirtId: _readPacketShirtId(view, foff),
-            floatOffset: foff
+            ...avatar,
+            floatOffset: foff,
+            recordBytes: hasModernTail ? 63 : (foff + 55 <= view.byteLength ? 55 : 22)
         };
         let score = 0;
         if (rec.state0 <= 1 && rec.state1 <= 1) score += 100;
         if (Math.abs(rec.yaw) <= 8) score += 20;
-        if (foff === foffNoNul + 1) score += 2;
+        if (foff === foffNoNul + 1) score += 4;
+        else if (foff === foffNoNul + 2) score += 2;
         if (!best || score > best.score) best = { rec, score };
     }
     return best?.rec || null;
 }
 
-function _readPacketShirtId(view, foff) {
-    let shirtId = 0;
-    if (foff + 55 <= view.byteLength) {
-        shirtId = view.getUint8(foff + 22);
+function _packetColorHex(value) {
+    return `#${(Number(value || 0) & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
+function _readPacketAvatar(view, foff) {
+    const avatar = {
+        shirtId: 0,
+        pantId: 0,
+        bodyType: "male",
+        bodyColors: [],
+        faceId: 0,
+        hasAvatar: false,
+        valid: true
+    };
+    if (foff + 63 <= view.byteLength && view.getUint8(foff + 22) === 1) {
+        const firstId = view.getUint32(foff + 23, true);
+        avatar.faceId = firstId;
+        avatar.pantId = view.getUint32(foff + 28, true);
+        const colors = [];
+        let off = foff + 33;
+        for (let i = 0; i < 6; i += 1) {
+            colors.push(_packetColorHex(view.getUint32(off, true)));
+            off += 4;
+        }
+        avatar.bodyColors = colors;
+        const bodyTypeByte = view.getUint8(off);
+        avatar.bodyType = bodyTypeByte === 2 ? "female" : "male";
+        avatar.faceId = view.getUint32(off + 1, true);
+        avatar.valid = (bodyTypeByte === 1 || bodyTypeByte === 2) &&
+            avatar.pantId >= 0 && avatar.pantId < 1000 &&
+            avatar.faceId >= 0 && avatar.faceId < 1000;
+        avatar.hasAvatar = avatar.valid;
+    } else if (foff + 55 <= view.byteLength) {
+        avatar.shirtId = view.getUint8(foff + 22);
+        avatar.pantId = view.getUint8(foff + 23);
+        const colors = [];
+        let off = foff + 25;
+        for (let i = 0; i < 6; i += 1) {
+            colors.push(_packetColorHex(view.getUint32(off, true)));
+            off += 4;
+        }
+        avatar.bodyColors = colors;
+        const bodyTypeByte = view.getUint8(off);
+        avatar.bodyType = bodyTypeByte === 2 ? "female" : "male";
+        avatar.faceId = view.getUint32(off + 1, true);
+        avatar.valid = (bodyTypeByte === 1 || bodyTypeByte === 2) &&
+            avatar.shirtId >= 0 && avatar.shirtId < 1000 &&
+            avatar.pantId >= 0 && avatar.pantId < 1000 &&
+            avatar.faceId >= 0 && avatar.faceId < 1000;
+        avatar.hasAvatar = avatar.valid;
     } else if (foff + 27 <= view.byteLength && view.getUint8(foff + 22) === 1) {
-        shirtId = view.getUint32(foff + 23, true);
+        avatar.faceId = view.getUint32(foff + 23, true);
     } else if (foff + 26 <= view.byteLength) {
-        shirtId = view.getUint32(foff + 22, true);
+        avatar.shirtId = view.getUint32(foff + 22, true);
     }
-    return shirtId > 0 && shirtId < 1000 ? shirtId : 0;
+    if (avatar.shirtId < 0 || avatar.shirtId >= 1000) avatar.shirtId = 0;
+    if (avatar.pantId < 0 || avatar.pantId >= 1000) avatar.pantId = 0;
+    if (avatar.faceId < 0 || avatar.faceId >= 1000) avatar.faceId = 0;
+    return avatar;
 }
 
 function _findNextRecord(buffer, off, rec) {
-    const minNext = off + rec.floatOffset + 22;
+    const minNext = off + rec.floatOffset + (rec.recordBytes || 22);
     const maxNext = Math.min(buffer.byteLength, off + rec.floatOffset + 96);
     for (let next = minNext; next <= maxNext; next++) {
         if (_parseMovementRecord(buffer, next, false)) return next;
@@ -698,14 +808,20 @@ function _parsePlayersPacket(buffer) {
     const expected = _u64(view, 4);
     if (expected == null) return null;
     const records = [];
+    const seen = new Set();
     let off = 12;
-    while (off + 32 < buffer.byteLength && records.length < 64 && (!expected || records.length < expected)) {
+    while (off + 32 < buffer.byteLength && records.length < 128 && (!expected || records.length < expected)) {
         const rec = _parseMovementRecord(buffer, off, false);
-        if (!rec) break;
-        records.push(rec);
+        if (!rec) {
+            off += 1;
+            continue;
+        }
+        if (!seen.has(rec.id)) {
+            seen.add(rec.id);
+            records.push(rec);
+        }
         const next = _findNextRecord(buffer, off, rec);
-        if (next == null) break;
-        off = next;
+        off = next == null ? off + 1 : next;
     }
     return records;
 }
@@ -775,7 +891,7 @@ function _packetColorInt(color) {
 
 function _encodeMovementPacket(data) {
     const nameBytes = new TextEncoder().encode(launchInfo.username);
-    const len = 4 + 8 + 8 + 8 + nameBytes.length + 1 + 4 + 4 + 4 + 4 + 1 + 1 + 4 + 33;
+    const len = 4 + 8 + 8 + 8 + nameBytes.length + 1 + 16 + 2 + 4 + 41;
     const buffer = new ArrayBuffer(len);
     const view = new DataView(buffer);
     let off = 0;
@@ -784,7 +900,7 @@ function _encodeMovementPacket(data) {
     _writeU64(view, off, launchInfo.gameId); off += 8;
     _writeU64(view, off, nameBytes.length); off += 8;
     new Uint8Array(buffer, off, nameBytes.length).set(nameBytes); off += nameBytes.length;
-    view.setUint8(off, 2); off += 1;
+    view.setUint8(off, 0); off += 1;
     view.setFloat32(off, Number(data.x || 0), true); off += 4;
     view.setFloat32(off, Number(data.y || 0), true); off += 4;
     view.setFloat32(off, Number(data.z || 0), true); off += 4;
@@ -794,16 +910,20 @@ function _encodeMovementPacket(data) {
     view.setUint8(off, anim === "jump" ? 0 : 1); off += 1;
     animClock += 0.05;
     view.setFloat32(off, animClock, true); off += 4;
-    view.setUint8(off, (launchInfo.shirtId || 0) & 0xff); off += 1;
-    view.setUint8(off, (launchInfo.pantId || 0) & 0xff); off += 1;
-    view.setUint8(off, 0); off += 1;
     const colors = _safeBodyColors(launchInfo.bodyColors);
-    for (let i = 0; i < 6; i++) {
+    const bodyType = String(launchInfo.bodyType || "male").toLowerCase() === "female" ? 2 : 1;
+    const faceId = Number(launchInfo.faceId || 0) || 0;
+    view.setUint8(off, 1); off += 1;
+    view.setUint32(off, faceId, true); off += 4;
+    view.setUint8(off, bodyType); off += 1;
+    view.setUint32(off, Number(launchInfo.pantId || 0) || 0, true); off += 4;
+    view.setUint8(off, 0); off += 1;
+    for (let i = 0; i < 6; i += 1) {
         view.setUint32(off, _packetColorInt(colors[i]), true);
         off += 4;
     }
-    view.setUint8(off, String(launchInfo.bodyType || "male").toLowerCase() === "female" ? 2 : 1); off += 1;
-    view.setUint32(off, launchInfo.faceId || 0, true); off += 4;
+    view.setUint8(off, bodyType); off += 1;
+    view.setUint32(off, faceId, true); off += 4;
     view.setUint8(off, 0);
     return buffer;
 }
@@ -838,18 +958,27 @@ function _encodeChatPacket(msg) {
 function _handleNativePacket(buffer) {
     const players = _parsePlayersPacket(buffer);
     if (players) {
-        const converted = players.filter(p => p.id !== myId).map(p => ({
-            id: p.id,
-            username: p.name,
-            is_staff: false,
-            is_booster: false,
-            shirt_id: p.shirtId || 0,
-            x: p.x,
-            y: p.y,
-            z: p.z,
-            ry: p.yaw,
-            anim: p.state1 === 0 ? "jump" : p.state0 ? "walk" : "idle"
-        }));
+        const converted = players.filter(p => p.id !== myId).map(p => {
+            const state = {
+                id: p.id,
+                username: p.name,
+                is_staff: false,
+                is_booster: false,
+                x: p.x,
+                y: p.y,
+                z: p.z,
+                ry: p.yaw,
+                anim: p.state1 === 0 ? "jump" : p.state0 ? "walk" : "idle"
+            };
+            if (p.hasAvatar) {
+                if (p.shirtId) state.shirt_id = p.shirtId;
+                if (p.pantId) state.pant_id = p.pantId;
+                if (p.bodyType) state.body_type = p.bodyType;
+                if (Array.isArray(p.bodyColors) && p.bodyColors.length === 6) state.body_colors = p.bodyColors;
+                if (p.faceId) state.face_id = p.faceId;
+            }
+            return state;
+        });
         for (const p of converted) {
             if (!remotes.has(p.id)) handle({ type: "join", ...p });
         }
@@ -984,6 +1113,10 @@ async function connectOnce() {
         is_staff: false,
         is_booster: false,
         shirt_id: launchInfo.shirtId,
+        pant_id: launchInfo.pantId,
+        body_type: launchInfo.bodyType,
+        body_colors: launchInfo.bodyColors,
+        face_id: launchInfo.faceId,
         players: []
     });
 
@@ -1200,6 +1333,26 @@ function removeBlocks(userid) {
 const url = new URL(document.URL);
 const gamei = url.searchParams.get("V22GameId");
 function decodeNetworkData(playerData, r) {
+    if (playerData.shirt_id !== undefined || playerData.pant_id !== undefined || playerData.body_colors !== undefined || playerData.face_id !== undefined) {
+        const avatarPatch = {};
+        if (playerData.shirt_id !== undefined && Number(playerData.shirt_id) > 0) avatarPatch.shirt_id = playerData.shirt_id;
+        if (playerData.pant_id !== undefined && Number(playerData.pant_id) > 0) avatarPatch.pant_id = playerData.pant_id;
+        if (playerData.body_type !== undefined) avatarPatch.body_type = playerData.body_type;
+        if (Array.isArray(playerData.body_colors) && playerData.body_colors.length === 6) avatarPatch.body_colors = playerData.body_colors;
+        if (playerData.face_id !== undefined && Number(playerData.face_id) > 0) avatarPatch.face_id = playerData.face_id;
+        const nextAvatar = _normalizeAvatarFields({ ...(r.avatar || {}), ...avatarPatch });
+        const prev = JSON.stringify(r.avatar || {});
+        const next = JSON.stringify(nextAvatar);
+        if (prev !== next) {
+            r.avatar = nextAvatar;
+            if (r.meshes) _vortex.applyAvatarToMeshes?.(r.meshes, nextAvatar);
+        }
+    }
+
+    if (![playerData.x, playerData.y, playerData.z, playerData.ry].every(Number.isFinite)) {
+        return;
+    }
+
     let fractional = (playerData.ry * 100) % 1;
     let specialState = Math.round(fractional * 1024);
 
@@ -1228,7 +1381,7 @@ function decodeNetworkData(playerData, r) {
             syncNormalData = true;
         }
         if (syncNormalData) {
-            r.tPos.set(playerData.x, playerData.y, playerData.z);
+            r.tPos.set(playerData.x, _nativeYToSceneY(playerData.y), playerData.z);
             r.tRy = Math.round(playerData.ry * 100) / 100;
             r.anim = playerData.anim;
             r.seen = performance.now();
@@ -1244,7 +1397,7 @@ function decodeNetworkData(playerData, r) {
             syncNormalData = true;
         }
         if (syncNormalData) {
-            r.tPos.set(playerData.x, playerData.y, playerData.z);
+            r.tPos.set(playerData.x, _nativeYToSceneY(playerData.y), playerData.z);
             r.tRy = Math.round(playerData.ry * 100) / 100;
             r.anim = playerData.anim;
             r.seen = performance.now();
@@ -1264,7 +1417,7 @@ function decodeNetworkData(playerData, r) {
             _setBlockState(playerData.id, x_block, y_block, z_block, state_block);
         }
     } else {
-        r.tPos.set(playerData.x, playerData.y, playerData.z);
+        r.tPos.set(playerData.x, _nativeYToSceneY(playerData.y), playerData.z);
         r.tRy = playerData.ry;
         r.anim = playerData.anim;
         r.seen = performance.now();
@@ -1295,6 +1448,10 @@ function handle(d) {
                     username: d.username,
                     gameId: d.game_id || d.gameId || Number(window.GAME_ID || 0),
                     shirtId: d.shirt_id || 0,
+                    pantId: d.pant_id || 0,
+                    bodyType: d.body_type || "male",
+                    bodyColors: d.body_colors || [],
+                    faceId: d.face_id || 0,
                     clientToken: "",
                     appToken: "",
                     raw: d
@@ -1303,10 +1460,10 @@ function handle(d) {
             Leaderboard.setMyId(myId);
             Leaderboard.addPlayer({ id: myId, username: d.username, is_staff: d.is_staff, is_booster: d.is_booster });
             for (const p of d.players) {
-                addRemote(p.id, p.username, p.is_staff, p.is_booster, p.shirt_id);
+                addRemote(p.id, p.username, p.is_staff, p.is_booster, p);
                 _showHealthBar(p.id)
             }
-            _vortex.applyShirt(d.shirt_id ? "/assets/clothing/" + d.shirt_id + ".png" : null);
+            _vortex.applyAvatar?.(d);
             _showHealthBar(myId);
             fetchFriendData();
             if (window.BUILD_MODE) {
@@ -1323,7 +1480,7 @@ function handle(d) {
 
         case 'join': {
             if (d.id === myId) break;
-            addRemote(d.id, d.username, d.is_staff, d.is_booster, d.shirt_id);
+            addRemote(d.id, d.username, d.is_staff, d.is_booster, d);
             _showHealthBar(d.id);
             Chat.systemPlayer(d.username, `${d.username} joined.`);
             break;
@@ -1345,6 +1502,9 @@ function handle(d) {
 
         case 'states': {
             for (const p of d.players) {
+                if (p.id !== myId && !remotes.has(p.id)) {
+                    addRemote(p.id, p.username, p.is_staff, p.is_booster, p);
+                }
                 const r = remotes.get(p.id);
                 if (!r) continue;
                 decodeNetworkData(p, r)
@@ -1353,6 +1513,9 @@ function handle(d) {
         }
 
         case 'chat': {
+            if (d.id !== myId && !remotes.has(d.id)) {
+                addRemote(d.id, d.username, d.is_staff, d.is_booster, {});
+            }
             Chat.message(d.username, d.msg, d.id === myId, d.is_staff, d.is_owner, d.is_booster);
             if (d.id === myId || remotes.has(d.id)) {
                 _showBubble(d.id, d.msg);
@@ -1393,7 +1556,9 @@ function handle(d) {
         case "shirt_update": {
             const rp = remotes.get(d.id);
             if (rp?.meshes) {
-                _vortex.applyShirtToMesh(rp.meshes.shirtMesh, d.shirt_id ? "/assets/clothing/" + d.shirt_id + ".png" : null);
+                const avatar = _normalizeAvatarFields({ ...(rp.avatar || {}), ...d });
+                rp.avatar = avatar;
+                _vortex.applyAvatarToMeshes?.(rp.meshes, avatar);
             } else {
                 const pending = _pendingAvatars.get(d.id);
                 if (pending) pending.shirt_id = d.shirt_id;
@@ -1446,12 +1611,19 @@ window._mpSetFriendStatus = function (id, status) {
     Leaderboard.setFriendStatus(id, status);
 };
 
-function addRemote(id, username, is_staff, is_booster, shirtId) {
-    if (remotes.has(id)) return;
-    const shirtUrl = shirtId ? "/assets/clothing/" + shirtId + ".png" : null;
+function addRemote(id, username, is_staff, is_booster, avatarData) {
+    if (remotes.has(id)) {
+        const r = remotes.get(id);
+        r.username = username || r.username;
+        r.is_staff = is_staff ?? r.is_staff;
+        r.is_booster = is_booster ?? r.is_booster;
+        decodeNetworkData(avatarData || {}, r);
+        return;
+    }
+    const avatar = _normalizeAvatarFields(avatarData);
     let meshes = null;
-    if (_vortex.getCharacter()) { try { meshes = makeRemote(username, id, shirtUrl); } catch (e) { console.error('[mp] makeRemote failed:', e); } }
-    if (!meshes) _pendingAvatars.set(id, { username, is_staff, is_booster, shirt_id: shirtId });
+    if (_vortex.getCharacter()) { try { meshes = makeRemote(username, id, avatar); } catch (e) { console.error('[mp] makeRemote failed:', e); } }
+    if (!meshes) _pendingAvatars.set(id, { username, is_staff, is_booster, ...avatar });
 
     remotes.set(id, {
         meshes,
@@ -1461,10 +1633,14 @@ function addRemote(id, username, is_staff, is_booster, shirtId) {
         animTime: 0,
         seen: performance.now(),
         id: id,
+        username,
+        is_staff,
+        is_booster,
+        avatar,
     });
     Leaderboard.addPlayer({ id, username, is_staff, is_booster });
     Leaderboard.setFriendStatus(id, _statusFor(id));
-    if (!shirtId) hydrateRemoteShirt(id);
+    if (!avatar.shirt_id) hydrateRemoteShirt(id);
 
     const pendingBubbles = _pendingBubbles.get(id);
     if (pendingBubbles?.length) {
@@ -1536,10 +1712,11 @@ function extractProfileShirtId(data) {
 }
 
 function applyRemoteShirt(id, shirtId) {
-    const url = shirtId ? "/assets/clothing/" + shirtId + ".png" : null;
+    const avatar = _normalizeAvatarFields({ ...(remotes.get(id)?.avatar || {}), shirt_id: shirtId || 0 });
     const rp = remotes.get(id);
     if (rp?.meshes) {
-        _vortex.applyShirtToMesh(rp.meshes.shirtMesh, url);
+        rp.avatar = avatar;
+        _vortex.applyAvatarToMeshes?.(rp.meshes, avatar);
     } else {
         const pending = _pendingAvatars.get(id);
         if (pending) pending.shirt_id = shirtId || 0;
@@ -1592,7 +1769,7 @@ function startBroadcast() {
         let dataToEncode = {
             type: 'state',
             x: char.position.x,
-            y: char.position.y,
+            y: _sceneYToNativeY(char.position.y),
             z: char.position.z,
             ry: ry,
             anim: anim,
@@ -1615,7 +1792,8 @@ window._mpUpdate = function (dt) {
             const r = remotes.get(id);
             if (r && !r.meshes) {
                 try {
-                    r.meshes = makeRemote(info.username, id, info.shirt_id ? "/assets/clothing/" + info.shirt_id + ".png" : null);
+                    r.avatar = _normalizeAvatarFields(info);
+                    r.meshes = makeRemote(info.username, id, r.avatar);
                 } catch (e) {
                     console.error('[mp] makeRemote failed:', e);
                 }
@@ -1660,6 +1838,71 @@ window._mpUpdate = function (dt) {
 window._mpSendChat = function (msg) {
     bridgeSend({ type: 'chat', msg });
 }
+
+window._mpRebuildAvatars = function () {
+    for (const [id, r] of remotes) {
+        const old = r.meshes;
+        const visible = old?.grp?.visible;
+        const pos = old?.grp?.position?.clone();
+        const ry = old?.grp?.rotation?.y;
+        disposeRemote(old);
+        r.meshes = null;
+        try {
+            r.meshes = makeRemote(r.username || String(id), id, r.avatar || {});
+            if (r.meshes) {
+                if (pos) r.meshes.grp.position.copy(pos);
+                if (Number.isFinite(ry)) r.meshes.grp.rotation.y = ry;
+                r.meshes.grp.visible = !!visible;
+            }
+        } catch (e) {
+            console.error("[mp] avatar rebuild failed:", e);
+        }
+    }
+};
+
+window.addEventListener("v22-character-renderer-changed", () => {
+    window._mpRebuildAvatars?.();
+});
+
+window.VortexAvatar = {
+    get renderer() {
+        return _vortex.getAvatarRenderer?.() || "legacy";
+    },
+    setRenderer(mode) {
+        const next = _vortex.setAvatarRenderer?.(mode);
+        return next;
+    },
+    getOutfit() {
+        return _vortex.getAvatar?.();
+    },
+    async setOutfit(outfit, persist = true) {
+        const normalized = _normalizeAvatarFields(outfit);
+        if (persist) {
+            const res = await fetch("/api/clothing/outfit", {
+                method: "PUT",
+                credentials: "same-origin",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    shirt_id: normalized.shirt_id,
+                    pant_id: normalized.pant_id,
+                    body_type: normalized.body_type,
+                    body_colors: normalized.body_colors,
+                    face_id: normalized.face_id
+                })
+            });
+            if (!res.ok) throw new Error(`outfit update failed: HTTP ${res.status} ${await res.text().catch(() => "")}`);
+        }
+        if (launchInfo) {
+            launchInfo.shirtId = normalized.shirt_id;
+            launchInfo.pantId = normalized.pant_id;
+            launchInfo.bodyType = normalized.body_type;
+            launchInfo.bodyColors = normalized.body_colors;
+            launchInfo.faceId = normalized.face_id;
+        }
+        await _vortex.applyAvatar?.(normalized);
+        return normalized;
+    }
+};
 
 window._mpCreateDummy = function (x, y, z, shirtUrl, ry = 0) {
     const char = _clonePlayerFBX();

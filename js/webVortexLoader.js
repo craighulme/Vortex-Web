@@ -6,6 +6,8 @@ const importedAssets = {
 
     swordMdl: extensionApi.runtime.getURL("files/meshes/swordMdl.fbx"),
     playerMdl: extensionApi.runtime.getURL("files/meshes/player.fbx"),
+    malePlayerGlb: extensionApi.runtime.getURL("files/meshes/male.glb"),
+    femalePlayerGlb: extensionApi.runtime.getURL("files/meshes/female.glb"),
 
     swordSlash: extensionApi.runtime.getURL("files/sounds/swordSlash.mp3"),
     placeBlock: extensionApi.runtime.getURL("files/sounds/placeBlock.mp3"),
@@ -52,6 +54,7 @@ const importedAssets = {
 const overrides = new Map([
     ["three.min.js", "overrides/libs/three.module.js"],
     ["FBXLoader.js", "overrides/libs/FBXLoader.js"],
+    ["GLTFLoader.js", "overrides/libs/GLTFLoader.js"],
     ["inflate.min.js", "overrides/libs/inflate.min.js"],
 
     ["inline_1.js", "overrides/inline_1.js"],

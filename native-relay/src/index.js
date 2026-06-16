@@ -202,18 +202,27 @@ class NativeSession {
       const present = new Set();
       const states = players
         .filter((p) => p.id !== this.player?.id)
-        .map((p) => ({
-          id: p.id,
-          username: p.name,
-          is_staff: false,
-          is_booster: false,
-          shirt_id: p.shirtId || 0,
-          x: p.x,
-          y: p.y,
-          z: p.z,
-          ry: p.yaw,
-          anim: p.state1 === 0 ? "jump" : p.state0 ? "walk" : "idle",
-        }));
+        .map((p) => {
+          const state = {
+            id: p.id,
+            username: p.name,
+            is_staff: false,
+            is_booster: false,
+            x: p.x,
+            y: p.y,
+            z: p.z,
+            ry: p.yaw,
+            anim: p.state1 === 0 ? "jump" : p.state0 ? "walk" : "idle",
+          };
+          if (p.hasAvatar) {
+            if (p.shirtId) state.shirt_id = p.shirtId;
+            if (p.pantId) state.pant_id = p.pantId;
+            if (p.bodyType) state.body_type = p.bodyType;
+            if (Array.isArray(p.bodyColors) && p.bodyColors.length === 6) state.body_colors = p.bodyColors;
+            if (p.faceId) state.face_id = p.faceId;
+          }
+          return state;
+        });
 
       for (const p of states) {
         present.add(p.id);
@@ -388,14 +397,14 @@ function encodeHeartbeat(token) {
 
 function encodeMovement(player, data, animClock) {
   const nameBytes = encoder.encode(player.username);
-  const buf = Buffer.alloc(4 + 8 + 8 + 8 + nameBytes.length + 1 + 16 + 2 + 4 + 33);
+  const buf = Buffer.alloc(4 + 8 + 8 + 8 + nameBytes.length + 1 + 16 + 2 + 4 + 41);
   let off = 0;
   buf.writeUInt32LE(0, off); off += 4;
   writeU64(buf, off, player.id); off += 8;
   writeU64(buf, off, player.gameId); off += 8;
   writeU64(buf, off, nameBytes.length); off += 8;
   Buffer.from(nameBytes).copy(buf, off); off += nameBytes.length;
-  buf.writeUInt8(2, off); off += 1;
+  buf.writeUInt8(0, off); off += 1;
   buf.writeFloatLE(Number(data.x || 0), off); off += 4;
   buf.writeFloatLE(Number(data.y || 0), off); off += 4;
   buf.writeFloatLE(Number(data.z || 0), off); off += 4;
@@ -405,16 +414,20 @@ function encodeMovement(player, data, animClock) {
   buf.writeUInt8(anim === "idle" ? 0 : 1, off); off += 1;
   buf.writeUInt8(anim === "jump" ? 0 : 1, off); off += 1;
   buf.writeFloatLE(animClock, off); off += 4;
-  buf.writeUInt8((player.shirtId || 0) & 0xff, off); off += 1;
-  buf.writeUInt8((player.pantId || 0) & 0xff, off); off += 1;
-  buf.writeUInt8(0, off); off += 1;
   const colors = safeBodyColors(player.bodyColors);
+  const bodyType = player.bodyType === "female" ? 2 : 1;
+  const faceId = safeInt(player.faceId);
+  buf.writeUInt8(1, off); off += 1;
+  buf.writeUInt32LE(faceId, off); off += 4;
+  buf.writeUInt8(bodyType, off); off += 1;
+  buf.writeUInt32LE(safeInt(player.pantId), off); off += 4;
+  buf.writeUInt8(0, off); off += 1;
   for (let i = 0; i < 6; i += 1) {
     buf.writeUInt32LE(colorToPacketInt(colors[i]), off);
     off += 4;
   }
-  buf.writeUInt8(player.bodyType === "female" ? 2 : 1, off); off += 1;
-  buf.writeUInt32LE(player.faceId || 0, off); off += 4;
+  buf.writeUInt8(bodyType, off); off += 1;
+  buf.writeUInt32LE(faceId, off); off += 4;
   buf.writeUInt8(0, off);
   return buf;
 }
@@ -440,14 +453,22 @@ function parsePlayersPacket(buf) {
   if (expected == null) return null;
 
   const records = [];
+  const seen = new Set();
   let off = 12;
-  while (off + 32 < buf.length && records.length < 64 && (!expected || records.length < expected)) {
+  while (off + 32 < buf.length && records.length < 128 && (!expected || records.length < expected)) {
     const rec = parseMovementRecord(buf, off, false);
-    if (!rec) break;
-    records.push(rec);
+    if (!rec) {
+      off += 1;
+      continue;
+    }
+
+    if (!seen.has(rec.id)) {
+      seen.add(rec.id);
+      records.push(rec);
+    }
+
     const next = findNextRecord(buf, off, rec);
-    if (next == null) break;
-    off = next;
+    off = next == null ? off + 1 : next;
   }
 
   return records;
@@ -469,7 +490,7 @@ function parseMovementRecord(buf, offset, hasPacketType) {
   if (!textOk(name)) return null;
 
   const firstFloat = nameOff + nameLen;
-  const offsets = [firstFloat + 1, firstFloat, firstFloat + 2];
+  const offsets = [firstFloat + 1, firstFloat + 2, firstFloat];
   let best = null;
 
   for (const foff of offsets) {
@@ -486,7 +507,9 @@ function parseMovementRecord(buf, offset, hasPacketType) {
     const state1 = buf.readUInt8(foff + 17);
     if (state0 > 2 || state1 > 2) continue;
 
-    const shirtId = readShirtId(buf, foff);
+    const hasModernTail = foff + 63 <= buf.length && buf.readUInt8(foff + 22) === 1;
+    const avatar = readPacketAvatar(buf, foff);
+    if (hasModernTail && !avatar.valid) continue;
     const rec = {
       id,
       game,
@@ -498,30 +521,81 @@ function parseMovementRecord(buf, offset, hasPacketType) {
       state0,
       state1,
       animTime: foff + 22 <= buf.length ? buf.readFloatLE(foff + 18) : 0,
-      shirtId,
+      ...avatar,
       floatOffset: foff - offset,
+      recordBytes: hasModernTail ? 63 : (foff + 55 <= buf.length ? 55 : 22),
     };
 
     let score = 0;
     if (state0 <= 1 && state1 <= 1) score += 100;
     if (Math.abs(yaw) <= 8) score += 20;
-    if (foff === firstFloat + 1) score += 2;
+    if (foff === firstFloat + 1) score += 4;
+    else if (foff === firstFloat + 2) score += 2;
     if (!best || score > best.score) best = { rec, score };
   }
 
   return best?.rec || null;
 }
 
-function readShirtId(buf, foff) {
-  let shirtId = 0;
-  if (foff + 55 <= buf.length) {
-    shirtId = buf.readUInt8(foff + 22);
+function packetColorHex(value) {
+  return `#${(Number(value || 0) & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
+function readPacketAvatar(buf, foff) {
+  const avatar = {
+    shirtId: 0,
+    pantId: 0,
+    bodyType: "male",
+    bodyColors: [],
+    faceId: 0,
+    hasAvatar: false,
+    valid: true,
+  };
+  if (foff + 63 <= buf.length && buf.readUInt8(foff + 22) === 1) {
+    const firstId = buf.readUInt32LE(foff + 23);
+    avatar.faceId = firstId;
+    avatar.pantId = buf.readUInt32LE(foff + 28);
+    const colors = [];
+    let off = foff + 33;
+    for (let i = 0; i < 6; i += 1) {
+      colors.push(packetColorHex(buf.readUInt32LE(off)));
+      off += 4;
+    }
+    avatar.bodyColors = colors;
+    const bodyTypeByte = buf.readUInt8(off);
+    avatar.bodyType = bodyTypeByte === 2 ? "female" : "male";
+    avatar.faceId = buf.readUInt32LE(off + 1);
+    avatar.valid = (bodyTypeByte === 1 || bodyTypeByte === 2) &&
+      avatar.pantId >= 0 && avatar.pantId < 1000 &&
+      avatar.faceId >= 0 && avatar.faceId < 1000;
+    avatar.hasAvatar = avatar.valid;
+  } else if (foff + 55 <= buf.length) {
+    avatar.shirtId = buf.readUInt8(foff + 22);
+    avatar.pantId = buf.readUInt8(foff + 23);
+    const colors = [];
+    let off = foff + 25;
+    for (let i = 0; i < 6; i += 1) {
+      colors.push(packetColorHex(buf.readUInt32LE(off)));
+      off += 4;
+    }
+    avatar.bodyColors = colors;
+    const bodyTypeByte = buf.readUInt8(off);
+    avatar.bodyType = bodyTypeByte === 2 ? "female" : "male";
+    avatar.faceId = buf.readUInt32LE(off + 1);
+    avatar.valid = (bodyTypeByte === 1 || bodyTypeByte === 2) &&
+      avatar.shirtId >= 0 && avatar.shirtId < 1000 &&
+      avatar.pantId >= 0 && avatar.pantId < 1000 &&
+      avatar.faceId >= 0 && avatar.faceId < 1000;
+    avatar.hasAvatar = avatar.valid;
   } else if (foff + 27 <= buf.length && buf.readUInt8(foff + 22) === 1) {
-    shirtId = buf.readUInt32LE(foff + 23);
+    avatar.faceId = buf.readUInt32LE(foff + 23);
   } else if (foff + 26 <= buf.length) {
-    shirtId = buf.readUInt32LE(foff + 22);
+    avatar.shirtId = buf.readUInt32LE(foff + 22);
   }
-  return shirtId > 0 && shirtId < 1000 ? shirtId : 0;
+  if (avatar.shirtId < 0 || avatar.shirtId >= 1000) avatar.shirtId = 0;
+  if (avatar.pantId < 0 || avatar.pantId >= 1000) avatar.pantId = 0;
+  if (avatar.faceId < 0 || avatar.faceId >= 1000) avatar.faceId = 0;
+  return avatar;
 }
 
 function safeBodyType(value) {
@@ -544,7 +618,7 @@ function colorToPacketInt(color) {
 }
 
 function findNextRecord(buf, off, rec) {
-  const minNext = off + rec.floatOffset + 22;
+  const minNext = off + rec.floatOffset + (rec.recordBytes || 22);
   const maxNext = Math.min(buf.length, off + rec.floatOffset + 96);
   for (let next = minNext; next <= maxNext; next++) {
     if (parseMovementRecord(buf, next, false)) return next;

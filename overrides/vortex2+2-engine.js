@@ -4,10 +4,12 @@ console.log('VORTEX ENGINE OVERRIDDEN!')
 import * as THRE from "./libs/three.module.js";
 import * as BufferGeometryUtils from "./libs/BufferGeometryUtils.js";
 import { FBXLoader } from "./libs/FBXLoader.js";
+import { GLTFLoader } from "./libs/GLTFLoader.js";
 
 const THREE = {
     ...THRE,
     FBXLoader: FBXLoader,
+    GLTFLoader: GLTFLoader,
     BufferGeometryUtils: BufferGeometryUtils,
 };
 
@@ -718,45 +720,201 @@ function getBone(...names) {
 let character = null;
 let _spawnPoint = { x: 0, y: null, z: 0, ry: Math.PI };
 let _shirtMesh = null;
+let _pantsMesh = null;
+let _faceMesh = null;
+let _avatarRenderer = localStorage.getItem("v22AvatarRenderer") || "modern";
+let _avatarState = {
+    shirt_id: 0,
+    pant_id: 0,
+    body_type: "male",
+    body_colors: ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"],
+    face_id: 0
+};
+const _clothingImageCache = new Map();
 
 const fbxLoader = new THREE.FBXLoader();
-fbxLoader.load(importedAssets.playerMdl, (fbx) => {
-    //const helper = new THREE.SkeletonHelper(fbx.children[0]);
-    //scene.add(helper);
+const gltfLoader = new THREE.GLTFLoader();
 
-    fbx.position.set(0, 0, 0);
-    fbx.updateMatrixWorld(true);
+function _canonicalBoneName(name) {
+    return String(name || "").replace(/\s+/g, "_");
+}
 
-    const box = new THREE.Box3().setFromObject(fbx);
+const _neutralAvatarState = {
+    shirt_id: 0,
+    pant_id: 0,
+    body_type: "male",
+    body_colors: ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"],
+    face_id: 0
+};
+
+function _normalizeAvatar(avatar = {}, fallback = _avatarState) {
+    const base = fallback || _neutralAvatarState;
+    const colors = Array.isArray(avatar.body_colors) ? avatar.body_colors : (Array.isArray(avatar.bodyColors) ? avatar.bodyColors : base.body_colors);
+    const outColors = [];
+    for (let i = 0; i < 6; i++) {
+        const color = String(colors[i] || "#ffffff").trim();
+        outColors.push(/^#?[0-9a-f]{6}$/i.test(color) ? (color.startsWith("#") ? color : `#${color}`) : "#ffffff");
+    }
+    return {
+        shirt_id: Number(avatar.shirt_id ?? avatar.shirtId ?? base.shirt_id ?? 0) || 0,
+        pant_id: Number(avatar.pant_id ?? avatar.pantId ?? base.pant_id ?? 0) || 0,
+        body_type: String(avatar.body_type ?? avatar.bodyType ?? base.body_type ?? "male").toLowerCase() === "female" ? "female" : "male",
+        body_colors: outColors,
+        face_id: Number(avatar.face_id ?? avatar.faceId ?? base.face_id ?? 0) || 0
+    };
+}
+
+function _legacyClothingUrl(id) {
+    return id ? `/assets/clothing/${id}.png` : null;
+}
+
+async function _modernClothingUrl(id) {
+    id = Number(id || 0);
+    if (!id) return null;
+    if (_clothingImageCache.has(id)) return _clothingImageCache.get(id);
+    const res = await fetch(`/api/clothing/images?ids=${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "force-cache" });
+    if (!res.ok) throw new Error(`clothing image ${id} failed: HTTP ${res.status}`);
+    const data = await res.json();
+    const url = data[String(id)] || data[id] || null;
+    _clothingImageCache.set(id, url);
+    return url;
+}
+
+async function _avatarClothingUrl(id) {
+    return _avatarRenderer === "legacy" ? _legacyClothingUrl(id) : _modernClothingUrl(id);
+}
+
+function _registerBone(child) {
+    const name = child.name;
+    const alias = _canonicalBoneName(name);
+    const rest = {
+        x: child.rotation.x, y: child.rotation.y, z: child.rotation.z,
+        px: child.position.x, py: child.position.y, pz: child.position.z,
+    };
+    anim.bones[name] = child;
+    anim.rest[name] = rest;
+    anim.bones[alias] = child;
+    anim.rest[alias] = rest;
+}
+
+function _disposeCharacter(root) {
+    if (!root) return;
+    scene.remove(root);
+    root.traverse((obj) => {
+        if (obj.geometry && /Overlay$/.test(obj.name || "")) obj.geometry.dispose?.();
+        if (obj.material && /Overlay$/.test(obj.name || "")) {
+            obj.material.map?.dispose?.();
+            obj.material.dispose?.();
+        }
+    });
+}
+
+function _prepareCharacterModel(model) {
+    const previous = character;
+    const previousFootY = previous ? previous.position.y - CHAR_FOOT_OFFSET : null;
+    const previousRotationY = previous ? previous.rotation.y : _spawnPoint.ry;
+    const previousPosition = previous ? previous.position.clone() : null;
+
+    model.position.set(0, 0, 0);
+    model.rotation.set(0, 0, 0);
+    model.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(model);
     CHAR_FOOT_OFFSET = -box.min.y;
     CHAR_HEIGHT = box.max.y - box.min.y;
     CHAR_STAND_Y = G + CHAR_FOOT_OFFSET;
-    console.log('char foot offset:', CHAR_FOOT_OFFSET.toFixed(3), '| height:', CHAR_HEIGHT.toFixed(3));
+    console.log('char foot offset:', CHAR_FOOT_OFFSET.toFixed(3), '| height:', CHAR_HEIGHT.toFixed(3), '| renderer:', _avatarRenderer);
 
-    const spawnY = _spawnPoint.y !== null ? _spawnPoint.y + CHAR_FOOT_OFFSET : CHAR_STAND_Y;
-    fbx.position.set(_spawnPoint.x, spawnY, _spawnPoint.z);
-    fbx.rotation.y = _spawnPoint.ry;
-    fbx.castShadow = true;
-    fbx.traverse(child => {
-        if (child.isBone || child.type === 'Bone') {
-            anim.bones[child.name] = child;
-            anim.rest[child.name] = {
-                x: child.rotation.x, y: child.rotation.y, z: child.rotation.z,
-                px: child.position.x, py: child.position.y, pz: child.position.z,
-            };
+    const spawnY = previousFootY !== null
+        ? previousFootY + CHAR_FOOT_OFFSET
+        : (_spawnPoint.y !== null ? _spawnPoint.y + CHAR_FOOT_OFFSET : CHAR_STAND_Y);
+    model.position.set(
+        previousPosition ? previousPosition.x : _spawnPoint.x,
+        spawnY,
+        previousPosition ? previousPosition.z : _spawnPoint.z
+    );
+    model.rotation.y = previousRotationY;
+    model.castShadow = true;
+
+    anim.bones = {};
+    anim.rest = {};
+    model.traverse(child => {
+        if (child.isBone || child.type === 'Bone') _registerBone(child);
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
         }
     });
-    fbx.traverse(child => {
-        if (child.isMesh) child.castShadow = true;
-    });
-    fbx.children[0].receiveShadow = true;
 
-    scene.add(fbx);
-    character = fbx;
+    _disposeCharacter(previous);
+    scene.add(model);
+    character = model;
     window.character = character;
-    _shirtMesh = _buildShirtOverlay(fbx);
+    _shirtMesh = _buildShirtOverlay(model);
+    _pantsMesh = _avatarRenderer === "legacy" ? null : _buildPantsOverlay(model);
+    _faceMesh = _avatarRenderer === "legacy" ? null : _buildFaceOverlay(model);
+    _applyAvatar(_avatarState).catch((err) => console.warn("[avatar] apply failed", err));
     renderer.shadowMap.needsUpdate = true;
-});
+    window.dispatchEvent(new CustomEvent("v22-character-renderer-changed", { detail: { renderer: _avatarRenderer } }));
+}
+
+function _loadLegacyCharacter() {
+    console.warn("[avatar] legacy FBX renderer is deprecated and kept only for old shirt compatibility.");
+    fbxLoader.load(importedAssets.playerMdl, (fbx) => _prepareCharacterModel(fbx));
+}
+
+function _loadModernCharacter() {
+    const url = _avatarState.body_type === "female" ? importedAssets.femalePlayerGlb : importedAssets.malePlayerGlb;
+    gltfLoader.load(url, (gltf) => {
+        const root = new THREE.Group();
+        root.name = "ModernAvatarRoot";
+        gltf.scene.name = "ModernAvatarVisual";
+        gltf.scene.rotation.y = Math.PI;
+        root.add(gltf.scene);
+        _prepareCharacterModel(root);
+    }, undefined, (err) => {
+        console.error("[avatar] GLB load failed, falling back to legacy FBX", err);
+        _avatarRenderer = "legacy";
+        localStorage.setItem("v22AvatarRenderer", _avatarRenderer);
+        _loadLegacyCharacter();
+    });
+}
+
+function _reloadCharacter() {
+    if (_avatarRenderer === "legacy") _loadLegacyCharacter();
+    else _loadModernCharacter();
+}
+
+async function _applyAvatar(avatar = {}) {
+    const previousBodyType = _avatarState.body_type;
+    _avatarState = _normalizeAvatar(avatar);
+    if (window.VortexAvatarDebug) console.debug("[avatar] local", JSON.stringify(_avatarState));
+    if (character && _avatarRenderer === "modern" && previousBodyType !== _avatarState.body_type) {
+        _reloadCharacter();
+        return;
+    }
+    if (!character) return;
+
+    if (_avatarRenderer === "modern") {
+        _applyBodyColors(character, _avatarState.body_colors);
+        _applyShirtToMesh(_shirtMesh, await _avatarClothingUrl(_avatarState.shirt_id).catch(() => null));
+        _applyShirtToMesh(_pantsMesh, await _avatarClothingUrl(_avatarState.pant_id).catch(() => null));
+        _applyShirtToMesh(_faceMesh, await _avatarClothingUrl(_avatarState.face_id).catch(() => null));
+    } else {
+        _applyShirtToMesh(_shirtMesh, _legacyClothingUrl(_avatarState.shirt_id));
+    }
+}
+
+function _setAvatarRenderer(mode) {
+    const next = String(mode || "").toLowerCase() === "legacy" ? "legacy" : "modern";
+    if (_avatarRenderer === next) return _avatarRenderer;
+    _avatarRenderer = next;
+    localStorage.setItem("v22AvatarRenderer", _avatarRenderer);
+    _reloadCharacter();
+    return _avatarRenderer;
+}
+
+_reloadCharacter();
 
 const cam = {
     yaw: 0,
@@ -2183,12 +2341,50 @@ window._vortex = {
     buildShirtOverlay(target) {
         return _buildShirtOverlay(target);
     },
+    buildPantsOverlay(target) {
+        return _buildPantsOverlay(target);
+    },
+    buildFaceOverlay(target) {
+        return _buildFaceOverlay(target);
+    },
+    applyBodyColors(target, colors) {
+        _applyBodyColors(target, colors);
+    },
+    async applyAvatar(avatar) {
+        await _applyAvatar(avatar);
+    },
+    async applyAvatarToMeshes(meshes, avatar) {
+        if (!meshes) return;
+        const normalized = _normalizeAvatar(avatar, _neutralAvatarState);
+        if (window.VortexAvatarDebug) console.debug("[avatar] remote", JSON.stringify(normalized));
+        if (_avatarRenderer === "modern") {
+            _applyBodyColors(meshes.grp, normalized.body_colors);
+            _applyShirtToMesh(meshes.shirtMesh, await _avatarClothingUrl(normalized.shirt_id).catch(() => null));
+            _applyShirtToMesh(meshes.pantsMesh, await _avatarClothingUrl(normalized.pant_id).catch(() => null));
+            _applyShirtToMesh(meshes.faceMesh, await _avatarClothingUrl(normalized.face_id).catch(() => null));
+        } else {
+            _applyShirtToMesh(meshes.shirtMesh, _legacyClothingUrl(normalized.shirt_id));
+            _applyShirtToMesh(meshes.pantsMesh, null);
+            _applyShirtToMesh(meshes.faceMesh, null);
+        }
+    },
+    getAvatarRenderer() {
+        return _avatarRenderer;
+    },
+    setAvatarRenderer(mode) {
+        return _setAvatarRenderer(mode);
+    },
+    getAvatar() {
+        return { ..._avatarState, body_colors: [..._avatarState.body_colors] };
+    },
 };
 
 
 window.THREE = THREE;
 window.FBXLoader = FBXLoader;
+window.GLTFLoader = GLTFLoader;
 window.fbxLoader = fbxLoader;
+window.gltfLoader = gltfLoader;
 
 window.addStud = addStud;
 window.removeStud = removeStud;
