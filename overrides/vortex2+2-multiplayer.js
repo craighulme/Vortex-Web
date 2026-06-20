@@ -45,9 +45,11 @@ function _clonePlayerFBX() {
     if (!src) return null;
 
     const clone = src.clone(true);
+    delete clone.userData.v22ModernAvatarMaterials;
     const toRemove = [];
     clone.traverse(o => {
         if (/Overlay$/.test(o.name || "")) toRemove.push(o);
+        delete o.userData?.v22ModernAvatarMaterials;
     });
     toRemove.forEach(o => o.parent?.remove(o));
 
@@ -590,6 +592,374 @@ function bridgeOpen() {
     return ws && ws.readyState === WebSocket.OPEN;
 }
 
+const _packetDebug = {
+    enabled: localStorage.getItem("v22PacketDebug") === "1",
+    players: new Map(),
+    history: [],
+    lastPrintAt: 0,
+    originalAvatar: null,
+    randomTimer: null,
+    spoofSeq: 0,
+    pendingSpoofs: [],
+    latencies: [],
+    probes: [],
+    lastProbePrintKey: "",
+    lastProbePrintAt: 0
+};
+let _skipNextRemoteAvatarRebuild = false;
+
+function _packetDebugSnapshot(player) {
+    if (!player || !Number.isFinite(Number(player.id))) return null;
+    return {
+        id: Number(player.id),
+        username: String(player.username || player.name || ""),
+        game: Number(player.game || player.game_id || player.gameId || window.GAME_ID || 0) || 0,
+        x: Number(player.x || 0),
+        y: Number(player.y || 0),
+        z: Number(player.z || 0),
+        ry: Number(player.ry ?? player.yaw ?? 0),
+        anim: String(player.anim || ""),
+        shirt_id: Number(player.shirt_id ?? player.shirtId ?? 0) || 0,
+        pant_id: Number(player.pant_id ?? player.pantId ?? 0) || 0,
+        body_type: String(player.body_type ?? player.bodyType ?? ""),
+        body_colors: Array.isArray(player.body_colors) ? [...player.body_colors] : (Array.isArray(player.bodyColors) ? [...player.bodyColors] : []),
+        face_id: Number(player.face_id ?? player.faceId ?? 0) || 0,
+        has_avatar: !!(player.hasAvatar || player.shirt_id || player.pant_id || player.face_id || player.body_colors || player.bodyColors),
+        record_bytes: Number(player.recordBytes || 0) || 0,
+        float_offset: Number(player.floatOffset || 0) || 0,
+        seen_at: new Date().toISOString()
+    };
+}
+
+function _recordReplicatedPlayers(source, players) {
+    if (!Array.isArray(players) || !players.length) return;
+    const batch = [];
+    for (const player of players) {
+        const snap = _packetDebugSnapshot(player);
+        if (!snap) continue;
+        snap.source = source;
+        _matchSpoofEcho(snap);
+        _packetDebug.players.set(snap.id, snap);
+        batch.push(snap);
+    }
+    if (!batch.length) return;
+    _packetDebug.history.push({ source, at: new Date().toISOString(), players: batch });
+    while (_packetDebug.history.length > 200) _packetDebug.history.shift();
+    if (_packetDebug.enabled && performance.now() - _packetDebug.lastPrintAt > 1000) {
+        _packetDebug.lastPrintAt = performance.now();
+        console.table([..._packetDebug.players.values()].map((p) => ({
+            id: p.id,
+            username: p.username,
+            shirt: p.shirt_id,
+            pants: p.pant_id,
+            face: p.face_id,
+            body: p.body_type,
+            colors: p.body_colors.join(","),
+            bytes: p.record_bytes,
+            source: p.source
+        })));
+    }
+}
+
+function _avatarSignature(avatar) {
+    const normalized = _normalizeAvatarFields(avatar || {});
+    return JSON.stringify({
+        shirt_id: normalized.shirt_id,
+        pant_id: normalized.pant_id,
+        body_type: normalized.body_type,
+        body_colors: normalized.body_colors,
+        face_id: normalized.face_id
+    });
+}
+
+function _matchSpoofEcho(snap) {
+    if (!launchInfo || snap.id !== launchInfo.id || !snap.has_avatar) return;
+    const sig = _avatarSignature(snap);
+    const index = _packetDebug.pendingSpoofs.findIndex((item) => item.signature === sig);
+    if (index < 0) return;
+    const item = _packetDebug.pendingSpoofs.splice(index, 1)[0];
+    const latencyMs = performance.now() - item.sentAt;
+    const result = {
+        seq: item.seq,
+        latency_ms: Math.round(latencyMs * 10) / 10,
+        source: snap.source,
+        avatar: item.avatar,
+        seen_at: new Date().toISOString()
+    };
+    snap.spoof_latency_ms = result.latency_ms;
+    _packetDebug.latencies.push(result);
+    while (_packetDebug.latencies.length > 100) _packetDebug.latencies.shift();
+    if (_packetDebug.enabled) {
+        console.log(`[packet-debug] spoof #${result.seq} echoed in ${result.latency_ms}ms via ${result.source}`);
+    }
+}
+
+function _recordProbeEvent(event) {
+    const item = { ...event, at: event.at || new Date().toISOString() };
+    _packetDebug.probes.push(item);
+    while (_packetDebug.probes.length > 200) _packetDebug.probes.shift();
+    if (_packetDebug.enabled) {
+        const key = JSON.stringify({
+            type: item.type,
+            packet_type: item.packet_type,
+            bytes: item.bytes,
+            expected: item.expected,
+            records: item.records,
+            anomalies: item.anomalies || [],
+            case: item.case,
+            mutation: item.mutation
+        });
+        const now = performance.now();
+        if (key === _packetDebug.lastProbePrintKey && now - _packetDebug.lastProbePrintAt < 2000) return item;
+        _packetDebug.lastProbePrintKey = key;
+        _packetDebug.lastProbePrintAt = now;
+        if (item.type === "debug_packet" && Array.isArray(item.anomalies) && item.anomalies.length) {
+            console.warn("[packet-debug] packet anomaly", item);
+        } else {
+            console.log("[packet-debug] probe", item);
+        }
+    }
+    return item;
+}
+
+function _currentLaunchAvatar() {
+    return _normalizeAvatarFields({
+        shirt_id: launchInfo?.shirtId || 0,
+        pant_id: launchInfo?.pantId || 0,
+        body_type: launchInfo?.bodyType || "male",
+        body_colors: launchInfo?.bodyColors || [],
+        face_id: launchInfo?.faceId || 0
+    });
+}
+
+function _setOutboundAvatar(patch = {}, rememberOriginal = true, options = {}) {
+    if (!launchInfo) throw new Error("not connected yet");
+    if (rememberOriginal && !_packetDebug.originalAvatar) _packetDebug.originalAvatar = _currentLaunchAvatar();
+    const next = _normalizeAvatarFields({ ..._currentLaunchAvatar(), ...patch });
+    launchInfo.shirtId = next.shirt_id;
+    launchInfo.pantId = next.pant_id;
+    launchInfo.bodyType = next.body_type;
+    launchInfo.bodyColors = next.body_colors;
+    launchInfo.faceId = next.face_id;
+    const rebuildLocal = options.rebuild !== false && options.applyLocal !== false;
+    if (rebuildLocal) {
+        if (options.rebuildRemotes === false) _skipNextRemoteAvatarRebuild = true;
+        _vortex.applyAvatar?.(next);
+    }
+    if (options.measure) {
+        const seq = ++_packetDebug.spoofSeq;
+        _packetDebug.pendingSpoofs.push({
+            seq,
+            signature: _avatarSignature(next),
+            avatar: next,
+            sentAt: performance.now()
+        });
+        while (_packetDebug.pendingSpoofs.length > 40) _packetDebug.pendingSpoofs.shift();
+    }
+    if (hubMode && bridgeOpen()) {
+        ws.send(JSON.stringify({ type: "spoof_avatar", flush: options.flush !== false, ...next }));
+    }
+    return next;
+}
+
+function _randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function _randHexColor() {
+    return `#${_randInt(0, 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
+function _randomAvatarPatch(options = {}) {
+    const defaultIds = Array.from({ length: Number(options.maxId || 50) || 50 }, (_, i) => i + 1);
+    const shirts = Array.isArray(options.shirts) && options.shirts.length ? options.shirts : defaultIds;
+    const pants = Array.isArray(options.pants) && options.pants.length ? options.pants : defaultIds;
+    const faces = Array.isArray(options.faces) && options.faces.length ? options.faces : defaultIds;
+    return {
+        shirt_id: Number(shirts[_randInt(0, shirts.length - 1)]) || 0,
+        pant_id: Number(pants[_randInt(0, pants.length - 1)]) || 0,
+        body_type: Math.random() < 0.5 ? "male" : "female",
+        body_colors: Array.from({ length: 6 }, _randHexColor),
+        face_id: Number(faces[_randInt(0, faces.length - 1)]) || 0
+    };
+}
+
+function _startRandomSpoof(options = {}) {
+    // Lowered the minimum interval to 50ms so you can push it much harder
+    const intervalMs = Math.max(50, Number(options.intervalMs ?? options.interval ?? 1000) || 1000);
+    const count = Math.max(0, Number(options.count || 0) || 0);
+
+    // New Options
+    const threadCount = Math.max(1, Number(options.MultiThread || 1));
+    const posRand = !!options.PosRand;
+
+    // Clean up any existing legacy timer or new thread arrays
+    if (_packetDebug.randomTimer) {
+        clearInterval(_packetDebug.randomTimer);
+        _packetDebug.randomTimer = null;
+    }
+    if (!_packetDebug.randomTimers) _packetDebug.randomTimers = [];
+    _packetDebug.randomTimers.forEach(clearInterval);
+    _packetDebug.randomTimers = [];
+
+    let sent = 0;
+
+    for (let i = 0; i < threadCount; i++) {
+        // Jitter: Offset the start of each interval by a random fraction of the interval time
+        // This ensures the "threads" don't fire at the exact same millisecond, maximizing choke potential
+        const jitterMs = Math.random() * (intervalMs / 2);
+
+        setTimeout(() => {
+            const tick = () => {
+                sent += 1;
+
+                // 1. Positional Randomization (PosRand)
+                if (posRand && bridgeOpen()) {
+                    // Generate extreme coordinates (e.g., between -100,000 and 100,000)
+                    const rx = (Math.random() - 0.5) * 200000;
+                    const ry = (Math.random() - 0.5) * 200000;
+                    const rz = (Math.random() - 0.5) * 200000;
+
+                    // Send a movement state packet immediately before the avatar spoof.
+                    // This updates the relay's "lastState", ensuring the UDP flush uses these wild coordinates.
+                    bridgeSend({
+                        type: 'state',
+                        x: rx,
+                        y: ry,
+                        z: rz,
+                        ry: Math.random() * Math.PI * 2, // Random rotation
+                        anim: Math.random() > 0.5 ? 'jump' : 'walk'
+                    });
+                }
+
+                // 2. Avatar Spoofing
+                const patch = _randomAvatarPatch(options);
+                _setOutboundAvatar(patch, true, {
+                    measure: true,
+                    flush: true, // Crucial: forces the relay to immediately push the UDP packet
+                    rebuild: options.rebuild !== false && options.applyLocal !== false,
+                    rebuildRemotes: false
+                });
+
+                if (_packetDebug.enabled) {
+                    console.log(`[packet-debug] thread ${i} spoof #${_packetDebug.spoofSeq}`, patch);
+                }
+
+                // Stop conditions
+                if (count && sent >= count * threadCount) {
+                    _packetDebug.randomTimers.forEach(clearInterval);
+                    _packetDebug.randomTimers = [];
+                }
+            };
+
+            tick(); // Execute the first tick immediately after the jitter delay
+
+            if (!count || count > 1) {
+                const timer = setInterval(tick, intervalMs);
+                _packetDebug.randomTimers.push(timer);
+            }
+        }, jitterMs);
+    }
+
+    return {
+        running: true,
+        threads: threadCount,
+        intervalMs,
+        countPerThread: count,
+        totalExpected: count ? count * threadCount : "infinite"
+    };
+}
+
+function _sendProbe(options = {}) {
+    if (!hubMode || !bridgeOpen()) throw new Error("probe requires the local relay connection");
+    const probeCase = String(options.case || options.probe || "append_tail");
+    const payload = { ...options, type: "probe_packet", case: probeCase };
+    ws.send(JSON.stringify(payload));
+    return _recordProbeEvent({ type: "probe_requested", case: probeCase, payload });
+}
+
+window.VortexPacketDebug = {
+    enable(value = true) {
+        _packetDebug.enabled = !!value;
+        localStorage.setItem("v22PacketDebug", _packetDebug.enabled ? "1" : "0");
+        return _packetDebug.enabled;
+    },
+    table() {
+        console.table([..._packetDebug.players.values()]);
+        return [..._packetDebug.players.values()];
+    },
+    players() {
+        return [..._packetDebug.players.values()];
+    },
+    last(id) {
+        return _packetDebug.players.get(Number(id));
+    },
+    history() {
+        return [..._packetDebug.history];
+    },
+    spoofAvatar(patch) {
+        return _setOutboundAvatar(patch || {});
+    },
+    spoofShirt(id) {
+        return _setOutboundAvatar({ shirt_id: Number(id) || 0 });
+    },
+    spoofOutfit(shirtId, pantId, faceId) {
+        return _setOutboundAvatar({ shirt_id: Number(shirtId) || 0, pant_id: Number(pantId) || 0, face_id: Number(faceId) || 0 });
+    },
+    spoofColors(colors) {
+        return _setOutboundAvatar({ body_colors: colors });
+    },
+    randomSpoof(options = {}) {
+        return _startRandomSpoof(options);
+    },
+    stopRandomSpoof() {
+        if (_packetDebug.randomTimers) {
+            _packetDebug.randomTimers.forEach(clearInterval);
+            _packetDebug.randomTimers = [];
+        }
+        if (_packetDebug.randomTimer) { // Fallback for legacy calls
+            clearInterval(_packetDebug.randomTimer);
+            _packetDebug.randomTimer = null;
+        }
+        return true;
+    },
+    latencies() {
+        console.table(_packetDebug.latencies);
+        return [..._packetDebug.latencies];
+    },
+    probe(options = {}) {
+        return _sendProbe(options);
+    },
+    probeCases() {
+        return [
+            "append_tail",
+            "random_tail",
+            "ff_tail",
+            "ascii_tail",
+            "truncate_tail",
+            "nan_pos",
+            "inf_pos",
+            "huge_pos",
+            "bad_state",
+            "bad_avatar_ids",
+            "bad_body_type",
+            "bad_marker",
+            "bad_name_len",
+            "byteflip"
+        ];
+    },
+    probes() {
+        console.table(_packetDebug.probes);
+        return [..._packetDebug.probes];
+    },
+    clearSpoof() {
+        if (!_packetDebug.originalAvatar) return _currentLaunchAvatar();
+        const original = _packetDebug.originalAvatar;
+        _packetDebug.originalAvatar = null;
+        return _setOutboundAvatar(original, false, { flush: false });
+    }
+};
+
 function _u64(view, off) {
     if (off + 8 > view.byteLength) return null;
     const v = view.getBigUint64(off, true);
@@ -662,7 +1032,7 @@ async function verifyLaunchToken(cfg) {
     });
     if (!res.ok) {
         let detail = "";
-        try { detail = await res.text(); } catch {}
+        try { detail = await res.text(); } catch { }
         throw new Error(`verify-launch failed: HTTP ${res.status}${detail ? " " + detail : ""}`);
     }
     const raw = await res.json();
@@ -748,7 +1118,7 @@ function _readPacketAvatar(view, foff) {
     };
     if (foff + 63 <= view.byteLength && view.getUint8(foff + 22) === 1) {
         const firstId = view.getUint32(foff + 23, true);
-        avatar.faceId = firstId;
+        avatar.shirtId = firstId;
         avatar.pantId = view.getUint32(foff + 28, true);
         const colors = [];
         let off = foff + 33;
@@ -761,6 +1131,7 @@ function _readPacketAvatar(view, foff) {
         avatar.bodyType = bodyTypeByte === 2 ? "female" : "male";
         avatar.faceId = view.getUint32(off + 1, true);
         avatar.valid = (bodyTypeByte === 1 || bodyTypeByte === 2) &&
+            avatar.shirtId >= 0 && avatar.shirtId < 1000 &&
             avatar.pantId >= 0 && avatar.pantId < 1000 &&
             avatar.faceId >= 0 && avatar.faceId < 1000;
         avatar.hasAvatar = avatar.valid;
@@ -912,9 +1283,10 @@ function _encodeMovementPacket(data) {
     view.setFloat32(off, animClock, true); off += 4;
     const colors = _safeBodyColors(launchInfo.bodyColors);
     const bodyType = String(launchInfo.bodyType || "male").toLowerCase() === "female" ? 2 : 1;
+    const shirtId = Number(launchInfo.shirtId || 0) || 0;
     const faceId = Number(launchInfo.faceId || 0) || 0;
     view.setUint8(off, 1); off += 1;
-    view.setUint32(off, faceId, true); off += 4;
+    view.setUint32(off, shirtId, true); off += 4;
     view.setUint8(off, bodyType); off += 1;
     view.setUint32(off, Number(launchInfo.pantId || 0) || 0, true); off += 4;
     view.setUint8(off, 0); off += 1;
@@ -1052,11 +1424,11 @@ async function connectOnce() {
         const hubUrl = new URL(cfg.hubUrl);
         if (!hubUrl.pathname || hubUrl.pathname === "/") hubUrl.pathname = "/ws";
         hubUrl.searchParams.set("game", String(localRelay ? (cfg.officialGameId || window.GAME_ID || 0) : launchInfo.gameId));
-        try { Chat.system(`Vortex2+2 connecting relay: ${hubUrl.host}`); } catch {}
+        try { Chat.system(`Vortex2+2 connecting relay: ${hubUrl.host}`); } catch { }
         ws = new WebSocket(hubUrl.toString());
 
         ws.onopen = () => {
-            try { Chat.system("Vortex2+2 relay connected."); } catch {}
+            try { Chat.system("Vortex2+2 relay connected."); } catch { }
             clearTimeout(ws._retry);
             _reconnectAttempts = 0;
             const hello = {
@@ -1098,7 +1470,7 @@ async function connectOnce() {
         };
 
         ws.onerror = () => {
-            try { Chat.system("Vortex2+2 hub connection failed."); } catch {}
+            try { Chat.system("Vortex2+2 hub connection failed."); } catch { }
             ws.close();
         };
 
@@ -1157,7 +1529,7 @@ async function connectOnce() {
     };
 
     ws.onerror = () => {
-        try { Chat.system("Vortex2+2 multiplayer websocket connection failed."); } catch {}
+        try { Chat.system("Vortex2+2 multiplayer websocket connection failed."); } catch { }
         ws.close();
     }
     connectFinished = true;
@@ -1314,7 +1686,7 @@ function _setBlockState(userid, x, y, z, state) {
 }
 
 let intv = setInterval(() => {
-    if(typeof validPlacement!='undefined' && typeof blockCounter!='undefined'){
+    if (typeof validPlacement != 'undefined' && typeof blockCounter != 'undefined') {
         clearInterval(intv);
         loadBlocks();
     }
@@ -1460,6 +1832,7 @@ function handle(d) {
             Leaderboard.setMyId(myId);
             Leaderboard.addPlayer({ id: myId, username: d.username, is_staff: d.is_staff, is_booster: d.is_booster });
             const initialPlayers = Array.isArray(d.players) ? d.players : [];
+            _recordReplicatedPlayers("init", [d, ...initialPlayers]);
             _vortex.prefetchAvatarImages?.([d, ...initialPlayers]);
             for (const p of initialPlayers) {
                 addRemote(p.id, p.username, p.is_staff, p.is_booster, p);
@@ -1482,6 +1855,7 @@ function handle(d) {
 
         case 'join': {
             if (d.id === myId) break;
+            _recordReplicatedPlayers("join", [d]);
             _vortex.prefetchAvatarImages?.(d);
             addRemote(d.id, d.username, d.is_staff, d.is_booster, d);
             _showHealthBar(d.id);
@@ -1505,6 +1879,7 @@ function handle(d) {
 
         case 'states': {
             const players = Array.isArray(d.players) ? d.players : [];
+            _recordReplicatedPlayers("states", players);
             _vortex.prefetchAvatarImages?.(players);
             for (const p of players) {
                 if (p.id !== myId && !remotes.has(p.id)) {
@@ -1514,6 +1889,21 @@ function handle(d) {
                 if (!r) continue;
                 decodeNetworkData(p, r)
             }
+            break;
+        }
+
+        case "debug_players": {
+            _recordReplicatedPlayers(d.source || "debug_players", Array.isArray(d.players) ? d.players : []);
+            break;
+        }
+
+        case "debug_packet": {
+            _recordProbeEvent({ type: "debug_packet", ...d });
+            break;
+        }
+
+        case "probe_sent": {
+            _recordProbeEvent({ type: "probe_sent", ...d });
             break;
         }
 
@@ -1845,6 +2235,193 @@ window._mpSendChat = function (msg) {
     bridgeSend({ type: 'chat', msg });
 }
 
+function _commandPlayerList() {
+    const out = [];
+    if (myId !== null) {
+        const char = _vortex.getCharacter?.();
+        out.push({
+            id: myId,
+            username: launchInfo?.username || "You",
+            self: true,
+            pos: char?.position?.clone?.() || null
+        });
+    }
+    for (const [id, r] of remotes) {
+        out.push({
+            id,
+            username: r.username || String(id),
+            self: false,
+            pos: r.tPos?.clone?.() || r.meshes?.grp?.position?.clone?.() || null
+        });
+    }
+    return out;
+}
+
+function _commandNameKey(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[il1|]/g, "l")
+        .replace(/[o0]/g, "o")
+        .replace(/[^a-z0-9_]/g, "");
+}
+
+function _findCommandPlayer(query) {
+    const needle = String(query || "").trim().toLowerCase();
+    if (!needle) return { error: "missing player name" };
+
+    const players = _commandPlayerList();
+    const exactId = /^\d+$/.test(needle) ? players.find((p) => String(p.id) === needle) : null;
+    if (exactId) return { player: exactId };
+
+    const exact = players.find((p) => String(p.username || "").toLowerCase() === needle);
+    if (exact) return { player: exact };
+
+    const starts = players.filter((p) => String(p.username || "").toLowerCase().startsWith(needle));
+    if (starts.length === 1) return { player: starts[0] };
+    if (starts.length > 1) return { error: `ambiguous: ${starts.map((p) => p.username).slice(0, 6).join(", ")}` };
+
+    const contains = players.filter((p) => String(p.username || "").toLowerCase().includes(needle));
+    if (contains.length === 1) return { player: contains[0] };
+    if (contains.length > 1) return { error: `ambiguous: ${contains.map((p) => p.username).slice(0, 6).join(", ")}` };
+
+    const looseNeedle = _commandNameKey(needle);
+    if (looseNeedle) {
+        const looseExact = players.filter((p) => _commandNameKey(p.username) === looseNeedle);
+        if (looseExact.length === 1) return { player: looseExact[0] };
+        if (looseExact.length > 1) return { error: `ambiguous: ${looseExact.map((p) => p.username).slice(0, 6).join(", ")}` };
+
+        const looseStarts = players.filter((p) => _commandNameKey(p.username).startsWith(looseNeedle));
+        if (looseStarts.length === 1) return { player: looseStarts[0] };
+        if (looseStarts.length > 1) return { error: `ambiguous: ${looseStarts.map((p) => p.username).slice(0, 6).join(", ")}` };
+
+        const looseContains = players.filter((p) => _commandNameKey(p.username).includes(looseNeedle));
+        if (looseContains.length === 1) return { player: looseContains[0] };
+        if (looseContains.length > 1) return { error: `ambiguous: ${looseContains.map((p) => p.username).slice(0, 6).join(", ")}` };
+    }
+
+    return { error: `no player matching "${query}"` };
+}
+
+function _teleportLocalToScene(x, y, z) {
+    const char = _vortex.getCharacter?.();
+    if (!char) return false;
+    char.position.set(Number(x), Number(y), Number(z));
+    _vortex.setVelY?.(0);
+    _vortex.setGrounded?.(false);
+    return true;
+}
+
+function _formatPos(pos) {
+    if (!pos) return "(unknown)";
+    return `(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})`;
+}
+
+function _chatCommandHelp() {
+    Chat.system("Commands: ::goto <player>, ::tp <x> <y> <z>, ::where [player], ::players, ::bring <player>, ::help");
+}
+
+window._mpHandleChatCommand = function (text) {
+    const raw = String(text || "").trim();
+    if (!raw.startsWith("::")) return false;
+
+    const parts = raw.slice(2).trim().split(/\s+/).filter(Boolean);
+    const command = String(parts.shift() || "help").toLowerCase();
+    const rest = parts.join(" ");
+
+    if (command === "help" || command === "?") {
+        _chatCommandHelp();
+        return true;
+    }
+
+    if (command === "players" || command === "plr") {
+        const names = _commandPlayerList()
+            .filter((p) => !p.self)
+            .map((p) => p.username)
+            .sort((a, b) => a.localeCompare(b));
+        Chat.system(names.length ? `Players: ${names.join(", ")}` : "No remote players loaded.");
+        return true;
+    }
+
+    if (command === "where" || command === "pos" || command === "coords") {
+        if (!rest) {
+            const char = _vortex.getCharacter?.();
+            Chat.system(`You are at ${_formatPos(char?.position)}.`);
+            return true;
+        }
+        const found = _findCommandPlayer(rest);
+        if (!found.player) {
+            Chat.warn(found.error || "player not found");
+            return true;
+        }
+        Chat.system(`${found.player.username} is at ${_formatPos(found.player.pos)}.`);
+        return true;
+    }
+
+    if (command === "tp" || command === "teleport") {
+        const nums = parts.map(Number);
+        if (nums.length < 3 || nums.slice(0, 3).some((n) => !Number.isFinite(n))) {
+            Chat.warn("Usage: ::tp <x> <y> <z>");
+            return true;
+        }
+        if (_teleportLocalToScene(nums[0], nums[1], nums[2])) {
+            Chat.system(`Teleported to ${_formatPos({ x: nums[0], y: nums[1], z: nums[2] })}.`);
+        } else {
+            Chat.warn("No local character yet.");
+        }
+        return true;
+    }
+
+    if (command === "goto" || command === "to") {
+        const found = _findCommandPlayer(rest);
+        if (!found.player) {
+            Chat.warn(found.error || "player not found");
+            return true;
+        }
+        if (!found.player.pos) {
+            Chat.warn(`${found.player.username} has no position yet.`);
+            return true;
+        }
+        const y = found.player.pos.y + 0.25;
+        if (_teleportLocalToScene(found.player.pos.x, y, found.player.pos.z)) {
+            Chat.system(`Teleported to ${found.player.username}.`);
+        } else {
+            Chat.warn("No local character yet.");
+        }
+        return true;
+    }
+
+    if (command === "bring") {
+        const found = _findCommandPlayer(rest);
+        if (!found.player) {
+            Chat.warn(found.error || "player not found");
+            return true;
+        }
+        if (found.player.self) {
+            Chat.warn("You cannot bring yourself.");
+            return true;
+        }
+        const char = _vortex.getCharacter?.();
+        const remote = remotes.get(found.player.id);
+        if (!char || !remote) {
+            Chat.warn("Player is not loaded.");
+            return true;
+        }
+        const pos = char.position.clone();
+        pos.x += Math.sin(char.rotation.y || 0) * 3;
+        pos.z += Math.cos(char.rotation.y || 0) * 3;
+        remote.tPos.copy(pos);
+        remote.meshes?.grp?.position?.copy(pos);
+        remote.meshes && (remote.meshes.grp.visible = true);
+        remote.seen = performance.now();
+        Chat.system(`Moved ${found.player.username} locally. This does not move them server-side.`);
+        return true;
+    }
+
+    Chat.warn(`Unknown command "::${command}". Try ::help`);
+    return true;
+}
+
 window._mpRebuildAvatars = function () {
     for (const [id, r] of remotes) {
         const old = r.meshes;
@@ -1867,6 +2444,10 @@ window._mpRebuildAvatars = function () {
 };
 
 window.addEventListener("v22-character-renderer-changed", () => {
+    if (_skipNextRemoteAvatarRebuild) {
+        _skipNextRemoteAvatarRebuild = false;
+        return;
+    }
     window._mpRebuildAvatars?.();
 });
 

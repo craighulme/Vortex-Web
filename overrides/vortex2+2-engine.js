@@ -866,7 +866,8 @@ async function _flushClothingImageQueue() {
 }
 
 async function _avatarClothingUrl(id) {
-    return _modernClothingUrl(id);
+    id = Number(id || 0);
+    return id ? `/api/clothing/image/${encodeURIComponent(id)}` : null;
 }
 
 function _avatarImageIds(avatar) {
@@ -948,9 +949,16 @@ function _prepareCharacterModel(model) {
     scene.add(model);
     character = model;
     window.character = character;
-    _shirtMesh = _buildShirtOverlay(model);
-    _pantsMesh = _avatarRenderer === "legacy" ? null : _buildPantsOverlay(model);
-    _faceMesh = _avatarRenderer === "legacy" ? null : _buildFaceOverlay(model);
+    if (_avatarRenderer === "modern") {
+        _prepareModernAvatarMaterials(model);
+        _shirtMesh = null;
+        _pantsMesh = null;
+        _faceMesh = null;
+    } else {
+        _shirtMesh = _buildShirtOverlay(model);
+        _pantsMesh = null;
+        _faceMesh = null;
+    }
     _applyAvatar(_avatarState).catch((err) => console.warn("[avatar] apply failed", err));
     renderer.shadowMap.needsUpdate = true;
     window.dispatchEvent(new CustomEvent("v22-character-renderer-changed", { detail: { renderer: _avatarRenderer } }));
@@ -1000,9 +1008,7 @@ async function _applyAvatar(avatar = {}) {
             _avatarClothingUrl(_avatarState.pant_id).catch(() => null),
             _avatarClothingUrl(_avatarState.face_id).catch(() => null),
         ]);
-        _applyShirtToMesh(_shirtMesh, shirtUrl);
-        _applyShirtToMesh(_pantsMesh, pantsUrl);
-        _applyShirtToMesh(_faceMesh, faceUrl);
+        _applyModernAvatarTextures(character, { shirtUrl, pantsUrl, faceUrl });
     } else {
         const shirtUrl = await _avatarClothingUrl(_avatarState.shirt_id).catch(() => null);
         _applyShirtToMesh(_shirtMesh, shirtUrl);
@@ -2443,16 +2449,31 @@ window._vortex = {
         _applyShirtToMesh(mesh, url);
     },
     buildShirtOverlay(target) {
+        if (_avatarRenderer === "modern") {
+            _prepareModernAvatarMaterials(target);
+            return null;
+        }
         return _buildShirtOverlay(target);
     },
     buildPantsOverlay(target) {
-        return _buildPantsOverlay(target);
+        if (_avatarRenderer === "modern") {
+            _prepareModernAvatarMaterials(target);
+            return null;
+        }
+        return null;
     },
     buildFaceOverlay(target) {
-        return _buildFaceOverlay(target);
+        if (_avatarRenderer === "modern") {
+            _prepareModernAvatarMaterials(target);
+            return null;
+        }
+        return null;
     },
     applyBodyColors(target, colors) {
         _applyBodyColors(target, colors);
+    },
+    prepareModernAvatarMaterials(target) {
+        return _prepareModernAvatarMaterials(target);
     },
     prefetchAvatarImages(avatars) {
         _prefetchAvatarImages(Array.isArray(avatars) ? avatars : [avatars]);
@@ -2471,9 +2492,7 @@ window._vortex = {
                 _avatarClothingUrl(normalized.pant_id).catch(() => null),
                 _avatarClothingUrl(normalized.face_id).catch(() => null),
             ]);
-            _applyShirtToMesh(meshes.shirtMesh, shirtUrl);
-            _applyShirtToMesh(meshes.pantsMesh, pantsUrl);
-            _applyShirtToMesh(meshes.faceMesh, faceUrl);
+            _applyModernAvatarTextures(meshes.grp, { shirtUrl, pantsUrl, faceUrl });
         } else {
             const shirtUrl = await _avatarClothingUrl(normalized.shirt_id).catch(() => null);
             _applyShirtToMesh(meshes.shirtMesh, shirtUrl);

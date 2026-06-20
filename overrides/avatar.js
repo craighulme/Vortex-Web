@@ -202,10 +202,10 @@ function _bodyPartIndexForMaterial(material, fallbackIndex = 0) {
   const materialName = String(material?.name || "");
   if (/Material\.002/i.test(materialName)) return 0;
   if (/Material\.001|Material\.003/i.test(materialName)) return 1;
-  if (/Material\.005/i.test(materialName)) return 2;
-  if (/Material\.004/i.test(materialName)) return 3;
-  if (/Material\.008/i.test(materialName)) return 4;
-  if (/Material\.007/i.test(materialName)) return 5;
+  if (/Material\.004/i.test(materialName)) return 2;
+  if (/Material\.005/i.test(materialName)) return 3;
+  if (/Material\.007/i.test(materialName)) return 4;
+  if (/Material\.008/i.test(materialName)) return 5;
 
   return [0, 2, 4, 3, 5, 1][fallbackIndex] ?? 0;
 }
@@ -213,9 +213,156 @@ function _bodyPartIndexForMaterial(material, fallbackIndex = 0) {
 function _setBodyMaterialColor(material, color) {
   if (!material) return;
 
-  material.vertexColors = false;
+  if (!material.userData?.v22KeepVertexColors) {
+    material.vertexColors = false;
+  }
   material.color?.set(color);
   material.needsUpdate = true;
+}
+
+const _MODERN_SHIRT_MATS = new Set(["Material.001", "Material.003", "Material.004", "Material.005"]);
+const _MODERN_PANT_MATS = new Set(["Material.007", "Material.008"]);
+const _MODERN_HEAD_MAT = "Material.002";
+
+function _catalogBlendShader(shader) {
+  shader.fragmentShader = shader.fragmentShader.replace(
+    "#include <map_fragment>",
+    `#ifdef USE_MAP
+      vec4 sampledDiffuseColor = texture2D(map, vMapUv);
+      diffuseColor.rgb = mix(diffuseColor.rgb, sampledDiffuseColor.rgb, sampledDiffuseColor.a);
+      diffuseColor.a = 1.0;
+    #endif`
+  );
+}
+
+function _catalogHeadBlendShader(shader) {
+  shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", "");
+  shader.fragmentShader = shader.fragmentShader.replace(
+    "#include <map_fragment>",
+    `#ifdef USE_MAP
+      vec4 sampledDiffuseColor = texture2D(map, vMapUv);
+      float front = vColor.r;
+      diffuseColor.rgb = mix(diffuseColor.rgb, sampledDiffuseColor.rgb, sampledDiffuseColor.a * front);
+      diffuseColor.a = 1.0;
+    #endif`
+  );
+}
+
+function _cloneMaterialForAvatar(mesh) {
+  if (!mesh?.material || mesh.userData.v22CatalogMaterialsCloned) return;
+
+  if (Array.isArray(mesh.material)) {
+    mesh.material = mesh.material.map((material) => material?.clone ? material.clone() : material);
+    mesh.userData.v22ClonedBodyMaterials = true;
+  } else if (mesh.material.clone) {
+    mesh.material = mesh.material.clone();
+    mesh.userData.v22ClonedBodyMaterial = true;
+  }
+  mesh.userData.v22CatalogMaterialsCloned = true;
+}
+
+function _prepareModernAvatarMaterials(characterModel) {
+  if (!characterModel) return null;
+  if (characterModel.userData.v22ModernAvatarMaterials) {
+    return characterModel.userData.v22ModernAvatarMaterials;
+  }
+
+  const materials = {
+    shirtMaterials: [],
+    pantMaterials: [],
+    headMaterials: [],
+    bodySlotMaterials: [[], [], [], [], [], []],
+    tickets: { shirt: 0, pants: 0, face: 0 }
+  };
+  const seen = new Set();
+
+  characterModel.traverse((node) => {
+    if (!node.isMesh || /Overlay$/.test(node.name || "")) return;
+    _cloneMaterialForAvatar(node);
+
+    const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of nodeMaterials) {
+      if (!material || seen.has(material.uuid)) continue;
+      seen.add(material.uuid);
+
+      const materialName = String(material.name || "");
+      const slot = _bodyPartIndexForMaterial(material, -1);
+      if (slot >= 0 && slot < 6 && /Material\.00[1234578]/i.test(materialName)) {
+        materials.bodySlotMaterials[slot].push(material);
+      }
+
+      if (_MODERN_SHIRT_MATS.has(materialName)) {
+        material.vertexColors = false;
+        material.transparent = false;
+        material.onBeforeCompile = _catalogBlendShader;
+        material.customProgramCacheKey = () => "v22_catalog_clothing_blend";
+        materials.shirtMaterials.push(material);
+      } else if (_MODERN_PANT_MATS.has(materialName)) {
+        material.vertexColors = false;
+        material.transparent = false;
+        material.onBeforeCompile = _catalogBlendShader;
+        material.customProgramCacheKey = () => "v22_catalog_clothing_blend";
+        materials.pantMaterials.push(material);
+      } else if (materialName === _MODERN_HEAD_MAT) {
+        material.vertexColors = true;
+        material.transparent = false;
+        material.onBeforeCompile = _catalogHeadBlendShader;
+        material.customProgramCacheKey = () => "v22_catalog_head_blend";
+        material.userData.v22KeepVertexColors = true;
+        materials.headMaterials.push(material);
+      } else {
+        material.vertexColors = false;
+        material.map = null;
+      }
+
+      material.needsUpdate = true;
+    }
+  });
+
+  characterModel.userData.v22ModernAvatarMaterials = materials;
+  return materials;
+}
+
+function _setModernTexture(materials, textureUrl, kind) {
+  if (!materials) return;
+
+  const targets =
+    kind === "shirt" ? materials.shirtMaterials :
+    kind === "pants" ? materials.pantMaterials :
+    materials.headMaterials;
+  const ticket = (materials.tickets[kind] || 0) + 1;
+  materials.tickets[kind] = ticket;
+
+  if (!textureUrl || !targets.length) {
+    for (const material of targets) {
+      material.map = null;
+      material.needsUpdate = true;
+    }
+    return;
+  }
+
+  _textureLoader().load(textureUrl, (texture) => {
+    if (materials.tickets[kind] !== ticket) {
+      texture.dispose?.();
+      return;
+    }
+
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.flipY = false;
+    texture.needsUpdate = true;
+
+    for (const material of targets) {
+      material.map = texture;
+      material.needsUpdate = true;
+    }
+  });
+}
+
+function _applyModernAvatarTextures(characterModel, urls = {}) {
+  const materials = _prepareModernAvatarMaterials(characterModel);
+  _setModernTexture(materials, urls.shirtUrl, "shirt");
+  _setModernTexture(materials, urls.pantsUrl, "pants");
+  _setModernTexture(materials, urls.faceUrl, "face");
 }
 
 function _applyBodyColors(characterModel, bodyColors) {
@@ -224,6 +371,16 @@ function _applyBodyColors(characterModel, bodyColors) {
   for (let i = 0; i < 6; i += 1) {
     const value = String(colors[i] || "#ffffff").trim();
     normalized.push(/^#?[0-9a-f]{6}$/i.test(value) ? (value.startsWith("#") ? value : `#${value}`) : "#ffffff");
+  }
+
+  const modernMaterials = characterModel.userData?.v22ModernAvatarMaterials;
+  if (modernMaterials) {
+    for (let slot = 0; slot < 6; slot += 1) {
+      for (const material of modernMaterials.bodySlotMaterials[slot] || []) {
+        _setBodyMaterialColor(material, normalized[slot]);
+      }
+    }
+    return;
   }
 
   characterModel.traverse((mesh) => {
@@ -252,10 +409,10 @@ function _applyBodyColors(characterModel, bodyColors) {
       const partIndex =
         /Head|Material\.002/i.test(`${meshName} ${materialName}`) ? 0 :
         /Torso|Material\.001|Material\.003/i.test(`${meshName} ${materialName}`) ? 1 :
-        /LArm|Left.?Arm|Material\.005/i.test(`${meshName} ${materialName}`) ? 2 :
-        /RArm|Right.?Arm|Material\.004/i.test(`${meshName} ${materialName}`) ? 3 :
-        /LLeg|Left.?Leg|Material\.008/i.test(`${meshName} ${materialName}`) ? 4 :
-        /RLeg|Right.?Leg|Material\.007/i.test(`${meshName} ${materialName}`) ? 5 :
+        /LArm|Left.?Arm|Material\.004/i.test(`${meshName} ${materialName}`) ? 2 :
+        /RArm|Right.?Arm|Material\.005/i.test(`${meshName} ${materialName}`) ? 3 :
+        /LLeg|Left.?Leg|Material\.007/i.test(`${meshName} ${materialName}`) ? 4 :
+        /RLeg|Right.?Leg|Material\.008/i.test(`${meshName} ${materialName}`) ? 5 :
         0;
 
       _setBodyMaterialColor(mesh.material, normalized[partIndex]);

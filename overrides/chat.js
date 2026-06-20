@@ -142,6 +142,12 @@
             deactivateChat();
             return;
         }
+        if (window._mpHandleChatCommand?.(text)) {
+            chatValue = '';
+            selAnchor = selFocus = 0;
+            deactivateChat();
+            return;
+        }
         window._mpSendChat?.(text);
         chatValue = '';
         selAnchor = selFocus = 0;

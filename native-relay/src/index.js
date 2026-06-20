@@ -49,6 +49,8 @@ class NativeSession {
     this.lastAnimClock = 0;
     this.lastState = { x: 0, y: 0, z: 0, ry: 0, anim: "idle" };
     this.browserStateSeen = false;
+    this.probeSeq = 0;
+    this.pendingProbes = new Map();
   }
 
   onBrowserMessage(data) {
@@ -69,6 +71,16 @@ class NativeSession {
 
     if (!this.player || !this.udp) return;
 
+    if (msg.type === "spoof_avatar") {
+      this.applyAvatarPatch(msg);
+      return;
+    }
+
+    if (msg.type === "probe_packet") {
+      this.sendProbePacket(msg);
+      return;
+    }
+
     if (msg.type === "state") {
       this.browserStateSeen = true;
       this.lastState = {
@@ -86,6 +98,58 @@ class NativeSession {
       const text = String(msg.msg || "").slice(0, 512);
       if (text.trim()) this.sendNative(encodeChat(this.player, text));
     }
+  }
+
+  applyAvatarPatch(raw) {
+    const next = normalizeAvatarPatch(raw, this.player);
+    this.player.shirtId = next.shirtId;
+    this.player.pantId = next.pantId;
+    this.player.bodyType = next.bodyType;
+    this.player.bodyColors = next.bodyColors;
+    this.player.faceId = next.faceId;
+    console.log(`[native-relay] ${this.player.username} spoof avatar shirt=${this.player.shirtId} pants=${this.player.pantId} face=${this.player.faceId} body=${this.player.bodyType}`);
+    if (raw.flush !== false && this.lastState) this.sendNative(encodeMovement(this.player, this.lastState, this.nextAnimClock()));
+  }
+
+  sendProbePacket(raw) {
+    const seq = ++this.probeSeq;
+    const result = encodeProbeMovement(this.player, this.lastState, this.nextAnimClock(), { ...raw, seq });
+    if (!result) {
+      this.sendBrowser({ type: "probe_sent", ok: false, reason: "invalid_probe" });
+      return;
+    }
+    const pending = {
+      seq,
+      case: result.report.case,
+      mutation: result.report.mutation,
+      marker: result.report.marker,
+      sentAt: Date.now(),
+      timer: null,
+    };
+    pending.timer = setTimeout(() => this.finishProbe(seq, "no_echo"), clampInt(raw.timeoutMs ?? 1200, 250, 5000));
+    this.pendingProbes.set(seq, pending);
+    this.sendNative(result.buffer);
+    console.warn(`[native-relay] ${this.player.username} probe #${seq} ${result.report.case} bytes=${result.report.bytes} mutation=${result.report.mutation}`);
+    this.sendBrowser({ type: "probe_sent", ok: true, ...result.report });
+  }
+
+  finishProbe(seq, result, details = {}) {
+    const pending = this.pendingProbes.get(seq);
+    if (!pending) return;
+    if (pending.timer) clearTimeout(pending.timer);
+    this.pendingProbes.delete(seq);
+    const latencyMs = Date.now() - pending.sentAt;
+    this.sendBrowser({
+      type: "probe_result",
+      seq,
+      case: pending.case,
+      mutation: pending.mutation,
+      result,
+      latency_ms: latencyMs,
+      ...details,
+      at: new Date().toISOString(),
+    });
+    console.warn(`[native-relay] ${this.player.username} probe #${seq} ${pending.case} result=${result} latency=${latencyMs}ms`);
   }
 
   async start(hello) {
@@ -201,6 +265,10 @@ class NativeSession {
 
     const players = parsePlayersPacket(buf);
     if (players) {
+      const summary = summarizeNativePacket(buf, players);
+      if (summary.anomalies.length) this.sendBrowser({ type: "debug_packet", ...summary });
+      this.matchProbeEcho(players);
+      this.sendBrowser({ type: "debug_players", source: "native_players_packet", players: players.map(playerDebugState) });
       const present = new Set();
       const states = players
         .filter((p) => p.id !== this.player?.id)
@@ -259,6 +327,19 @@ class NativeSession {
       return;
     }
 
+    const packetType = buf.length >= 4 ? buf.readUInt32LE(0) : null;
+    if (packetType === 1) {
+      this.sendBrowser({
+        type: "debug_packet",
+        packet_type: packetType,
+        bytes: buf.length,
+        expected: readU64(buf, 4),
+        records: 0,
+        anomalies: ["players_packet_parse_failed"],
+        at: new Date().toISOString(),
+      });
+    }
+
     const chat = parseChatPacket(buf);
     if (chat) {
       this.sendBrowser({
@@ -276,6 +357,16 @@ class NativeSession {
     const notice = parseSystemPacket(buf);
     if (notice) {
       this.sendBrowser(classifySystemMessage(notice.message));
+    }
+  }
+
+  matchProbeEcho(players) {
+    if (!this.pendingProbes.size || !this.player) return;
+    const self = players.find((p) => p.id === this.player.id);
+    if (!self?.hasAvatar || !Array.isArray(self.bodyColors)) return;
+    for (const pending of [...this.pendingProbes.values()]) {
+      if (!sameColors(self.bodyColors, pending.marker)) continue;
+      this.finishProbe(pending.seq, "echoed", { player: playerDebugState(self) });
     }
   }
 
@@ -368,6 +459,16 @@ function hasBrowserIdentity(hello) {
   };
 }
 
+function normalizeAvatarPatch(raw, fallback) {
+  return {
+    shirtId: safeInt(raw.shirt_id ?? raw.shirtId ?? fallback?.shirtId),
+    pantId: safeInt(raw.pant_id ?? raw.pantId ?? fallback?.pantId),
+    bodyType: safeBodyType(raw.body_type ?? raw.bodyType ?? fallback?.bodyType),
+    bodyColors: safeBodyColors(raw.body_colors ?? raw.bodyColors ?? fallback?.bodyColors),
+    faceId: safeInt(raw.face_id ?? raw.faceId ?? fallback?.faceId),
+  };
+}
+
 function chooseAuthTokens(hello, verified) {
   const candidates = [
     ["env", process.env.V22_NATIVE_AUTH_TOKEN],
@@ -421,9 +522,10 @@ function encodeMovement(player, data, animClock) {
   buf.writeFloatLE(animClock, off); off += 4;
   const colors = safeBodyColors(player.bodyColors);
   const bodyType = player.bodyType === "female" ? 2 : 1;
+  const shirtId = safeInt(player.shirtId);
   const faceId = safeInt(player.faceId);
   buf.writeUInt8(1, off); off += 1;
-  buf.writeUInt32LE(faceId, off); off += 4;
+  buf.writeUInt32LE(shirtId, off); off += 4;
   buf.writeUInt8(bodyType, off); off += 1;
   buf.writeUInt32LE(safeInt(player.pantId), off); off += 4;
   buf.writeUInt8(0, off); off += 1;
@@ -435,6 +537,98 @@ function encodeMovement(player, data, animClock) {
   buf.writeUInt32LE(faceId, off); off += 4;
   buf.writeUInt8(0, off);
   return buf;
+}
+
+function encodeProbeMovement(player, data, animClock, raw = {}) {
+  const base = encodeMovement(player, data, animClock);
+  const nameBytes = encoder.encode(player.username);
+  const foff = 4 + 8 + 8 + 8 + nameBytes.length + 1;
+  const probeCase = String(raw.case || raw.probe || "append_tail").toLowerCase();
+  const report = {
+    case: probeCase,
+    bytes: base.length,
+    mutation: "none",
+    at: new Date().toISOString(),
+  };
+
+  const append = (length, pattern) => {
+    const tail = patternBytes(length, pattern);
+    report.bytes = base.length + tail.length;
+    report.mutation = `append:${tail.length}:${pattern}`;
+    return Buffer.concat([base, tail]);
+  };
+
+  let out = Buffer.from(base);
+  switch (probeCase) {
+    case "append_tail":
+    case "tail":
+      out = append(raw.bytes ?? raw.length ?? 16, raw.pattern || "zero");
+      break;
+    case "random_tail":
+      out = append(raw.bytes ?? raw.length ?? 32, "random");
+      break;
+    case "ff_tail":
+      out = append(raw.bytes ?? raw.length ?? 32, "ff");
+      break;
+    case "ascii_tail":
+      out = append(raw.bytes ?? raw.length ?? 32, "ascii");
+      break;
+    case "truncate_tail": {
+      const cut = clampInt(raw.bytes ?? raw.length ?? 8, 1, 40);
+      out = out.subarray(0, Math.max(0, out.length - cut));
+      report.bytes = out.length;
+      report.mutation = `truncate:${cut}`;
+      break;
+    }
+    case "nan_pos":
+      writeProbeFloat(out, foff + probeAxisOffset(raw.axis), NaN);
+      report.mutation = `float:${raw.axis || "x"}:NaN`;
+      break;
+    case "inf_pos":
+      writeProbeFloat(out, foff + probeAxisOffset(raw.axis), Number.POSITIVE_INFINITY);
+      report.mutation = `float:${raw.axis || "x"}:Infinity`;
+      break;
+    case "huge_pos":
+      writeProbeFloat(out, foff + probeAxisOffset(raw.axis), Number(raw.value || 1e12));
+      report.mutation = `float:${raw.axis || "x"}:${Number(raw.value || 1e12)}`;
+      break;
+    case "bad_state":
+      out.writeUInt8(clampInt(raw.state0 ?? 255, 0, 255), foff + 16);
+      out.writeUInt8(clampInt(raw.state1 ?? 255, 0, 255), foff + 17);
+      report.mutation = `state:${out.readUInt8(foff + 16)},${out.readUInt8(foff + 17)}`;
+      break;
+    case "bad_avatar_ids":
+      out.writeUInt32LE(clampUint32(raw.shirt ?? 0xffffffff), foff + 23);
+      out.writeUInt32LE(clampUint32(raw.pants ?? 0xffffffff), foff + 28);
+      out.writeUInt32LE(clampUint32(raw.face ?? 0xffffffff), foff + 58);
+      report.mutation = "avatar_ids:uint32_max";
+      break;
+    case "bad_body_type":
+      out.writeUInt8(clampInt(raw.value ?? 255, 0, 255), foff + 27);
+      out.writeUInt8(clampInt(raw.value ?? 255, 0, 255), foff + 57);
+      report.mutation = `body_type:${out.readUInt8(foff + 27)}`;
+      break;
+    case "bad_marker":
+      out.writeUInt8(clampInt(raw.value ?? 255, 0, 255), foff + 22);
+      report.mutation = `avatar_marker:${out.readUInt8(foff + 22)}`;
+      break;
+    case "bad_name_len":
+      writeU64(out, 20, clampInt(raw.value ?? 1024, 0, 4096));
+      report.mutation = `name_len:${readU64(out, 20)}`;
+      break;
+    case "byteflip": {
+      const offset = clampInt(raw.offset ?? (foff + 22), 0, out.length - 1);
+      const xor = clampInt(raw.xor ?? 0xff, 0, 255);
+      out.writeUInt8(out.readUInt8(offset) ^ xor, offset);
+      report.mutation = `byteflip:${offset}:xor${xor}`;
+      break;
+    }
+    default:
+      return null;
+  }
+
+  report.bytes = out.length;
+  return { buffer: out, report };
 }
 
 function encodeChat(player, msg) {
@@ -450,6 +644,56 @@ function encodeChat(player, msg) {
   Buffer.from(text).copy(buf, off); off += text.length;
   buf.writeUInt8(0, off);
   return buf;
+}
+
+function summarizeNativePacket(buf, players) {
+  const expected = readU64(buf, 4);
+  const anomalies = [];
+  if (expected != null && expected !== players.length) anomalies.push(`record_count:${players.length}/${expected}`);
+  return {
+    packet_type: 1,
+    bytes: buf.length,
+    expected,
+    records: players.length,
+    anomalies,
+    at: new Date().toISOString(),
+  };
+}
+
+function patternBytes(length, pattern) {
+  const n = clampInt(length, 1, 256);
+  const out = Buffer.alloc(n);
+  if (pattern === "ff") out.fill(0xff);
+  else if (pattern === "random") crypto.randomFillSync(out);
+  else if (pattern === "ascii") {
+    const text = Buffer.from("V22_PROBE");
+    for (let i = 0; i < n; i += 1) out[i] = text[i % text.length];
+  }
+  return out;
+}
+
+function probeAxisOffset(axis) {
+  const key = String(axis || "x").toLowerCase();
+  if (key === "y") return 4;
+  if (key === "z") return 8;
+  if (key === "ry" || key === "yaw") return 12;
+  return 0;
+}
+
+function writeProbeFloat(buf, offset, value) {
+  if (offset >= 0 && offset + 4 <= buf.length) buf.writeFloatLE(value, offset);
+}
+
+function clampInt(value, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function clampUint32(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(0xffffffff, Math.floor(n)));
 }
 
 function parsePlayersPacket(buf) {
@@ -477,6 +721,32 @@ function parsePlayersPacket(buf) {
   }
 
   return records;
+}
+
+function playerDebugState(p) {
+  const state = {
+    id: p.id,
+    username: p.name,
+    game: p.game,
+    x: p.x,
+    y: p.y,
+    z: p.z,
+    ry: p.yaw,
+    state0: p.state0,
+    state1: p.state1,
+    animTime: p.animTime,
+    hasAvatar: !!p.hasAvatar,
+    recordBytes: p.recordBytes || 0,
+    floatOffset: p.floatOffset || 0,
+  };
+  if (p.hasAvatar) {
+    state.shirt_id = p.shirtId || 0;
+    state.pant_id = p.pantId || 0;
+    state.body_type = p.bodyType || "male";
+    state.body_colors = Array.isArray(p.bodyColors) ? p.bodyColors : [];
+    state.face_id = p.faceId || 0;
+  }
+  return state;
 }
 
 function parseMovementRecord(buf, offset, hasPacketType) {
@@ -558,7 +828,7 @@ function readPacketAvatar(buf, foff) {
   };
   if (foff + 63 <= buf.length && buf.readUInt8(foff + 22) === 1) {
     const firstId = buf.readUInt32LE(foff + 23);
-    avatar.faceId = firstId;
+    avatar.shirtId = firstId;
     avatar.pantId = buf.readUInt32LE(foff + 28);
     const colors = [];
     let off = foff + 33;
@@ -571,6 +841,7 @@ function readPacketAvatar(buf, foff) {
     avatar.bodyType = bodyTypeByte === 2 ? "female" : "male";
     avatar.faceId = buf.readUInt32LE(off + 1);
     avatar.valid = (bodyTypeByte === 1 || bodyTypeByte === 2) &&
+      avatar.shirtId >= 0 && avatar.shirtId < 1000 &&
       avatar.pantId >= 0 && avatar.pantId < 1000 &&
       avatar.faceId >= 0 && avatar.faceId < 1000;
     avatar.hasAvatar = avatar.valid;
