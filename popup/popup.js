@@ -26,6 +26,11 @@ const CURRENT_VERSION = extensionApi.runtime?.getManifest?.().version || "0.0.0"
 
 extensionVersionLabel.textContent = `Version ${CURRENT_VERSION}`;
 
+function applyPopupTheme(enabled) {
+    document.documentElement.toggleAttribute("theme", Boolean(enabled));
+    if (enabled) document.documentElement.setAttribute("theme", "light");
+}
+
 function storageGet(defaults, cb) {
     const result = extensionApi.storage.sync.get(defaults, cb);
     if (result && typeof result.then === 'function') result.then(cb);
@@ -207,6 +212,7 @@ checkForUpdates();
 let lightMode = localStorage.getItem('theme')
 if (lightMode==='true') {
     lightMode=true;
+    applyPopupTheme(true);
     lightModeToggle.click();
     (async function () {
         const tabs = await extensionApi.tabs.query({ active: true, currentWindow: true });
@@ -223,6 +229,7 @@ if (lightMode==='true') {
 lightModeToggle.onclick = async function () {
     lightMode = !lightMode
     localStorage.setItem("theme", lightMode);
+    applyPopupTheme(lightMode);
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const tabId = tabs[0];
 

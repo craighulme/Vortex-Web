@@ -29,24 +29,25 @@
             #v22-update-notice{
                 position:fixed;right:18px;top:18px;z-index:2147483647;
                 width:min(360px,calc(100vw - 36px));box-sizing:border-box;
-                border:1px solid rgba(148,163,184,.28);border-radius:8px;
-                background:#10141d;color:#eef4ff;box-shadow:0 14px 40px rgba(0,0,0,.38);
+                border:1px solid var(--linecol2, rgba(255,255,255,.16));border-radius:8px;
+                background:var(--bgcol2, #252525);color:var(--textcol1, #fff);
+                box-shadow:0 14px 40px rgba(0,0,0,.28);
                 font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
                 text-align:left;padding:13px;
             }
             #v22-update-notice *{box-sizing:border-box}
             .v22-update-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
             .v22-update-title{font-size:14px;font-weight:760;line-height:1.25}
-            .v22-update-pill{flex:0 0 auto;border-radius:999px;padding:3px 8px;background:#2563eb;color:#fff;font-size:10px;font-weight:760;text-transform:uppercase}
-            .v22-update-body{margin:0 0 9px;color:#cbd5e1;font-size:12px;line-height:1.4}
-            .v22-update-list{margin:0 0 11px;padding-left:17px;color:#e5edf8;font-size:12px;line-height:1.35}
+            .v22-update-pill{flex:0 0 auto;border-radius:999px;padding:3px 8px;background:var(--accentcol1, #098b4a);color:#fff;font-size:10px;font-weight:760;text-transform:uppercase}
+            .v22-update-body{margin:0 0 9px;color:var(--textcol2, rgba(255,255,255,.74));font-size:12px;line-height:1.4}
+            .v22-update-list{margin:0 0 11px;padding-left:17px;color:var(--textcol1, #fff);font-size:12px;line-height:1.35}
             .v22-update-list li{margin:3px 0}
             .v22-update-actions{display:flex;justify-content:flex-end;gap:8px}
             .v22-update-actions button{
                 border:0;border-radius:6px;padding:7px 10px;font:inherit;font-size:12px;font-weight:720;cursor:pointer;
             }
-            .v22-update-primary{background:#2563eb;color:#fff}
-            .v22-update-secondary{background:rgba(255,255,255,.08);color:#dbeafe}
+            .v22-update-primary{background:var(--accentcol1, #098b4a) !important;color:#fff !important}
+            .v22-update-secondary{background:var(--bgcol3, rgba(255,255,255,.08)) !important;color:var(--textcol1, #fff) !important}
         `;
         document.documentElement.appendChild(style);
     }
