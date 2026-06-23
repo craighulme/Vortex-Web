@@ -1316,7 +1316,6 @@ document.addEventListener('keydown', e => {
 
 document.addEventListener('vortex-input-pointerlock-error', (event) => {
     console.warn('[pointer-lock] request failed', event.detail && event.detail.error);
-    overlay.style.opacity = 1;
     setSettingsOpen(true);
 });
 
@@ -1325,12 +1324,12 @@ document.addEventListener('pointerlockchange', () => {
         ? runtimeInput.isLocked()
         : !!document.pointerLockElement;
     if (window.locked) {
-        overlay.style.opacity = 0;
         cursorEl.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
     } else {
-        overlay.style.opacity = 1;
         rmb = false;
+        if (!settingsOpen) setSettingsOpen(true);
     }
+    syncPauseOverlay();
 });
 
 let rmb = false;
@@ -1440,6 +1439,12 @@ const audioStatus = document.getElementById('vw-audio-status');
 let settingsOpen = false;
 let reloadNoticeShown = false;
 
+function syncPauseOverlay() {
+    if (!overlay) return;
+    overlay.style.opacity = settingsOpen || !window.locked ? 1 : 0;
+    overlay.style.pointerEvents = settingsOpen || !window.locked ? 'auto' : 'none';
+}
+
 function inferSettingsTarget(label) {
     const text = String(label || '').toLowerCase();
     if (text.includes('music') || text.includes('sfx') || text.includes('master') || text.includes('chat')) return settingsTargets.audio;
@@ -1467,6 +1472,7 @@ function setSettingsOpen(open, options = {}) {
     settingsPanel.style.display = settingsOpen ? '' : 'none';
     settingsPanel.setAttribute('aria-hidden', settingsOpen ? 'false' : 'true');
     document.body.classList.toggle('vw-menu-open', settingsOpen);
+    syncPauseOverlay();
     if (settingsOpen) {
         refreshSettingsStatus();
         populateAudioDevices().catch(() => {});
@@ -1538,7 +1544,7 @@ document.addEventListener('keydown', (event) => {
     if (window._chatFocused) return;
     if (settingsOpen) {
         event.preventDefault();
-        setSettingsOpen(false);
+        setSettingsOpen(false, { resume: true });
     }
 }, true);
 
@@ -1825,16 +1831,33 @@ async function populateAudioDevices() {
     if (!canRouteOutput) {
         setAudioStatus('Output device switching is not supported by this browser. The default output will be used.', 'warn');
     } else if (inputCount === 0 && outputCount === 0) {
-        setAudioStatus('No audio devices were exposed yet. Click Enable microphone list so the browser can ask permission.', 'warn');
+        setAudioStatus(microphoneAllowedByPolicy()
+            ? 'No audio devices were exposed yet. Click Enable microphone list so the browser can ask permission.'
+            : 'Microphone access is blocked by this page policy. Reload the extension and game page, then try again.', 'warn');
     } else {
         setAudioStatus(`Found ${inputCount || 1} microphone option(s) and ${outputCount || 1} output option(s).`);
     }
+}
+
+function microphoneAllowedByPolicy() {
+    const policy = document.permissionsPolicy || document.featurePolicy;
+    if (!policy) return true;
+    try {
+        if (typeof policy.allowsFeature === 'function') return policy.allowsFeature('microphone');
+        if (typeof policy.allowedFeatures === 'function') return policy.allowedFeatures().includes('microphone');
+    } catch {}
+    return true;
 }
 
 async function requestMicrophoneDeviceList() {
     if (!navigator.mediaDevices?.getUserMedia) {
         setAudioStatus('Microphone selection is not supported by this browser on this page.', 'error');
         window.Chat?.warn?.('Microphone selection is not supported in this browser.');
+        return false;
+    }
+    if (!microphoneAllowedByPolicy()) {
+        setAudioStatus('Microphone access is blocked by the game page policy. Reload the extension and launch the game again so the updated permission rule can apply.', 'error');
+        window.Chat?.warn?.('Microphone access is blocked by the page policy.');
         return false;
     }
     let stream = null;

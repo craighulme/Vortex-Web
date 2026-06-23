@@ -311,5 +311,51 @@
         "vortex.towerstats.com"
       ]
     }
+  },
+  {
+    "id": 100,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "permissions-policy",
+          "operation": "remove"
+        },
+        {
+          "header": "feature-policy",
+          "operation": "remove"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||playvortex.io/games/",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
+  },
+  {
+    "id": 101,
+    "priority": 3,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "permissions-policy",
+          "operation": "remove"
+        },
+        {
+          "header": "feature-policy",
+          "operation": "remove"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||vortex.towerstats.com/games/",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
   }
 ]
