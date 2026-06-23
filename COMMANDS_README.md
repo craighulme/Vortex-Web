@@ -1,6 +1,6 @@
-# Vortex2+2 Commands
+# Vortex Web Commands
 
-This file documents the current Vortex2+2 chat commands and browser console helpers.
+This file documents the current Vortex Web chat commands and browser console helpers.
 
 For a license key or more command authorisation, contact `quackduck.` on Discord.
 
@@ -8,7 +8,7 @@ For a license key or more command authorisation, contact `quackduck.` on Discord
 
 | Access | Meaning |
 | --- | --- |
-| Base license | Requires a valid Vortex2+2 license with `vortex-native-bridge`. |
+| Base license | Requires a valid Vortex Web license with `vortex-native-bridge`. |
 | `teleport-commands` | Allows local teleport chat commands. The hosted relay also rejects obvious movement jumps unless this feature is on the lease. |
 | `bring-command` | Allows the local-only bring command. This moves the remote model in your browser view only. |
 | `fly-command` | Allows browser-side fly mode. Space rises, Shift/Ctrl descends. |
@@ -39,7 +39,7 @@ Chat commands are typed in Vortex chat and start with `::`.
 
 ## Console Commands
 
-Run these from the browser devtools console while in a Vortex game page with Vortex2+2 loaded.
+Run these from the browser devtools console while in a Vortex game page with Vortex Web loaded.
 
 ### `window.VortexPacketDebug`
 
@@ -93,7 +93,7 @@ These helpers interact with the local browser avatar renderer and/or the logged-
 | Command | Access | Notes |
 | --- | --- | --- |
 | `VortexAvatar.renderer` | Base license | Reads the current avatar renderer mode. |
-| `VortexAvatar.setRenderer(mode)` | Base license | Changes renderer mode through the local Vortex2+2 avatar renderer. |
+| `VortexAvatar.setRenderer(mode)` | Base license | Changes renderer mode through the local Vortex Web avatar renderer. |
 | `VortexAvatar.getOutfit()` | Base license | Returns the current local outfit data. |
 | `await VortexAvatar.setOutfit(outfit, persist)` | Logged-in Vortex account | Applies an outfit locally; if `persist` is true, sends it to `/api/clothing/outfit`. |
 
@@ -127,5 +127,5 @@ These exist for debugging or engine integration and are not public user commands
 
 ## Notes
 
-- Hosted users should not need to send `session_token` to Vortex2+2 servers. Hosted mode uses the browser to get a launch token from Vortex, then the hosted relay verifies that launch token server-side.
+- Hosted users should not need to send `session_token` to Vortex Web servers. Hosted mode uses the browser to get a launch token from Vortex, then the hosted relay verifies that launch token server-side.
 - Local relay mode may use `session_token` locally on the user's machine to request a launch token. That is for local/private development and should not be sent to the hosted relay.

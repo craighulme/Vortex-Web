@@ -1,0 +1,16 @@
+{
+  "name": "@vortex2plus2/web-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.9"
+  }
+}

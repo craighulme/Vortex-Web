@@ -221,7 +221,7 @@ const maps = [
     },
 
     {
-        name: "Vortex2+2 Building game",
+        name: "Vortex Web Building game",
         url: "window._importedAssets.BuildingPlace",
         picture: "window._importedAssets.buildingplace",
         bannerpicture: "window._importedAssets.buildingplace",
@@ -575,7 +575,7 @@ async function initialize() {
         });
 
         const title = document.createElement('div');
-        title.textContent = "Vortex 2+2 Maps";
+        title.textContent = "Vortex Web Maps";
         Object.assign(title.style, {
             fontSize: "14px",
             fontWeight: "700",
@@ -737,7 +737,7 @@ function bootMapLoader(attempt = 0) {
     })
 
     let watermark = document.createElement('a')
-    watermark.innerHTML = 'Vortex2+2 v0.4.0 by @inuk'
+    watermark.innerHTML = 'Vortex Web by @inuk'
     Object.assign(watermark.style, {
         position: 'fixed',
         bottom: '5px',

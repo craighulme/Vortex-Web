@@ -1,7 +1,7 @@
 (() => {
     const BTN_ID = "v22-play-browser-btn";
     const HOSTED_LICENSE_API = "https://v22.irongiant.vip";
-    const LICENSE_HELP_MESSAGE = 'Vortex2+2 license key is invalid or not set.\nContact "quackduck." on Discord for access.';
+    const LICENSE_HELP_MESSAGE = 'Vortex Web license key is invalid or not set.\nContact "quackduck." on Discord for access.';
     const REQUESTED_FEATURES = [
         "vortex-native-bridge",
         "avatar-spoof",
@@ -314,7 +314,7 @@
             if (err?.code === "V22_LICENSE_INVALID") {
                 alert(LICENSE_HELP_MESSAGE);
             } else {
-                alert(`Vortex2+2 browser launch failed:\n${err.message || err}`);
+                alert(`Vortex Web browser launch failed:\n${err.message || err}`);
             }
             btn.disabled = false;
             btn.textContent = oldText;

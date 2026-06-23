@@ -2,6 +2,8 @@ _metadata/
 config/
 cloudflare-hub/node_modules/
 cloudflare-hub/.wrangler/
+web-client/node_modules/
+web-client/dist/
 native-relay/node_modules/
 native-relay/*.log
 native-relay/logs/

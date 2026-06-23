@@ -1,5 +1,8 @@
-const UPDATE_MANIFEST_URL = "https://api.github.com/repos/craighulme/Vortex2plus2/contents/extension-update.json?ref=main";
-const REPO_URL = "https://github.com/craighulme/Vortex2plus2";
+const UPDATE_MANIFEST_URLS = [
+    "https://api.github.com/repos/craighulme/Vortex-Web/contents/extension-update.json?ref=main",
+    "https://api.github.com/repos/craighulme/Vortex2plus2/contents/extension-update.json?ref=main"
+];
+const REPO_URL = "https://github.com/craighulme/Vortex-Web";
 const UPDATE_ALARM = "v22-update-check";
 const CHECK_INTERVAL_MINUTES = 240;
 const CACHE_MAX_AGE_MS = 60 * 60 * 1000;
@@ -85,12 +88,23 @@ async function takeLaunchConfig(launchId) {
 }
 
 async function fetchUpdateManifest() {
-    const res = await fetch(`${UPDATE_MANIFEST_URL}&t=${Date.now()}`, {
-        cache: "no-store",
-        headers: { accept: "application/json" }
-    });
-    if (!res.ok) throw new Error(`update check failed: HTTP ${res.status}`);
-    const raw = await res.json();
+    let raw = null;
+    let lastError = null;
+    for (const url of UPDATE_MANIFEST_URLS) {
+        try {
+            const joiner = url.includes("?") ? "&" : "?";
+            const res = await fetch(`${url}${joiner}t=${Date.now()}`, {
+                cache: "no-store",
+                headers: { accept: "application/json" }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            raw = await res.json();
+            break;
+        } catch (err) {
+            lastError = err;
+        }
+    }
+    if (!raw) throw new Error(`update check failed: ${lastError && lastError.message || lastError || "no update source available"}`);
     const update = raw?.content && raw.encoding === "base64"
         ? JSON.parse(atob(String(raw.content).replace(/\s/g, "")))
         : raw;

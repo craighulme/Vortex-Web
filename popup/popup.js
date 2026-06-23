@@ -20,8 +20,11 @@ let dismissUpdateBtn = document.getElementById('dismissUpdateBtn')
 const LOCAL_NATIVE_RELAY = "ws://127.0.0.1:27822/ws";
 const HOSTED_NATIVE_RELAY = "wss://v22-relay.116.203.155.30.sslip.io/ws";
 const HOSTED_LICENSE_API = "https://v22.irongiant.vip";
-const UPDATE_MANIFEST_URL = "https://api.github.com/repos/craighulme/Vortex2plus2/contents/extension-update.json?ref=main";
-const REPO_URL = "https://github.com/craighulme/Vortex2plus2";
+const UPDATE_MANIFEST_URLS = [
+    "https://api.github.com/repos/craighulme/Vortex-Web/contents/extension-update.json?ref=main",
+    "https://api.github.com/repos/craighulme/Vortex2plus2/contents/extension-update.json?ref=main"
+];
+const REPO_URL = "https://github.com/craighulme/Vortex-Web";
 const CURRENT_VERSION = extensionApi.runtime?.getManifest?.().version || "0.0.0";
 
 extensionVersionLabel.textContent = `Version ${CURRENT_VERSION}`;
@@ -182,12 +185,21 @@ async function checkForUpdates() {
     try {
         const stored = await storageGetAsync({ dismissedUpdateVersion: "" });
         const dismissedUpdateVersion = String(stored.dismissedUpdateVersion || "");
-        const res = await fetch(`${UPDATE_MANIFEST_URL}?t=${Date.now()}`, {
-            cache: "no-store",
-            headers: { accept: "application/json" }
-        });
-        if (!res.ok) return;
-        const update = decodeUpdatePayload(await res.json());
+        let raw = null;
+        for (const url of UPDATE_MANIFEST_URLS) {
+            try {
+                const joiner = url.includes("?") ? "&" : "?";
+                const res = await fetch(`${url}${joiner}t=${Date.now()}`, {
+                    cache: "no-store",
+                    headers: { accept: "application/json" }
+                });
+                if (!res.ok) continue;
+                raw = await res.json();
+                break;
+            } catch {}
+        }
+        if (!raw) return;
+        const update = decodeUpdatePayload(raw);
         const latestVersion = String(update.version || "");
         if (!latestVersion) return;
         const isNewer = compareVersions(latestVersion, CURRENT_VERSION) > 0;

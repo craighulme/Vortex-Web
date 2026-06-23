@@ -1,15 +1,15 @@
 {
-  "version": "0.4.3",
-  "date": "2026-06-22",
-  "url": "https://github.com/craighulme/Vortex2plus2",
-  "title": "Extension hardening",
-  "summary": "Vortex2+2 now keeps hosted relay launch credentials in the extension layer, stores license settings locally, and narrows extension fetch/resource exposure.",
+  "version": "0.4.4",
+  "date": "2026-06-23",
+  "url": "https://github.com/craighulme/Vortex-Web",
+  "title": "Vortex Web rebrand begins",
+  "summary": "Vortex2+2 is beginning its transition into Vortex Web: an unofficial, extension-powered browser client focused on native multiplayer relay support, optimisation, modular runtime work, and future scripting.",
   "changelog": [
-    "Moved Play in Browser launch handoff behind an extension-managed nonce instead of URL token parameters.",
-    "Moved hosted relay WebSocket ownership into the extension content script so page JS no longer receives the launch token.",
-    "Removed the third-party cors.io fetch bridge and restricted bridge fetches to known Vortex/update hosts.",
-    "Moved license and relay settings from Chrome Sync to local extension storage.",
-    "Restricted web-accessible extension assets and redirect rules to Vortex origins.",
-    "Kept existing local relay compatibility while tightening hosted relay credential handling."
+    "Renamed the extension branding from Vortex2+2 toward Vortex Web.",
+    "Update checks now try the new Vortex-Web repo first and fall back to the old Vortex2plus2 repo during the transition.",
+    "Added the first TypeScript/Vite runtime shell for future modular engine, asset, physics, avatar, scripting, UI, and protocol work.",
+    "Kept existing gameplay behaviour on the legacy engine while the rewrite is migrated incrementally.",
+    "Documented the direction: native multiplayer relay support, better optimisation, safer extension boundaries, and future game API/Lua support.",
+    "Added a best-effort game-focus guard for common browser shortcuts and tab-close prompts while playing."
   ]
 }

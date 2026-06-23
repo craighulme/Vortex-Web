@@ -561,12 +561,12 @@ function _scheduleReconnect(label = "relay") {
     connectFinished = false;
     if (closedWs?._kicked) return;
     if (_reconnectAttempts >= _MAX_RECONNECTS) {
-        try { Chat.warn(`Vortex2+2 ${label} disconnected. Reload the page to retry.`); } catch { }
+        try { Chat.warn(`Vortex Web ${label} disconnected. Reload the page to retry.`); } catch { }
         return;
     }
     _reconnectAttempts += 1;
     const delay = Math.min(_RECONNECT_MAX_MS, _RECONNECT_BASE_MS * Math.pow(1.45, _reconnectAttempts - 1));
-    try { Chat.system(`Vortex2+2 ${label} disconnected. Reconnecting in ${(delay / 1000).toFixed(1)}s...`); } catch { }
+    try { Chat.system(`Vortex Web ${label} disconnected. Reconnecting in ${(delay / 1000).toFixed(1)}s...`); } catch { }
     setTimeout(connect, delay);
 }
 
@@ -1824,7 +1824,7 @@ async function connectOnce() {
     const hostedRelay = cfg.hubUrl && !localRelay;
     const brokeredRelay = hostedRelay && cfg.brokered !== false;
     if (!cfg.launchToken && !brokeredRelay) {
-        Chat.system("Vortex2+2 multiplayer is offline: missing launch token.");
+        Chat.system("Vortex Web multiplayer is offline: missing launch token.");
         return;
     }
 
@@ -1841,13 +1841,13 @@ async function connectOnce() {
             }
         }
         if (!launchInfo) {
-            Chat.system(`Vortex2+2 multiplayer auth failed: ${err.message || err}`);
+            Chat.system(`Vortex Web multiplayer auth failed: ${err.message || err}`);
             connectFinished = true;
             return;
         }
     }
     if (!launchInfo) {
-        Chat.system("Vortex2+2 multiplayer auth failed: missing launch identity.");
+        Chat.system("Vortex Web multiplayer auth failed: missing launch identity.");
         connectFinished = true;
         return;
     }
@@ -1857,11 +1857,11 @@ async function connectOnce() {
         const hubUrl = new URL(cfg.hubUrl);
         if (!hubUrl.pathname || hubUrl.pathname === "/") hubUrl.pathname = "/ws";
         hubUrl.searchParams.set("game", String(localRelay ? (cfg.officialGameId || window.GAME_ID || 0) : launchInfo.gameId));
-        try { Chat.system(`Vortex2+2 connecting relay: ${hubUrl.host}`); } catch { }
+        try { Chat.system(`Vortex Web connecting relay: ${hubUrl.host}`); } catch { }
         ws = brokeredRelay ? new V22BrokeredSocket(hubUrl.toString()) : new WebSocket(hubUrl.toString());
 
         ws.onopen = () => {
-            try { Chat.system("Vortex2+2 relay connected."); } catch { }
+            try { Chat.system("Vortex Web relay connected."); } catch { }
             clearTimeout(ws._retry);
             _reconnectAttempts = 0;
             const hello = {
@@ -1908,7 +1908,7 @@ async function connectOnce() {
         };
 
         ws.onerror = () => {
-            try { Chat.system("Vortex2+2 hub connection failed."); } catch { }
+            try { Chat.system("Vortex Web hub connection failed."); } catch { }
             ws.close();
         };
 
@@ -1931,7 +1931,7 @@ async function connectOnce() {
     });
 
     if (!launchInfo.wsEndpoint) {
-        Chat.system("Vortex2+2 multiplayer is offline: set a browser multiplayer hub URL in the extension popup. The live app no longer exposes a browser WebSocket endpoint, and Chrome extensions cannot connect to UDP/raw TCP game sockets.");
+        Chat.system("Vortex Web multiplayer is offline: set a browser multiplayer hub URL in the extension popup. The live app no longer exposes a browser WebSocket endpoint, and Chrome extensions cannot connect to UDP/raw TCP game sockets.");
         connectFinished = true;
         return;
     }
@@ -1962,7 +1962,7 @@ async function connectOnce() {
     };
 
     ws.onerror = () => {
-        try { Chat.system("Vortex2+2 multiplayer websocket connection failed."); } catch { }
+        try { Chat.system("Vortex Web multiplayer websocket connection failed."); } catch { }
         ws.close();
     }
     connectFinished = true;

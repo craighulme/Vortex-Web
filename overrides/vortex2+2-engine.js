@@ -17,7 +17,7 @@ const _loadingScreen = document.createElement("div");
 _loadingScreen.id = "loadingScreen";
 const _loadingLogo = document.createElement("div");
 _loadingLogo.id = "loadingLogo";
-_loadingLogo.textContent = "VORTEX 2+2";
+_loadingLogo.textContent = "VORTEX WEB";
 const _loadingBarBg = document.createElement("div");
 _loadingBarBg.id = "loadingBarBg";
 const _loadingBarFill = document.createElement("div");
@@ -1086,6 +1086,42 @@ function setMouseLock(sl) {
     }
 }
 let isFirstPerson = false;
+const GAME_BROWSER_SHORTCUTS = new Set([
+    "KeyW",
+    "KeyR",
+    "KeyL",
+    "KeyN",
+    "KeyT",
+    "KeyD",
+    "Digit1",
+    "Digit2",
+    "Digit3",
+    "Digit4",
+    "Digit5",
+    "Digit6",
+    "Digit7",
+    "Digit8",
+    "Digit9"
+]);
+
+function gameHasBrowserFocus() {
+    return !!window.locked || document.pointerLockElement === renderer.domElement;
+}
+
+document.addEventListener('keydown', e => {
+    if (!gameHasBrowserFocus() || window._chatFocused) return;
+    if ((e.ctrlKey || e.metaKey) && GAME_BROWSER_SHORTCUTS.has(e.code)) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}, true);
+
+window.addEventListener('beforeunload', e => {
+    if (!gameHasBrowserFocus()) return;
+    e.preventDefault();
+    e.returnValue = "";
+});
+
 document.addEventListener('keydown', e => {
     if (window._chatFocused) return;
     if (!window.locked) return;

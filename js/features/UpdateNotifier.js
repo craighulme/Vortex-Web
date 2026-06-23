@@ -18,7 +18,7 @@
     }
 
     function openUpdate(url) {
-        window.open(String(url || "https://github.com/craighulme/Vortex2plus2"), "_blank", "noopener");
+        window.open(String(url || "https://github.com/craighulme/Vortex-Web"), "_blank", "noopener");
     }
 
     function ensureStyle() {
@@ -72,7 +72,7 @@
                 <button class="v22-update-primary" type="button">Get update</button>
             </div>
         `;
-        card.querySelector(".v22-update-title").textContent = `Vortex2+2 ${latestVersion} is available`;
+        card.querySelector(".v22-update-title").textContent = `Vortex Web ${latestVersion} is available`;
         const subtitle = card.querySelector(".v22-update-subtitle");
         subtitle.textContent = update.title || "";
         subtitle.hidden = !update.title;

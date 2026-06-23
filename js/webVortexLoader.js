@@ -52,6 +52,8 @@ const importedAssets = {
 };
 
 const overrides = new Map([
+    ["boot.iife.js", "overrides/v22-runtime/boot.iife.js"],
+
     ["three.min.js", "overrides/libs/three.module.js"],
     ["FBXLoader.js", "overrides/libs/FBXLoader.js"],
     ["GLTFLoader.js", "overrides/libs/GLTFLoader.js"],
@@ -269,8 +271,8 @@ if (play) {
         await rewritePlayDocument(html);
     }
     init().catch(err => {
-        console.error("[Vortex2+2] play loader failed", err);
-        document.body.innerHTML = `<pre style="padding:16px;color:#fff;background:#111;white-space:pre-wrap">Vortex2+2 failed to load:\n${String(err && err.stack || err)}</pre>`;
+        console.error("[Vortex Web] play loader failed", err);
+        document.body.innerHTML = `<pre style="padding:16px;color:#fff;background:#111;white-space:pre-wrap">Vortex Web failed to load:\n${String(err && err.stack || err)}</pre>`;
     });
 } else {
     if (url.searchParams.get("V22GameId")) {
