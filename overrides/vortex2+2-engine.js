@@ -54,14 +54,27 @@ scene.fog = new THREE.Fog(0x87CEEB, 192, 486);
 let fov = 85;
 const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.1, 3200);
 
-let enableShadows = localStorage.getItem('enableShadows');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+function readStorageFlag(key, fallback = false) {
+    const value = localStorage.getItem(key);
+    if (value === null) return fallback;
+    return value === "1" || value === "yes" || value === "true" || value === "on";
+}
+
+function readStorageNumber(key, fallback, min = -Infinity, max = Infinity) {
+    const value = Number(localStorage.getItem(key));
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(max, Math.max(min, value));
+}
+
+let enableShadows = readStorageFlag('enableShadows', false);
+const renderer = new THREE.WebGLRenderer({
+    antialias: readStorageFlag('v22Antialias', false),
+    powerPreference: "high-performance",
+});
 renderer.setClearColor(0x87CEEB);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = enableShadows === 'yes';
+renderer.shadowMap.enabled = enableShadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.antialias = false;
-renderer.powerPreference = "high-performance";
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
 renderer.toneMapping = THREE.AgXToneMapping;
 document.getElementById("scene").appendChild(renderer.domElement);
@@ -75,9 +88,10 @@ const ambient = new THREE.AmbientLight(0xffffff, 0.45);
 scene.add(ambient);
 
 const sun = new THREE.DirectionalLight(0xffffff, 3);
-sun.castShadow = enableShadows === 'yes';
-sun.shadow.mapSize.width = 4000;
-sun.shadow.mapSize.height = 4000;
+sun.castShadow = enableShadows;
+const shadowMapSize = readStorageNumber('v22ShadowMapSize', 1024, 256, 4096);
+sun.shadow.mapSize.width = shadowMapSize;
+sun.shadow.mapSize.height = shadowMapSize;
 sun.shadow.camera.near = 0.1;
 const s = 350;
 sun.shadow.camera.far = 2 * s;
@@ -85,8 +99,9 @@ sun.shadow.camera.left = -s;
 sun.shadow.camera.right = s;
 sun.shadow.camera.top = s;
 sun.shadow.camera.bottom = -s;
-sun.shadow.autoUpdate = true;
+sun.shadow.autoUpdate = enableShadows;
 sun.shadow.bias = -0.000002;
+sun.target = camera;
 scene.add(sun);
 const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
 backLight.position.set(-160, 500, -160);
@@ -94,20 +109,179 @@ backLight.castShadow = false;
 window.backLight = backLight;
 scene.add(backLight);
 
+function shadowsActive() {
+    return !!enableShadows && !!renderer.shadowMap.enabled;
+}
+
+function syncSceneShadowFlags(root = scene) {
+    const active = shadowsActive();
+    root.traverse?.((obj) => {
+        if (!obj.isMesh) return;
+        obj.castShadow = active;
+        obj.receiveShadow = active;
+    });
+}
+
+function setShadowsEnabled(value) {
+    enableShadows = !!value;
+    sun.castShadow = enableShadows;
+    sun.shadow.autoUpdate = enableShadows;
+    renderer.shadowMap.enabled = enableShadows;
+    renderer.shadowMap.needsUpdate = enableShadows;
+    localStorage.setItem('enableShadows', enableShadows ? 'yes' : 'no');
+    syncSceneShadowFlags();
+    return enableShadows;
+}
+
+const VortexPerf = window.VortexPerf || {};
+Object.assign(VortexPerf, {
+    enabled: readStorageFlag('v22Perf', false),
+    log: false,
+    frames: 0,
+    totals: Object.create(null),
+    lastReport: null,
+    lastRafAt: null,
+    rafSamples: 0,
+    rafTotal: 0,
+    rafMin: Infinity,
+    rafMax: 0,
+    rafLongFrames: 0,
+    reset(clearLastReport = false) {
+        this.frames = 0;
+        this.totals = Object.create(null);
+        this.lastRafAt = null;
+        this.rafSamples = 0;
+        this.rafTotal = 0;
+        this.rafMin = Infinity;
+        this.rafMax = 0;
+        this.rafLongFrames = 0;
+        if (clearLastReport) this.lastReport = null;
+    },
+    setEnabled(value) {
+        this.enabled = !!value;
+        localStorage.setItem('v22Perf', this.enabled ? '1' : '0');
+        this.reset(true);
+        return this.enabled;
+    },
+    setLog(value) {
+        this.log = !!value;
+        return this.log;
+    },
+    stop() {
+        this.enabled = false;
+        this.log = false;
+        localStorage.setItem('v22Perf', '0');
+        localStorage.removeItem('v22PerfLog');
+        this.reset(true);
+        return true;
+    },
+    begin(now) {
+        if (!this.enabled) return null;
+        if (this.lastRafAt !== null && Number.isFinite(now)) {
+            const rafDt = Math.max(0, now - this.lastRafAt);
+            this.rafSamples++;
+            this.rafTotal += rafDt;
+            this.rafMin = Math.min(this.rafMin, rafDt);
+            this.rafMax = Math.max(this.rafMax, rafDt);
+            if (rafDt > 34) this.rafLongFrames++;
+        }
+        if (Number.isFinite(now)) this.lastRafAt = now;
+        const start = performance.now();
+        return { frameStart: start, mark: start, rafNow: now };
+    },
+    mark(frame, name) {
+        if (!frame) return;
+        const now = performance.now();
+        this.totals[name] = (this.totals[name] || 0) + (now - frame.mark);
+        frame.mark = now;
+    },
+    end(frame) {
+        if (!frame) return;
+        const now = performance.now();
+        this.totals.frame = (this.totals.frame || 0) + (now - frame.frameStart);
+        this.frames++;
+        if (this.frames >= 180) {
+            this.lastReport = this.report();
+            if (this.log) {
+                console.table(this.lastReport.sections);
+                console.table(this.lastReport.cadence);
+                console.table(this.lastReport.renderer);
+            }
+            this.reset();
+        }
+    },
+    report() {
+        if (this.frames === 0 && this.lastReport) return this.lastReport;
+        const frames = Math.max(1, this.frames);
+        const sections = {};
+        for (const [name, value] of Object.entries(this.totals)) {
+            sections[name] = Number((value / frames).toFixed(3));
+        }
+        const avgRafMs = this.rafSamples ? this.rafTotal / this.rafSamples : 0;
+        const info = renderer.info;
+        return {
+            frames: this.frames,
+            sections,
+            cadence: {
+                samples: this.rafSamples,
+                avgRafMs: Number(avgRafMs.toFixed(3)),
+                estimatedPresentedFps: avgRafMs > 0 ? Number((1000 / avgRafMs).toFixed(1)) : 0,
+                minRafMs: Number((Number.isFinite(this.rafMin) ? this.rafMin : 0).toFixed(3)),
+                maxRafMs: Number(this.rafMax.toFixed(3)),
+                longFramesOver34ms: this.rafLongFrames
+            },
+            renderer: {
+                calls: info.render.calls,
+                triangles: info.render.triangles,
+                points: info.render.points,
+                lines: info.render.lines,
+                geometries: info.memory.geometries,
+                textures: info.memory.textures,
+                programs: info.programs?.length ?? 0
+            },
+            quality: window.VortexQuality?.get?.() || null
+        };
+    },
+    sample(seconds = 5, options = {}) {
+        const previousLog = this.log;
+        this.enabled = true;
+        this.log = !!options.log;
+        localStorage.setItem('v22Perf', '1');
+        this.reset(true);
+        const duration = Math.max(1, Math.min(30, Number(seconds) || 5)) * 1000;
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const report = this.report();
+                this.log = previousLog;
+                resolve(report);
+            }, duration);
+        });
+    }
+});
+window.VortexPerf = VortexPerf;
+
 const tlLoader = new THREE.TextureLoader();
 const texCache = new Map();
 let importedAssets = JSON.parse(window._importedAssets.content);
+const maxTextureAnisotropy = Math.min(4, renderer.capabilities?.getMaxAnisotropy?.() || 1);
+
+function cachedTexture(kind, url, rx, ry) {
+    const key = `${kind}|${url}|${Number(rx).toFixed(4)}|${Number(ry).toFixed(4)}`;
+    if (texCache.has(key)) return texCache.get(key);
+    const texture = tlLoader.load(url);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(rx, ry);
+    texture.anisotropy = maxTextureAnisotropy;
+    if (kind === "stud" && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+    texCache.set(key, texture);
+    return texture;
+}
+
 function studTex(rx, ry) {
-    const t = tlLoader.load(importedAssets.stud);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(rx, ry);
-    return t;
+    return cachedTexture("stud", importedAssets.stud, rx, ry);
 }
 function studNormalTex(rx, ry) {
-    const t = tlLoader.load(importedAssets.studNormal);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(rx, ry);
-    return t;
+    return cachedTexture("normal", importedAssets.studNormal, rx, ry);
 }
 function makeCube(width, height, depth) {
     const geo = new THREE.BoxGeometry(width, height, depth);
@@ -382,8 +556,8 @@ function addStud(sw, sh, sd, color, x, y, z, rx = 0, ry = 0, rz = 0, shape = "Bl
         mesh.position.set(x, cy, z);
         mesh.rotation.set(rx, ry, rz);
     }
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow = shadowsActive();
+    mesh.receiveShadow = shadowsActive();
     mesh.matrixAutoUpdate = false;
     mesh.frustumCulled = true;
     mesh.updateMatrix();
@@ -965,15 +1139,15 @@ function _prepareCharacterModel(model) {
         previousPosition ? previousPosition.z : _spawnPoint.z
     );
     model.rotation.y = previousRotationY;
-    model.castShadow = true;
+    model.castShadow = shadowsActive();
 
     anim.bones = {};
     anim.rest = {};
     model.traverse(child => {
         if (child.isBone || child.type === 'Bone') _registerBone(child);
         if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
+            child.castShadow = shadowsActive();
+            child.receiveShadow = shadowsActive();
         }
     });
 
@@ -992,7 +1166,7 @@ function _prepareCharacterModel(model) {
         _faceMesh = null;
     }
     _applyAvatar(_avatarState).catch((err) => console.warn("[avatar] apply failed", err));
-    renderer.shadowMap.needsUpdate = true;
+    if (shadowsActive()) renderer.shadowMap.needsUpdate = true;
     window.dispatchEvent(new CustomEvent("v22-character-renderer-changed", { detail: { renderer: _avatarRenderer } }));
 }
 
@@ -1068,8 +1242,21 @@ const cam = {
     maxDist: 512,
 };
 
-const keys = {};
+const runtimeInput = window.VortexRuntime && window.VortexRuntime.input;
+if (runtimeInput && typeof runtimeInput.attachTarget === 'function') {
+    runtimeInput.attachTarget(renderer.domElement);
+}
+const keys = runtimeInput && runtimeInput.keys || {};
 let mouseLock = false;
+
+function requestGamePointerLock() {
+    if (runtimeInput && typeof runtimeInput.requestPointerLock === 'function') {
+        runtimeInput.requestPointerLock(renderer.domElement);
+    } else if (document.pointerLockElement !== renderer.domElement) {
+        renderer.domElement.requestPointerLock();
+    }
+}
+
 function setMouseLock(sl) {
     if (mouseLock == sl) return
     mouseLock = sl;
@@ -1086,46 +1273,10 @@ function setMouseLock(sl) {
     }
 }
 let isFirstPerson = false;
-const GAME_BROWSER_SHORTCUTS = new Set([
-    "KeyW",
-    "KeyR",
-    "KeyL",
-    "KeyN",
-    "KeyT",
-    "KeyD",
-    "Digit1",
-    "Digit2",
-    "Digit3",
-    "Digit4",
-    "Digit5",
-    "Digit6",
-    "Digit7",
-    "Digit8",
-    "Digit9"
-]);
-
-function gameHasBrowserFocus() {
-    return !!window.locked || document.pointerLockElement === renderer.domElement;
-}
-
-document.addEventListener('keydown', e => {
-    if (!gameHasBrowserFocus() || window._chatFocused) return;
-    if ((e.ctrlKey || e.metaKey) && GAME_BROWSER_SHORTCUTS.has(e.code)) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-}, true);
-
-window.addEventListener('beforeunload', e => {
-    if (!gameHasBrowserFocus()) return;
-    e.preventDefault();
-    e.returnValue = "";
-});
 
 document.addEventListener('keydown', e => {
     if (window._chatFocused) return;
     if (!window.locked) return;
-    keys[e.code] = true;
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         shiftLock = !shiftLock;
         if (!isFirstPerson) setMouseLock(shiftLock);
@@ -1135,16 +1286,25 @@ document.addEventListener('keydown', e => {
     if (e.code === 'Space') jumpBuffer = JUMP_BUFFER;
     if (e.code === 'Backquote') toggleDebug();
 });
-document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+document.addEventListener('vortex-input-pointerlock-error', (event) => {
+    console.warn('[pointer-lock] request failed', event.detail && event.detail.error);
+    overlay.style.opacity = 1;
+    const overlayText = overlay.querySelector('span');
+    if (overlayText) overlayText.textContent = 'Click to play';
+});
 
 document.addEventListener('pointerlockchange', () => {
-    window.locked = !!document.pointerLockElement;
+    window.locked = runtimeInput && typeof runtimeInput.isLocked === 'function'
+        ? runtimeInput.isLocked()
+        : !!document.pointerLockElement;
     if (window.locked) {
         overlay.style.opacity = 0;
         cursorEl.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
+        const overlayText = overlay.querySelector('span');
+        if (overlayText) overlayText.textContent = 'Click to play';
     } else {
         overlay.style.opacity = 1;
-        Object.keys(keys).forEach(k => keys[k] = false);
         rmb = false;
     }
 });
@@ -1160,7 +1320,6 @@ function _cursorOver(el) {
 
 
 const chatEl = document.getElementById('chat-window');
-renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 renderer.domElement.addEventListener('click', () => {
     if (window.locked) {
         const cursorOver = _cursorOver;
@@ -1233,7 +1392,7 @@ renderer.domElement.addEventListener('click', () => {
 
         window.Leaderboard?.closeFriendPanel();
     }
-    renderer.domElement.requestPointerLock();
+    requestGamePointerLock();
 });
 
 const settingsPanel = document.getElementById('settings-panel');
@@ -1246,14 +1405,11 @@ toggleShadowsleftText.className = 'sp-label';
 toggleShadowsleftText.innerText = 'Toggle shadows'
 let toggleShadowsCheckBox = document.createElement('input');
 toggleShadowsCheckBox.type = "checkbox";
-if (enableShadows === 'yes') {
+if (enableShadows) {
     toggleShadowsCheckBox.click();
 }
 toggleShadowsCheckBox.onchange = function () {
-    enableShadows = toggleShadowsCheckBox.checked;
-    localStorage.setItem('enableShadows', enableShadows ? 'yes' : 'no')
-    sun.castShadow = enableShadows;
-    renderer.shadowMap.enabled = enableShadows;
+    setShadowsEnabled(toggleShadowsCheckBox.checked);
 }
 toggleShadows.appendChild(toggleShadowsleftText);
 toggleShadows.appendChild(toggleShadowsCheckBox);
@@ -2345,8 +2501,8 @@ function swordUpdate() {
         fbxLoader.load(importedAssets.swordMdl, (fbx) => {
             fbx.scale.multiplyScalar(0.005);
             sword = fbx;
-            sword.castShadow = true;
-            sword.receiveShadow = true;
+            sword.castShadow = shadowsActive();
+            sword.receiveShadow = shadowsActive();
             sword.rotation.order = 'YXZ';
             scene.add(sword);
         });
@@ -2407,12 +2563,16 @@ let lastTime = performance.now();
 
 function loop(now) {
     requestAnimationFrame(loop);
+    const perfFrame = VortexPerf.begin(now);
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
     update(dt);
+    VortexPerf.mark(perfFrame, "update");
     swordUpdate(dt);
+    VortexPerf.mark(perfFrame, "sword");
     updateCamera(dt);
+    VortexPerf.mark(perfFrame, "camera");
 
     if (charDebugMesh && character) {
         const fy = character.position.y - CHAR_FOOT_OFFSET;
@@ -2420,15 +2580,19 @@ function loop(now) {
         charDebugMesh.rotation.y = character.rotation.y;
     }
     updateDebugMeshes();
+    VortexPerf.mark(perfFrame, "debug");
 
     window._mpUpdate?.(dt);
+    VortexPerf.mark(perfFrame, "multiplayer");
 
     sun.position.set(camera.position.x + 50, camera.position.y + 100, camera.position.z + 50);
-    sun.target = camera;
-    sun.updateMatrixWorld();
+    camera.updateMatrixWorld();
     sun.target.updateMatrixWorld();
-    sun.shadow.camera.updateProjectionMatrix();
+    if (shadowsActive()) sun.updateMatrixWorld();
+    VortexPerf.mark(perfFrame, "lighting");
     renderer.render(scene, camera);
+    VortexPerf.mark(perfFrame, "render");
+    VortexPerf.end(perfFrame);
 }
 
 const DEG2RAD = Math.PI / 180;
@@ -2491,8 +2655,16 @@ overlay.addEventListener('click', () => {
             gameSong.play();
         }
     }
-    renderer.domElement.requestPointerLock();
+    requestGamePointerLock();
 });
+if (runtimeInput && typeof runtimeInput.attachOverlay === 'function') {
+    runtimeInput.attachOverlay(overlay, () => leaveButton.matches(':hover'));
+} else {
+    overlay.addEventListener('pointerdown', () => {
+        if (leaveButton.matches(':hover')) { return }
+        requestGamePointerLock();
+    });
+}
 
 window._vortex = {
     scene,
@@ -2515,7 +2687,13 @@ window._vortex = {
         CAM_H_SENS = 0.0015 * Math.PI * mult;
         CAM_V_SENS = 0.0015 * Math.PI * mult;
     },
-    requestLock() { renderer.domElement.requestPointerLock(); },
+    getShadowsEnabled() {
+        return shadowsActive();
+    },
+    setShadowsEnabled(value) {
+        return setShadowsEnabled(value);
+    },
+    requestLock() { requestGamePointerLock(); },
     loadMap: loadMapVortex,
     addPart(x, y, z, sx = 4, sy = 1, sz = 4, color = 0x4a6fd8, canCollide = true) {
         const [mesh, id] = addStud(sx, sy, sz, color, x, y - sy * 0.5, z, 0, 0, 0, "Block", 0, false, canCollide);
@@ -2607,6 +2785,44 @@ window._vortex = {
     },
 };
 
+window.VortexQuality = {
+    get() {
+        return {
+            shadows: shadowsActive(),
+            antialias: readStorageFlag('v22Antialias', false),
+            pixelRatio: renderer.getPixelRatio(),
+            shadowMapSize,
+            avatarRenderer: _avatarRenderer,
+            perfProfiler: !!VortexPerf.enabled,
+            runtimeBooted: !!window.VortexRuntime,
+            runtimeDisabled: localStorage.getItem("v22RuntimeDisabled") === "1",
+            runtimeDevTools: !!window.VortexRuntimeDevTools?.active?.(),
+            renderer: window.VortexRuntime?.renderer?.snapshot?.() || null,
+            caches: {
+                geometries: geoCache.size,
+                materials: matCache.size,
+                textures: texCache.size
+            }
+        };
+    },
+    setShadows(value) {
+        return setShadowsEnabled(value);
+    },
+    setAvatarRenderer(mode) {
+        return _setAvatarRenderer(mode);
+    },
+    performance() {
+        setShadowsEnabled(false);
+        localStorage.setItem('v22Antialias', '0');
+        return this.get();
+    },
+    visual() {
+        setShadowsEnabled(true);
+        localStorage.setItem('v22Antialias', '1');
+        return this.get();
+    },
+};
+
 
 window.THREE = THREE;
 window.FBXLoader = FBXLoader;
@@ -2627,6 +2843,14 @@ window.renderer = renderer;
 window.objects = objects;
 window.camera = camera;
 window.cam = cam;
+window.VortexRuntime?.renderer?.attachLegacy?.({ scene, camera, renderer });
+window.VortexRuntime?.world?.attachLegacy?.({
+    addPart: window._vortex?.addPart,
+    removePart: window._vortex?.removePart,
+    pick: window._vortex?.pick,
+    getObjects: window._vortex?.getObjects,
+    getColliders: window._vortex?.getColliders
+});
 
 window._cursorOver = _cursorOver;
 

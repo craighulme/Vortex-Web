@@ -79,9 +79,16 @@ function loadMapRaw(name, r, tx=0, ty=1.6, tz=0, options = {}) {
     mapsLoaded[name].meshes=[];
     geometries.forEach((value, key) => {
         const merged = THREE.BufferGeometryUtils.mergeGeometries(value);
+        for (const geo of value) geo.dispose?.();
+        merged.computeBoundingBox?.();
+        merged.computeBoundingSphere?.();
         const mergedMesh = new THREE.Mesh(merged, materials.get(key));
-        mergedMesh.castShadow=true;
-        mergedMesh.receiveShadow=true;
+        const shadows = !!window._vortex?.getShadowsEnabled?.();
+        mergedMesh.castShadow = shadows;
+        mergedMesh.receiveShadow = shadows;
+        mergedMesh.matrixAutoUpdate = false;
+        mergedMesh.updateMatrix();
+        mergedMesh.frustumCulled = true;
         scene.add(mergedMesh);
         objects.push(mergedMesh);
         mapsLoaded[name].meshes=[...mapsLoaded[name].meshes,mergedMesh];
@@ -159,6 +166,7 @@ function unloadMap(name) {
             let mesh = mapsLoaded[name].meshes[i];
             removeMatching_array(objects,mesh);
             scene.remove(mesh);
+            mesh.geometry?.dispose?.();
         }
     }
 }
