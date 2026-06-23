@@ -1433,6 +1433,7 @@ const settingsTargets = {
 const settingsOutput = document.getElementById('vw-dev-output');
 const settingsStatus = document.getElementById('vw-session-status');
 const reloadNotice = document.getElementById('vw-reload-notice');
+const settingsTitle = document.getElementById('vw-menu-title');
 const audioOutputSelect = document.getElementById('vw-audio-output');
 const audioInputSelect = document.getElementById('vw-audio-input');
 const audioStatus = document.getElementById('vw-audio-status');
@@ -1448,6 +1449,10 @@ function inferSettingsTarget(label) {
 
 function setSettingsTab(tabName) {
     const tab = String(tabName || 'game');
+    const activeTab = [...settingsPanel.querySelectorAll('[data-settings-tab]')]
+        .find((btn) => btn.dataset.settingsTab === tab);
+    const title = activeTab?.textContent?.trim() || 'Settings';
+    if (settingsTitle) settingsTitle.textContent = title === 'Game' ? 'Settings' : title;
     for (const btn of settingsPanel.querySelectorAll('[data-settings-tab]')) {
         btn.classList.toggle('active', btn.dataset.settingsTab === tab);
     }

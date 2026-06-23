@@ -616,14 +616,6 @@ body.vw-menu-open #cursor {
     border-bottom: 1px solid rgba(255,255,255,0.09);
 }
 
-.vw-menu-eyebrow {
-    color: rgba(248,250,252,0.56);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
 .vw-menu-title {
     color: #fff;
     font-size: 24px;
