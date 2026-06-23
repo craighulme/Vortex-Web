@@ -291,6 +291,7 @@ const BUBBLE_DURATION = 15000;
 const MAX_BUBBLES = 3;
 const _bubbles = new Map();
 const _healthbars = new Map();
+const _healthbarLoops = new Set();
 
 const B_PAD = 18;
 const B_R = 12;
@@ -410,6 +411,8 @@ function _showBubble(id, text) {
 function _redrawHealthbar(id, health) {
     let hbar = _healthbars.get(id);
     if (!hbar) { hbar = { sprite: null }; _healthbars.set(id, hbar); }
+    if (hbar.lastHealth === health) return;
+    hbar.lastHealth = health;
 
     const canvas = document.createElement('canvas');
     canvas.width = 500;
@@ -451,9 +454,7 @@ let playerSpecialValues = {
 let customPlayerData = {};
 
 function _healthbarDrawingLoop(id) {
-    if (id == myId) {
-        customPlayerData[id] = playerSpecialValues
-    }
+    if (id == myId || !_healthbarLoops.has(id)) return;
     if (!customPlayerData[id]) {
         setTimeout(() => { _healthbarDrawingLoop(id) }, 500);
     } else {
@@ -466,6 +467,9 @@ function _showHealthBar(id) {
     if (!window.SWORD_FIGHT) {
         return;
     }
+    if (id == myId) return;
+    if (_healthbarLoops.has(id)) return;
+    _healthbarLoops.add(id);
     _healthbarDrawingLoop(id);
 }
 
@@ -553,6 +557,11 @@ let _reconnectAttempts = 0;
 const _MAX_RECONNECTS = 20;
 const _RECONNECT_BASE_MS = 1200;
 const _RECONNECT_MAX_MS = 15000;
+let _lastBroadcastState = null;
+let _lastBroadcastSentAt = 0;
+const ACTIVE_BROADCAST_MS = 50;
+const IDLE_BROADCAST_MS = 250;
+const BROADCAST_EPSILON = 0.0025;
 
 function _scheduleReconnect(label = "relay") {
     stopBroadcast();
@@ -729,6 +738,7 @@ function _packetDebugSnapshot(player) {
 
 function _recordReplicatedPlayers(source, players) {
     if (!Array.isArray(players) || !players.length) return;
+    if (!_packetDebug.enabled && !_packetDebug.pendingSpoofs.length) return;
     const batch = [];
     for (const player of players) {
         const snap = _packetDebugSnapshot(player);
@@ -2317,7 +2327,6 @@ function handle(d) {
         case 'states': {
             const players = Array.isArray(d.players) ? d.players : [];
             _recordReplicatedPlayers("states", players);
-            _vortex.prefetchAvatarImages?.(players);
             for (const p of players) {
                 if (p.id !== myId && !remotes.has(p.id)) {
                     addRemote(p.id, p.username, p.is_staff, p.is_booster, p);
@@ -2572,6 +2581,7 @@ function removeRemote(id) {
         _bubbles.delete(id);
     }
     const hbar = _healthbars.get(id);
+    _healthbarLoops.delete(id);
     if (hbar) {
         _vortex.scene.remove(hbar.sprite);
         _healthbars.delete(id)
@@ -2620,19 +2630,36 @@ function startBroadcast() {
             ry: ry,
             anim: anim,
         }
+        const now = performance.now();
+        const changed = !_lastBroadcastState ||
+            Math.abs(dataToEncode.x - _lastBroadcastState.x) > BROADCAST_EPSILON ||
+            Math.abs(dataToEncode.y - _lastBroadcastState.y) > BROADCAST_EPSILON ||
+            Math.abs(dataToEncode.z - _lastBroadcastState.z) > BROADCAST_EPSILON ||
+            Math.abs(dataToEncode.ry - _lastBroadcastState.ry) > BROADCAST_EPSILON ||
+            dataToEncode.anim !== _lastBroadcastState.anim;
+        const interval = changed ? ACTIVE_BROADCAST_MS : IDLE_BROADCAST_MS;
+        if (now - _lastBroadcastSentAt < interval) return;
+        _lastBroadcastState = dataToEncode;
+        _lastBroadcastSentAt = now;
         let encoded = encodeNetworkData(dataToEncode);
         bridgeSend(encoded);
-    }, 50);
+    }, ACTIVE_BROADCAST_MS);
 }
 
 function stopBroadcast() {
     clearInterval(broadcastTimer);
     broadcastTimer = null;
+    _lastBroadcastState = null;
+    _lastBroadcastSentAt = 0;
 }
 
 const LERP = 12;
 
 window._mpUpdate = function (dt) {
+    if (_pendingAvatars.size === 0 && remotes.size === 0 && _bubbles.size === 0 && _healthbars.size === 0) {
+        return;
+    }
+
     if (_pendingAvatars.size > 0 && _vortex.getCharacter()) {
         for (const [id, info] of _pendingAvatars) {
             const r = remotes.get(id);
