@@ -325,6 +325,18 @@ function chooseSpawnPoint(m) {
 
 window.chooseSpawnPoint = chooseSpawnPoint;
 
+function updateRuntimeMapState(map) {
+    const session = window.VortexRuntime?.gameSession;
+    if (!session) return;
+    if (typeof session.setMapName === "function") session.setMapName(map?.name || "");
+    if (typeof session.setFlag === "function") {
+        session.setFlag("SWORD_FIGHT", !!map?.SWORD_FIGHT);
+        session.setFlag("BUILD_MODE", !!map?.BUILD_MODE);
+        session.setFlag("VOID_DIE", !!map?.VOID_DIE);
+        session.setFlag("REMOVE_BASEPLATE", !!map?.REMOVE_BASEPLATE);
+    }
+}
+
 (function () {
     var url_string = document.URL;
     var url = new URL(url_string);
@@ -333,6 +345,7 @@ window.chooseSpawnPoint = chooseSpawnPoint;
     if (gamei) {
         let map = maps[gamei]
         window.map = map;
+        updateRuntimeMapState(map);
         let gameid = map.gameId
         if (map.SWORD_FIGHT) {
             window.SWORD_FIGHT = true;
@@ -359,6 +372,7 @@ window.chooseSpawnPoint = chooseSpawnPoint;
             officialGameId,
             spawnPoints: [[0, 10, 0]],
         };
+        updateRuntimeMapState(window.map);
         Object.defineProperty(window, "GAME_ID", {
             value: officialGameId,
             writable: false,
@@ -367,6 +381,7 @@ window.chooseSpawnPoint = chooseSpawnPoint;
         console.info(`official game id set to ${officialGameId}`);
     } else {
         window.map = false;
+        updateRuntimeMapState(null);
     }
     console.info('set window map data')
 })();
@@ -638,6 +653,7 @@ async function initialize() {
                     }
                     let spawn = window.chooseSpawnPoint(map)
                     window._vortex.setSpawn(spawn.x, spawn.y, spawn.z, 0);
+                    updateRuntimeMapState(map);
                     btn.innerHTML = map.name + '(Loaded)'
                     loaded = true
                 }
