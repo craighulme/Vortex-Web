@@ -1317,8 +1317,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('vortex-input-pointerlock-error', (event) => {
     console.warn('[pointer-lock] request failed', event.detail && event.detail.error);
     overlay.style.opacity = 1;
-    const overlayText = overlay.querySelector('span');
-    if (overlayText) overlayText.textContent = 'Click to play';
+    setSettingsOpen(true);
 });
 
 document.addEventListener('pointerlockchange', () => {
@@ -1328,8 +1327,6 @@ document.addEventListener('pointerlockchange', () => {
     if (window.locked) {
         overlay.style.opacity = 0;
         cursorEl.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
-        const overlayText = overlay.querySelector('span');
-        if (overlayText) overlayText.textContent = 'Click to play';
     } else {
         overlay.style.opacity = 1;
         rmb = false;
@@ -1470,7 +1467,7 @@ function setSettingsOpen(open, options = {}) {
         populateAudioDevices().catch(() => {});
         if (document.pointerLockElement) document.exitPointerLock?.();
     } else if (options.resume) {
-        requestGamePointerLock();
+        startGameSession();
     }
 }
 
@@ -1764,6 +1761,27 @@ function applyAudioVolumes() {
     oofSound.volume = masterVolume * sfxVolume;
 }
 
+function startGameSession() {
+    window.canPlaySounds = true;
+    document.body.classList.add('vw-game-started');
+    if (window.SWORD_FIGHT || window.BUILD_MODE) {
+        if (!gameSong) {
+            gameSong = new Audio(window.SWORD_FIGHT && importedAssets.sfothSong || importedAssets.buildSong);
+            gameSong.loop = true;
+            gameSong.preload = "auto";
+            applyAudioOutputTo(gameSong);
+            applyAudioVolumes();
+            gameSong.addEventListener('ended', function () {
+                this.currentTime = 0;
+                this.play();
+            }, false);
+            gameSong.preload = "auto";
+            gameSong.play();
+        }
+    }
+    requestGamePointerLock();
+}
+
 async function populateAudioDevices() {
     if (!audioOutputSelect || !audioInputSelect) return;
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -1965,6 +1983,7 @@ applyAudioOutputTo(slashSound);
 applyAudioOutputTo(clickSound);
 applyAudioOutputTo(oofSound);
 applyAudioVolumes();
+setSettingsOpen(true);
 
 
 var raycaster = new THREE.Raycaster();
@@ -3161,30 +3180,15 @@ async function loadMapVortex(path, tx = 0, ty = 0, tz = 0) {
 }
 
 overlay.addEventListener('click', () => {
-    window.canPlaySounds = true;
-    document.body.classList.add('vw-game-started');
-    if (window.SWORD_FIGHT || window.BUILD_MODE) {
-        if (!gameSong) {
-            gameSong = new Audio(window.SWORD_FIGHT && importedAssets.sfothSong || importedAssets.buildSong);
-            gameSong.loop = true;
-            gameSong.preload = "auto";
-            applyAudioOutputTo(gameSong);
-            applyAudioVolumes();
-            gameSong.addEventListener('ended', function () {
-                this.currentTime = 0;
-                this.play();
-            }, false);
-            gameSong.preload = "auto";
-            gameSong.play();
-        }
-    }
-    requestGamePointerLock();
+    if (settingsOpen) return;
+    startGameSession();
 });
 if (runtimeInput && typeof runtimeInput.attachOverlay === 'function') {
     runtimeInput.attachOverlay(overlay, () => false);
 } else {
     overlay.addEventListener('pointerdown', () => {
-        requestGamePointerLock();
+        if (settingsOpen) return;
+        startGameSession();
     });
 }
 

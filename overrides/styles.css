@@ -19,28 +19,7 @@ body.vw-menu-open {
     cursor: default;
 }
 
-#overlay span {
-    color: white;
-    font-family: sans-serif;
-    font-size: 24px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-    padding: 16px 32px;
-    border: 2px solid rgba(255,255,255,0.6);
-    border-radius: 8px;
-    background: rgba(0,0,0,0.35);
-}
-
 #overlay.hidden {
-    display: none;
-}
-
-body.vw-menu-open #overlay span {
-    display: none;
-}
-
-body.vw-game-started #overlay span {
     display: none;
 }
 
