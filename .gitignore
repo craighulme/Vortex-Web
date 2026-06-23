@@ -1,5 +1,6 @@
 _metadata/
 config/
+docs/
 cloudflare-hub/node_modules/
 cloudflare-hub/.wrangler/
 web-client/node_modules/

@@ -1,72 +1,91 @@
 # Vortex Web
 
-Vortex Web is the next-generation rewrite path for Vortex2+2: an unofficial, extension-powered browser client for Vortex focused on native multiplayer relay support, performance, modular runtime architecture, and future scripting support.
+Vortex Web is an unofficial browser client for Vortex, built from the Vortex2+2 project and moving toward a complete modern rewrite for web play.
 
-This project is not an official Vortex client. It exists to keep a browser-playable version alive while the official app continues to evolve.
+The goal is simple: keep Vortex playable in the browser, support native-style multiplayer through a relay, and build a cleaner web runtime that can grow with future Vortex features.
 
-## Direction
+This is not an official Vortex client.
 
-Vortex2+2 is being rebranded into Vortex Web. The goal is not just a name change; it is a gradual rewrite that keeps the current browser client working while moving toward a cleaner, production-ready runtime.
+## What Is Changing
 
-Planned direction:
-- Preserve extension-based browser play on `https://playvortex.io/games/{id}`.
-- Keep native multiplayer alive in the browser through a WebSocket-to-native/app relay.
-- Move legacy globals into a typed runtime shell.
-- Improve loading, asset management, map handling, rendering, physics, avatar equipment, UI, and diagnostics.
-- Add a game API first, then evaluate Lua/WASM scripting behind safe runtime permissions.
-- Avoid building a web studio for now; the focus is the playable web client.
+Vortex2+2 is being rebranded as Vortex Web.
 
-## Current State
+The rebrand is more than a new name. Vortex Web is becoming a faster, more modular browser client with better update handling, cleaner runtime systems, stronger multiplayer support, and room for future features such as streamed assets, richer avatars, equipment, physics, and safe scripting support.
 
-The current playable game still uses the legacy Vortex2+2 engine scripts for movement, rendering, multiplayer, chat, maps, avatars, and building/sword modes.
+The current public focus is the playable web client. A web studio is not part of this plan.
 
-The new TypeScript/Vite runtime shell has been added as the first migration step. It provides typed services for assets, renderer ownership, world/entities, physics adapters, avatar slots, animation/foot-IK configuration, scripting permissions, UI, diagnostics, and protocol definitions. These systems are not fully wired into live gameplay yet.
+## What Works Today
 
-Important: Rapier physics, foot IK, and the new avatar/equipment service are scaffolded for the rewrite path, not active replacements for the legacy in-game movement/avatar systems yet.
+- Browser play from supported Vortex game pages
+- Hosted WebSocket relay support for native-style multiplayer
+- Extension-managed launch flow
+- Multiplayer chat, player replication, health, swords, and building modes
+- Current map loading and classic bundled maps
+- Avatar clothing support for existing shirt, pants, face, body type, and colour data
+- Command-gated movement and avatar tools for authorised users
+- A new TypeScript/Vite web runtime that now boots alongside the live client
 
-## Access And Auth
+## Runtime Upgrade Progress
 
-Vortex Web browser multiplayer is license-gated. To get a key, or to request more authorisation for restricted commands, contact `quackduck.` on Discord.
+Vortex Web is being upgraded in stages so the browser client remains playable during the rewrite.
 
-Hosted mode does not send user session tokens or browser cookies to Vortex Web servers. The extension uses the user's existing Vortex browser session locally to request a normal short-lived game authorisation token from Vortex, then sends that game authorisation token and the signed license lease to the hosted relay. The hosted relay verifies the game authorisation token server-side and keeps relay secrets out of the extension.
+Already in the new web runtime:
 
-Command access is documented in [COMMANDS_README.md](COMMANDS_README.md).
+- Modern boot bundle loaded by the extension
+- Runtime service layer for renderer, world, avatar, animation, scripting permissions, protocol definitions, diagnostics, and UI
+- Input and focus service for pointer lock, key state, shortcut blocking, and game focus
+- Runtime HUD panel with live input, world, FPS, SLIM, streaming, sandbox, and avatar status
+- SLIM-style distance band infrastructure for future mesh and streamed asset optimisation
+- Client-only physics sandbox for stress testing, falling parts, and a kickable test ball
+- Early asset streaming manifest validation for future models, meshes, textures, avatar items, map chunks, and script packages
+- World map-part normalisation through the new `WorldService`, currently mirrored through the legacy add/remove backend
+- Vortex-Web-only community cosmetic state for future badges, name gradients, nameplates, and supporter features
+- Performance-first renderer defaults, connected-idle multiplayer throttling, and browser profiling helpers
 
-## Browser Play
+Still being migrated:
 
-This extension injects a `Play in Browser` button on `https://playvortex.io/games/{id}`. The button fetches the normal Vortex launch token with your existing browser login and opens the Vortex Web browser client.
+- Full map loading and batching
+- Chat and leaderboard UI ownership
+- Rapier side-by-side physics
+- Foot IK
+- Character movement replacement
+- Avatar equipment slots for hats, masks, tools, shoes, and held items
+- Production SLIM for real meshes, repeated assets, streamed UGC, and map chunks
+- Streamed UGC models/assets from future Vortex APIs
+- Script package loading and the public game API
 
-The official app uses UDP for live multiplayer. Browser extensions cannot open UDP sockets, so live Vortex multiplayer uses a WebSocket-to-native/app relay. Public builds default to the hosted Vortex Web relay.
+Legacy gameplay remains active while these systems move across. That means movement, collision, build placement, sword hits, core map rendering, and multiplayer packets are still protected for compatibility.
 
-Local relay mode is not the supported public setup. It is possible for private development or self-hosted/reverse-engineering work, but you must provide and maintain your own local relay/runtime configuration.
+## Multiplayer
 
-The historical local relay URL is `ws://127.0.0.1:27822/ws`, but public users should use the hosted default unless they are deliberately building and maintaining their own local relay.
+The official Vortex app uses native networking. Browser extensions cannot use native UDP sockets directly, so Vortex Web uses a WebSocket relay model for browser multiplayer.
 
-## Current Features
+Public builds are designed around the hosted Vortex Web relay. Local relay mode exists for private development and testing, but it is not the normal public setup.
 
-- Clean custom dark UI
-- Map loader
-- Normal mapping
-- Shadows
-- Custom games
-- Multiplayer health and sword system
-- Multiplayer building game
-- Hosted native multiplayer relay support
-- Extension-managed launch handoff
-- Rebrand/update path from Vortex2+2 to Vortex Web
-- Early modular TypeScript runtime shell for future migration work
+## Access
+
+Vortex Web browser multiplayer is license-gated while the project is still moving fast. For access, contact `quackduck.` on Discord.
+
+Command access is feature-gated. Some commands are available to all licensed users, while advanced movement, avatar, and packet tools require extra authorisation. See [COMMANDS_README.md](COMMANDS_README.md).
+
+Hosted mode does not send your Vortex browser cookies or session token to Vortex Web servers. The extension uses your normal browser session locally to request a short-lived Vortex launch authorisation, then the hosted relay verifies that authorisation server-side.
 
 ## Installation
 
 1. Download the latest release.
 2. Unzip it.
-3. Go to `chrome://extensions`.
+3. Open `chrome://extensions`.
 4. Enable developer mode.
-5. Press `Load unpacked` and select the folder containing this file.
+5. Select `Load unpacked`.
+6. Choose the folder containing this README.
 
 ## Troubleshooting
 
-If Vortex Web breaks the game, check whether another extension is interfering and disable it first. If that does not fix it, Vortex may have changed something upstream and the extension may need an update.
+If the browser client stops loading, first reload the extension and refresh the Vortex game page. If the problem continues, disable other extensions that may be changing the same page.
+
+If launch authorisation fails, the relay or license server may have rejected the request. Newer builds show the server reason where available.
+
+For performance testing, launch from the game page with the normal Play in Web button. Reloading an already-running play page can drop the relay session.
 
 ## Credits
 
