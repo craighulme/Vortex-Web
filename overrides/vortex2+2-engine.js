@@ -1600,15 +1600,6 @@ document.addEventListener('keydown', (event) => {
     }
 }, true);
 
-document.addEventListener('pointerlockchange', () => {
-    const shouldOpenPause = runtimeInput && typeof runtimeInput.shouldOpenPauseOnUnlock === 'function'
-        ? runtimeInput.shouldOpenPauseOnUnlock()
-        : window.canPlaySounds && !settingsOpen;
-    if (!document.pointerLockElement && !settingsOpen && shouldOpenPause) {
-        openPauseMenu();
-    }
-});
-
 function refreshSettingsStatus() {
     if (!settingsStatus) return;
     const quality = window.VortexQuality?.get?.();
