@@ -1299,19 +1299,21 @@ function isLegacyInputActive() {
         !!(runtimeInput && typeof runtimeInput.isLocked === 'function' && runtimeInput.isLocked());
 }
 
-document.addEventListener('keydown', e => {
-    if (window._chatFocused) return;
-    if (!isLegacyInputActive()) return;
-    keys[e.code] = true;
-}, true);
+if (!runtimeInput) {
+    document.addEventListener('keydown', e => {
+        if (window._chatFocused) return;
+        if (!isLegacyInputActive()) return;
+        keys[e.code] = true;
+    }, true);
 
-document.addEventListener('keyup', e => {
-    keys[e.code] = false;
-}, true);
+    document.addEventListener('keyup', e => {
+        keys[e.code] = false;
+    }, true);
 
-window.addEventListener('blur', () => {
-    for (const key of Object.keys(keys)) keys[key] = false;
-});
+    window.addEventListener('blur', () => {
+        for (const key of Object.keys(keys)) keys[key] = false;
+    });
+}
 
 function requestGamePointerLock() {
     if (runtimeInput && typeof runtimeInput.requestPointerLock === 'function') {

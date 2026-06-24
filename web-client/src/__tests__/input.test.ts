@@ -53,4 +53,30 @@ describe("InputService", () => {
     })).toBe("pause");
     expect(input.snapshot()).toMatchObject({ focusState: "paused", pauseOpen: true });
   });
+
+  it("clears pressed keys when the browser window loses focus", () => {
+    const documentRef = new FakeDocument();
+    const windowRef = new EventTarget();
+    const target = new FakeTarget();
+    const input = new InputService(documentRef as unknown as Document, windowRef as unknown as Window);
+    input.attachTarget(target as unknown as HTMLElement);
+    documentRef.pointerLockElement = target;
+    documentRef.dispatchEvent(new Event("pointerlockchange"));
+    const keydown = new Event("keydown") as KeyboardEvent;
+    Object.defineProperties(keydown, {
+      code: { value: "KeyW" },
+      repeat: { value: false },
+      altKey: { value: false },
+      ctrlKey: { value: false },
+      metaKey: { value: false },
+      shiftKey: { value: false }
+    });
+    documentRef.dispatchEvent(keydown);
+
+    expect(input.snapshot().pressed).toContain("KeyW");
+
+    windowRef.dispatchEvent(new Event("blur"));
+
+    expect(input.snapshot().pressed).not.toContain("KeyW");
+  });
 });

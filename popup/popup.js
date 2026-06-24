@@ -243,46 +243,62 @@ storageGet({ hubUrl: "", licenseKey: "" }, (stored) => {
 
 checkForUpdates();
 
-let lightMode = localStorage.getItem('theme')
-if (lightMode==='true') {
-    lightMode=true;
-    applyPopupTheme(true);
-    lightModeToggle.click();
-    (async function () {
-        const tabs = await extensionApi.tabs.query({ active: true, currentWindow: true });
-        const tab = tabs[0];
-        extensionApi.scripting.executeScript({
+function normalizeTheme(value) {
+    return value === "light" || value === "true" ? "light" : "dark";
+}
+
+async function activeTab() {
+    const tabs = await extensionApi.tabs.query({ active: true, currentWindow: true });
+    return tabs[0] || null;
+}
+
+async function readActiveTabTheme() {
+    const tab = await activeTab();
+    if (!tab?.id || !extensionApi.scripting?.executeScript) return null;
+    try {
+        const results = await extensionApi.scripting.executeScript({
             target: { tabId: tab.id },
-            func: () => {
-                localStorage.setItem("theme", 'light');
-                document.documentElement.setAttribute('theme', 'light');
-            },
+            func: () => localStorage.getItem("theme") || "dark"
         });
-    })();
-}
-lightModeToggle.onclick = async function () {
-    lightMode = !lightMode
-    localStorage.setItem("theme", lightMode);
-    applyPopupTheme(lightMode);
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const tabId = tabs[0];
-
-    if (lightMode) {
-        extensionApi.scripting.executeScript({
-            target: { tabId: tabId.id },
-            func: () => {
-                localStorage.setItem("theme", 'light');
-                document.documentElement.setAttribute('theme', 'light');
-            },
-        });
-    } else {
-        extensionApi.scripting.executeScript({
-            target: { tabId: tabId.id },
-            func: () => {
-                localStorage.setItem("theme", 'dark');
-                document.documentElement.removeAttribute('theme');
-            },
-        });
+        return normalizeTheme(results?.[0]?.result);
+    } catch {
+        return null;
     }
-
 }
+
+async function writeActiveTabTheme(theme) {
+    const tab = await activeTab();
+    if (!tab?.id || !extensionApi.scripting?.executeScript) return;
+    try {
+        await extensionApi.scripting.executeScript({
+            target: { tabId: tab.id },
+            args: [theme],
+            func: (nextTheme) => {
+                localStorage.setItem("theme", nextTheme);
+                if (nextTheme === "light") {
+                    document.documentElement.setAttribute("theme", "light");
+                } else {
+                    document.documentElement.removeAttribute("theme");
+                }
+            }
+        });
+    } catch {}
+}
+
+function setLightModeChecked(enabled) {
+    lightModeToggle.checked = Boolean(enabled);
+    applyPopupTheme(Boolean(enabled));
+}
+
+(async function initLightModeToggle() {
+    const theme = await readActiveTabTheme() || normalizeTheme(localStorage.getItem("theme"));
+    localStorage.setItem("theme", theme);
+    setLightModeChecked(theme === "light");
+})();
+
+lightModeToggle.addEventListener("change", async () => {
+    const theme = lightModeToggle.checked ? "light" : "dark";
+    localStorage.setItem("theme", theme);
+    applyPopupTheme(theme === "light");
+    await writeActiveTabTheme(theme);
+});

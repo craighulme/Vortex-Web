@@ -64,6 +64,7 @@ export class InputService {
     this.document.addEventListener("keydown", this.onKeyDown, true);
     this.document.addEventListener("keyup", this.onKeyUp, true);
     this.document.addEventListener("pointerlockchange", this.onPointerLockChange);
+    this.windowRef.addEventListener("blur", this.onWindowBlur);
     this.windowRef.addEventListener("beforeunload", this.onBeforeUnload);
   }
 
@@ -209,6 +210,7 @@ export class InputService {
     this.document.removeEventListener("keydown", this.onKeyDown, true);
     this.document.removeEventListener("keyup", this.onKeyUp, true);
     this.document.removeEventListener("pointerlockchange", this.onPointerLockChange);
+    this.windowRef.removeEventListener("blur", this.onWindowBlur);
     this.windowRef.removeEventListener("beforeunload", this.onBeforeUnload);
     if (this.target) {
       this.target.removeEventListener("contextmenu", this.onContextMenu);
@@ -239,6 +241,10 @@ export class InputService {
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.keys[event.code] = false;
     this.document.dispatchEvent(new CustomEvent<InputEventDetail>("vortex-input-keyup", { detail: toInputDetail(event) }));
+  };
+
+  private readonly onWindowBlur = (): void => {
+    this.clearKeys();
   };
 
   private readonly onPointerLockChange = (): void => {

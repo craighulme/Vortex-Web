@@ -426,8 +426,14 @@ body.vw-menu-open {
 }
 
 .lb-vw-badge {
+    box-sizing: border-box;
+    flex: 0 0 17px;
     width: 17px;
+    min-width: 17px;
+    max-width: 17px;
     height: 17px;
+    min-height: 17px;
+    max-height: 17px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -435,14 +441,20 @@ body.vw-menu-open {
     border-radius: 5px;
     color: #fff;
     background: rgba(59, 130, 246, 0.9);
+    overflow: hidden;
     box-shadow:
         inset 0 0 0 1px rgba(255,255,255,0.28),
         0 2px 7px rgba(0,0,0,0.3);
 }
 
 .lb-vw-badge svg {
+    flex: 0 0 12px;
     width: 12px;
+    min-width: 12px;
+    max-width: 12px;
     height: 12px;
+    min-height: 12px;
+    max-height: 12px;
     display: block;
     fill: currentColor;
 }
@@ -501,115 +513,124 @@ body.vw-menu-open {
     text-overflow: ellipsis;
 }
 
-.lb-nameplate.has-gradient .lb-name-text {
-    background-image: var(--lb-name-gradient);
-    background-size: 220% 100%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-    font-weight: 780;
-}
-
+.lb-nameplate.has-gradient .lb-name-text,
+.lb-nameplate.vw-name-effect-flow .lb-name-text,
+.lb-nameplate.vw-name-effect-holo .lb-name-text,
+.lb-nameplate.vw-name-effect-neon .lb-name-text,
+.lb-nameplate.vw-name-effect-toxic .lb-name-text,
+.lb-nameplate.vw-name-effect-glitch .lb-name-text,
 .lb-nameplate.vw-name-effect-aurora .lb-name-text,
 .lb-nameplate.vw-name-effect-prism .lb-name-text,
 .lb-nameplate.vw-name-effect-ember .lb-name-text,
 .lb-nameplate.vw-name-effect-phantasm .lb-name-text,
-.lb-nameplate.vw-name-effect-toxic .lb-name-text,
 .lb-nameplate.vw-name-effect-noxious .lb-name-text,
-.lb-nameplate.vw-name-effect-glitch .lb-name-text,
-.lb-nameplate.vw-name-effect-pulse .lb-name-text {
+.lb-nameplate.vw-name-effect-pulse .lb-name-text,
+.lb-nameplate.vw-name-effect-frost .lb-name-text,
+.lb-nameplate.vw-name-effect-solar .lb-name-text,
+.lb-nameplate.vw-name-effect-void .lb-name-text,
+.lb-nameplate.vw-name-effect-static .lb-name-text {
+    background-image: var(--lb-name-gradient, var(--lb-name-effect-gradient));
+    background-size: var(--lb-name-background-size, 220% 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
     font-weight: 800;
 }
 
-.lb-nameplate.vw-name-effect-aurora .lb-name-text {
-    animation: vw-name-flow 3.2s linear infinite;
-    text-shadow: 0 0 8px rgba(255,255,255,0.18);
-}
-
-.lb-nameplate.vw-name-effect-prism .lb-name-text {
-    animation: vw-name-chroma 3.8s linear infinite;
-}
-
-.lb-nameplate.vw-name-effect-ember .lb-name-text {
-    animation: vw-name-glow 2.6s ease-in-out infinite;
-}
-
+.lb-nameplate.vw-name-effect-flow .lb-name-text,
+.lb-nameplate.vw-name-effect-aurora .lb-name-text,
 .lb-nameplate.vw-name-effect-pulse .lb-name-text {
-    animation: vw-name-pulse 1.7s ease-in-out infinite;
+    --lb-name-effect-gradient: linear-gradient(90deg, #60a5fa 0%, #a78bfa 35%, #67e8f9 65%, #60a5fa 100%);
+    --lb-name-background-size: 240% 100%;
+    animation: vw-name-flow 5.2s linear infinite;
+    filter: drop-shadow(0 0 5px rgba(125,211,252,0.18));
 }
 
-.lb-nameplate.vw-name-effect-phantasm .lb-name-text {
-    animation: vw-name-phantasm 3.4s ease-in-out infinite;
-    text-shadow:
-        0 0 8px rgba(192,132,252,0.32),
-        0 0 18px rgba(103,232,249,0.18);
+.lb-nameplate.vw-name-effect-holo .lb-name-text,
+.lb-nameplate.vw-name-effect-prism .lb-name-text,
+.lb-nameplate.vw-name-effect-phantasm .lb-name-text,
+.lb-nameplate.vw-name-effect-frost .lb-name-text,
+.lb-nameplate.vw-name-effect-void .lb-name-text {
+    --lb-name-holo-a: var(--lb-name-color-a, #a5b4fc);
+    --lb-name-holo-b: var(--lb-name-color-b, #67e8f9);
+    --lb-name-effect-gradient: linear-gradient(
+        90deg,
+        var(--lb-name-holo-a) 0%,
+        #67e8f9 12.5%,
+        var(--lb-name-holo-b) 25%,
+        #f0abfc 37.5%,
+        var(--lb-name-holo-a) 50%,
+        #86efac 62.5%,
+        var(--lb-name-holo-b) 75%,
+        #fde68a 87.5%,
+        var(--lb-name-holo-a) 100%
+    );
+    background-image: var(--lb-name-effect-gradient) !important;
+    --lb-name-background-size: 200% 100%;
+    background-repeat: repeat;
+    animation: vw-name-holo 8.5s linear infinite;
+    filter: drop-shadow(0 0 6px rgba(125,211,252,0.16)) saturate(1.14);
 }
 
-.lb-nameplate.vw-name-effect-toxic .lb-name-text {
-    animation: vw-name-toxic 2.6s ease-in-out infinite;
-    text-shadow:
-        0 0 7px rgba(132,204,22,0.4),
-        0 0 16px rgba(34,197,94,0.22);
+.lb-nameplate.vw-name-effect-neon .lb-name-text,
+.lb-nameplate.vw-name-effect-ember .lb-name-text,
+.lb-nameplate.vw-name-effect-solar .lb-name-text {
+    --lb-name-effect-gradient: linear-gradient(90deg, #22d3ee 0%, #fb7185 45%, #facc15 70%, #22d3ee 100%);
+    --lb-name-background-size: 230% 100%;
+    animation: vw-name-neon 3.6s ease-in-out infinite;
+    filter: drop-shadow(0 0 5px rgba(34,211,238,0.28)) drop-shadow(0 0 9px rgba(236,72,153,0.16));
 }
 
+.lb-nameplate.vw-name-effect-toxic .lb-name-text,
 .lb-nameplate.vw-name-effect-noxious .lb-name-text {
-    animation: vw-name-noxious 4.2s ease-in-out infinite;
-    text-shadow:
-        0 0 8px rgba(74,222,128,0.32),
-        2px 0 0 rgba(22,163,74,0.24),
-        -2px 0 0 rgba(20,184,166,0.18);
+    --lb-name-effect-gradient: linear-gradient(90deg, #84cc16 0%, #22c55e 45%, #14b8a6 70%, #84cc16 100%);
+    --lb-name-background-size: 220% 100%;
+    animation: vw-name-toxic 4.2s linear infinite;
+    filter: drop-shadow(0 0 6px rgba(34,197,94,0.24));
 }
 
-.lb-nameplate.vw-name-effect-glitch .lb-name-text {
-    animation: vw-name-glitch 1.3s steps(2, end) infinite;
-    text-shadow:
-        1px 0 0 rgba(103,232,249,0.55),
-        -1px 0 0 rgba(244,114,182,0.45);
+.lb-nameplate.vw-name-effect-glitch .lb-name-text,
+.lb-nameplate.vw-name-effect-static .lb-name-text {
+    --lb-name-effect-gradient: linear-gradient(90deg, #67e8f9 0%, #f472b6 50%, #c084fc 100%);
+    --lb-name-background-size: 180% 100%;
+    animation: vw-name-glitch 1.4s steps(2, end) infinite;
+    filter:
+        drop-shadow(1px 0 0 rgba(103,232,249,0.2))
+        drop-shadow(-1px 0 0 rgba(244,114,182,0.16));
 }
 
 @keyframes vw-name-flow {
     from { background-position: 0% 50%; }
+    to { background-position: 240% 50%; }
+}
+
+@keyframes vw-name-holo {
+    from { background-position: 0% 50%; }
     to { background-position: 200% 50%; }
 }
 
-@keyframes vw-name-pulse {
-    0%, 100% { opacity: 0.82; }
-    50% { opacity: 1; }
-}
-
-@keyframes vw-name-chroma {
-    0% { filter: hue-rotate(0deg); }
-    100% { filter: hue-rotate(360deg); }
-}
-
-@keyframes vw-name-glow {
-    0%, 100% { text-shadow: 0 0 4px rgba(255,255,255,0.12); }
-    50% { text-shadow: 0 0 10px rgba(255,255,255,0.45); }
-}
-
-@keyframes vw-name-phantasm {
-    0%, 100% { filter: drop-shadow(0 0 2px rgba(192,132,252,0.2)); transform: translateY(0); }
-    50% { filter: drop-shadow(0 0 10px rgba(103,232,249,0.42)); transform: translateY(-1px); }
+@keyframes vw-name-neon {
+    0%, 100% { background-position: 0% 50%; filter: drop-shadow(0 0 4px rgba(34,211,238,0.22)) drop-shadow(0 0 8px rgba(236,72,153,0.12)); }
+    50% { background-position: 120% 50%; filter: drop-shadow(0 0 6px rgba(34,211,238,0.36)) drop-shadow(0 0 12px rgba(236,72,153,0.2)); }
 }
 
 @keyframes vw-name-toxic {
-    0%, 100% { filter: saturate(1) brightness(1); }
-    45% { filter: saturate(1.75) brightness(1.12); }
-    60% { filter: saturate(1.2) brightness(0.95); }
-}
-
-@keyframes vw-name-noxious {
-    0%, 100% { letter-spacing: 0; filter: hue-rotate(0deg); }
-    50% { letter-spacing: 0.4px; filter: hue-rotate(28deg); }
+    from { background-position: 0% 50%; filter: drop-shadow(0 0 5px rgba(34,197,94,0.2)) saturate(1.05); }
+    to { background-position: 220% 50%; filter: drop-shadow(0 0 6px rgba(20,184,166,0.24)) saturate(1.18); }
 }
 
 @keyframes vw-name-glitch {
-    0%, 100% { transform: translate(0, 0); }
-    20% { transform: translate(1px, 0); }
-    40% { transform: translate(-1px, 0); }
-    60% { transform: translate(0, 1px); }
-    80% { transform: translate(0, -1px); }
+    0%, 100% { transform: translate(0, 0); background-position: 0% 50%; }
+    20% { transform: translate(0.6px, 0); }
+    40% { transform: translate(-0.6px, 0); background-position: 80% 50%; }
+    60% { transform: translate(0, 0.6px); }
+    80% { transform: translate(0, -0.6px); background-position: 140% 50%; }
+}
+
+@keyframes vw-name-pulse {
+    0%, 100% { opacity: 0.84; }
+    50% { opacity: 1; }
 }
 
 @keyframes vw-badge-shine {
@@ -627,6 +648,11 @@ body.vw-menu-open {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .lb-nameplate.vw-name-effect-flow .lb-name-text,
+    .lb-nameplate.vw-name-effect-holo .lb-name-text,
+    .lb-nameplate.vw-name-effect-neon .lb-name-text,
+    .lb-nameplate.vw-name-effect-toxic .lb-name-text,
+    .lb-nameplate.vw-name-effect-glitch .lb-name-text,
     .lb-nameplate.vw-name-effect-aurora .lb-name-text,
     .lb-nameplate.vw-name-effect-prism .lb-name-text,
     .lb-nameplate.vw-name-effect-ember .lb-name-text,
@@ -635,6 +661,12 @@ body.vw-menu-open {
     .lb-nameplate.vw-name-effect-noxious .lb-name-text,
     .lb-nameplate.vw-name-effect-glitch .lb-name-text,
     .lb-nameplate.vw-name-effect-pulse .lb-name-text,
+    .lb-nameplate.vw-name-effect-holo .lb-name-text,
+    .lb-nameplate.vw-name-effect-neon .lb-name-text,
+    .lb-nameplate.vw-name-effect-frost .lb-name-text,
+    .lb-nameplate.vw-name-effect-solar .lb-name-text,
+    .lb-nameplate.vw-name-effect-void .lb-name-text,
+    .lb-nameplate.vw-name-effect-static .lb-name-text,
     .vw-badge-effect-shine,
     .vw-badge-effect-phantasm,
     .vw-badge-effect-toxic,

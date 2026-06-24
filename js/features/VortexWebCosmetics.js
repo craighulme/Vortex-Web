@@ -1,7 +1,22 @@
 (function () {
+  document.documentElement.dataset.vwCosmeticsApiScript = "20260624-cache-negative";
+
   const STORAGE_KEY = "vortexWebCosmetics";
+  const PROFILE_AUTH_KEY = "vortexWebProfileAuth";
+  const LAST_LICENSE_LEASE_KEY = "v22LastLicenseLease";
   const API_BASE = "https://v22.irongiant.vip";
   const DEFAULT_RECORDS = {};
+  const CACHE_VERSION = 3;
+  const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
+  const OWN_USER_CACHE_TTL_MS = 2 * 60 * 1000;
+  const BRIDGE_RESPONSE_TTL_MS = 30 * 1000;
+  const REFRESH_RETRY_MS = 30 * 1000;
+  const inflightUserRefreshes = new Map();
+  const inflightUsersRefreshes = new Map();
+  const inflightBridgeRequests = new Map();
+  const bridgeResponseCache = new Map();
+  const lastRefreshAttemptAt = new Map();
+  let inflightOwnUserId = null;
 
   const BADGE_META = {
     developer: { label: "Developer", short: "DEV" },
@@ -12,14 +27,23 @@
   };
   const NAME_EFFECTS = {
     none: { label: "None", requires: [] },
-    aurora: { label: "Shimmer", requires: ["contributor", "supporter", "sponsor", "developer"] },
-    prism: { label: "Chroma", requires: ["supporter", "sponsor", "developer"] },
-    ember: { label: "Glow", requires: ["sponsor", "developer"] },
-    phantasm: { label: "Phantasm", requires: ["supporter", "sponsor", "developer"] },
+    flow: { label: "Flow", requires: ["contributor", "supporter", "sponsor", "developer"] },
+    holo: { label: "Holographic", requires: ["supporter", "sponsor", "developer"] },
+    neon: { label: "Neon", requires: ["sponsor", "developer"] },
     toxic: { label: "Toxic", requires: ["contributor", "supporter", "sponsor", "developer"] },
-    noxious: { label: "Noxious", requires: ["sponsor", "developer"] },
-    glitch: { label: "Glitch", requires: ["developer"] },
-    pulse: { label: "Pulse", requires: ["developer"] }
+    glitch: { label: "Glitch", requires: ["developer"] }
+  };
+  const LEGACY_NAME_EFFECTS = {
+    aurora: "flow",
+    pulse: "flow",
+    prism: "holo",
+    phantasm: "holo",
+    frost: "holo",
+    void: "holo",
+    ember: "neon",
+    solar: "neon",
+    noxious: "toxic",
+    static: "glitch"
   };
   const NAME_GRADIENTS = {
     none: { label: "None", requires: [], colors: null },
@@ -29,7 +53,13 @@
     gold: { label: "Gold", requires: ["sponsor", "developer"], colors: ["#f59e0b", "#fde68a"] },
     toxic: { label: "Toxic", requires: ["contributor", "supporter", "sponsor", "developer"], colors: ["#84cc16", "#22c55e"] },
     phantasm: { label: "Phantasm", requires: ["supporter", "sponsor", "developer"], colors: ["#c084fc", "#67e8f9"] },
-    admin: { label: "Admin", requires: ["developer"], colors: ["#ef4444", "#f97316"] }
+    admin: { label: "Admin", requires: ["developer"], colors: ["#ef4444", "#f97316"] },
+    neon: { label: "Neon", requires: ["supporter", "sponsor", "developer"], colors: ["#22d3ee", "#fb7185"] },
+    sunset: { label: "Sunset", requires: ["supporter", "sponsor", "developer"], colors: ["#f97316", "#ec4899"] },
+    frost: { label: "Frost", requires: ["contributor", "supporter", "sponsor", "developer"], colors: ["#7dd3fc", "#e0f2fe"] },
+    void: { label: "Void", requires: ["sponsor", "developer"], colors: ["#8b5cf6", "#020617"] },
+    lava: { label: "Lava", requires: ["sponsor", "developer"], colors: ["#ef4444", "#facc15"] },
+    ocean: { label: "Ocean", requires: ["contributor", "supporter", "sponsor", "developer"], colors: ["#06b6d4", "#2563eb"] }
   };
   const BADGE_EFFECTS = {
     none: { label: "None", requires: [] },
@@ -69,26 +99,51 @@
     });
   }
 
+  async function loadCachedCosmeticsState() {
+    const saved = await readCosmeticsCache();
+    return {
+      ownUserId: saved.ownUserId,
+      ownUserFetchedAt: saved.ownUserFetchedAt,
+      records: saved.records,
+      fetchedAt: saved.fetchedAt,
+      cacheTtlMs: PROFILE_CACHE_TTL_MS
+    };
+  }
+
   async function loadCosmeticsState() {
-    const stored = await readStorage([STORAGE_KEY]);
-    const saved = stored[STORAGE_KEY] || {};
-    const records = { ...DEFAULT_RECORDS };
-    for (const [userId, record] of Object.entries(saved.records || {})) {
-      records[userId] = mergeRecord(records[userId], record, { replaceBadges: true });
+    const saved = await readCosmeticsCache();
+    let ownUserId = saved.ownUserId;
+    let ownUserFetchedAt = saved.ownUserFetchedAt;
+    if (!ownUserId || Date.now() - ownUserFetchedAt > OWN_USER_CACHE_TTL_MS) {
+      const fetchedOwnUserId = await fetchOwnUserIdOnce();
+      if (fetchedOwnUserId) {
+        ownUserId = fetchedOwnUserId;
+        ownUserFetchedAt = Date.now();
+        await writeCosmeticsCache({ ...saved, ownUserId, ownUserFetchedAt });
+      }
     }
     return {
-      ownUserId: await fetchOwnUserId(),
-      records: normalizeRecords(records)
+      ownUserId,
+      ownUserFetchedAt,
+      records: saved.records,
+      fetchedAt: saved.fetchedAt,
+      cacheTtlMs: PROFILE_CACHE_TTL_MS
     };
   }
 
   async function loadCosmeticsUser(userId) {
     const id = Number(userId);
     if (!Number.isFinite(id) || id <= 0) return null;
-    const serverRecord = await fetchCosmeticsRecord(id).catch(() => null);
-    if (serverRecord) return serverRecord;
-    const state = await loadCosmeticsState();
-    return state.records[id] || null;
+    const state = await readCosmeticsCache();
+    const cached = state.records[id] || null;
+    if (cached) {
+      if (!isFresh(state.fetchedAt[id], PROFILE_CACHE_TTL_MS)) {
+        refreshCosmeticsUser(id).catch(() => {});
+      }
+      return cached;
+    }
+    if (isFresh(state.fetchedAt[id], PROFILE_CACHE_TTL_MS)) return null;
+    return refreshCosmeticsUser(id);
   }
 
   async function loadCosmeticsUsers(userIds) {
@@ -96,27 +151,252 @@
       .map((value) => Number(value))
       .filter((value) => Number.isFinite(value) && value > 0))].slice(0, 100);
     if (!ids.length) return {};
-    const serverRecords = await fetchCosmeticsRecords(ids).catch(() => ({}));
-    const missing = ids.filter((id) => !serverRecords[id]);
-    if (!missing.length) return normalizeRecords(serverRecords);
-    const state = await loadCosmeticsState();
-    const merged = { ...serverRecords };
-    for (const id of missing) {
-      if (state.records[id]) merged[id] = state.records[id];
+    const state = await readCosmeticsCache();
+    const out = {};
+    const missing = [];
+    const stale = [];
+    for (const id of ids) {
+      if (state.records[id]) out[id] = state.records[id];
+      if (!state.records[id] && !isFresh(state.fetchedAt[id], PROFILE_CACHE_TTL_MS)) missing.push(id);
+      else if (!isFresh(state.fetchedAt[id], PROFILE_CACHE_TTL_MS)) stale.push(id);
     }
-    return normalizeRecords(merged);
+    if (missing.length) {
+      return normalizeRecords({ ...out, ...await refreshCosmeticsUsers(missing) });
+    }
+    if (stale.length) {
+      refreshCosmeticsUsers(stale).catch(() => {});
+    }
+    return normalizeRecords(out);
   }
 
   async function saveCosmeticsRecord(userId, patch) {
+    const id = Number(userId);
+    if (!Number.isFinite(id) || id <= 0) {
+      return { ...(await loadCosmeticsState()), lastSave: { ok: false, error: "invalid_user_id" } };
+    }
     const state = await loadCosmeticsState();
-    const current = state.records[userId] || { userId, badges: [] };
-    const next = normalizeRecord(mergeRecord(current, patch, { replaceBadges: hasOwn(patch, "badges") }));
-    const serverSaved = await saveCosmeticsRecordRemote(userId, next).catch(() => null);
+    let current = state.records[id] || null;
+    if ((!current?.badges?.length) && !hasOwn(patch, "badges")) {
+      current = await fetchCosmeticsRecord(id).catch(() => null);
+    }
+    current = current || { userId: id, badges: [] };
+    const next = normalizeRecord(mergeRecord(current, { ...patch, userId: id }, { replaceBadges: hasOwn(patch, "badges") }));
+    const serverSaved = await saveCosmeticsRecordRemote(id, next).catch(() => null);
+    if (!serverSaved || !serverMatchesRequest(serverSaved, next)) {
+      await removeCosmeticsRecord(id);
+      const liveRecord = await fetchCosmeticsRecord(id).catch(() => null);
+      if (liveRecord) {
+        await cacheCosmeticsRecords({ [id]: liveRecord }, Date.now());
+        dispatchCosmeticsUpdate(id, liveRecord);
+      } else {
+        dispatchCosmeticsUpdate(id, null);
+      }
+      return { ...(await loadCosmeticsState()), lastSave: { ok: false, error: "remote_denied" } };
+    }
+    const reconciled = normalizeRecord(serverSaved) || serverSaved;
+    await cacheCosmeticsRecords({ [id]: reconciled }, Date.now());
+    dispatchCosmeticsUpdate(id, reconciled);
+    return { ...(await loadCosmeticsState()), lastSave: { ok: true } };
+  }
+
+  function serverMatchesRequest(serverRecord, requestedRecord) {
+    if (!serverRecord || !requestedRecord) return false;
+    const checks = [
+      ["nameEffect", ""],
+      ["badgeEffect", ""],
+      ["nameplateUrl", ""],
+      ["profileBackgroundUrl", ""]
+    ];
+    for (const [key, empty] of checks) {
+      if (hasOwn(requestedRecord, key) && String(serverRecord[key] || empty) !== String(requestedRecord[key] || empty)) {
+        return false;
+      }
+    }
+    for (const key of ["nameGradient", "badgeGradient"]) {
+      if (hasOwn(requestedRecord, key) && JSON.stringify(serverRecord[key] || []) !== JSON.stringify(requestedRecord[key] || [])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async function refreshCosmeticsUser(userId) {
+    const id = Number(userId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    if (inflightUserRefreshes.has(id)) return inflightUserRefreshes.get(id);
+    const cachedState = await readCosmeticsCache();
+    const cached = cachedState.records[id] || null;
+    const lastAttempt = Number(lastRefreshAttemptAt.get(id) || 0);
+    if (cached && Date.now() - lastAttempt < REFRESH_RETRY_MS) return cached;
+    if (!cached && isFresh(cachedState.fetchedAt[id], PROFILE_CACHE_TTL_MS)) return null;
+    lastRefreshAttemptAt.set(id, Date.now());
+    const refresh = (async () => {
+      const serverRecord = await fetchCosmeticsRecord(id).catch(() => null);
+      if (serverRecord) {
+        const state = await readCosmeticsCache();
+        const previous = state.records[id] || null;
+        await cacheCosmeticsRecords({ [id]: serverRecord }, Date.now());
+        if (JSON.stringify(previous) !== JSON.stringify(serverRecord)) {
+          dispatchCosmeticsUpdate(id, serverRecord);
+        }
+        return serverRecord;
+      }
+      await markCosmeticsChecked([id], Date.now());
+      const state = await readCosmeticsCache();
+      return state.records[id] || null;
+    })().finally(() => inflightUserRefreshes.delete(id));
+    inflightUserRefreshes.set(id, refresh);
+    return refresh;
+  }
+
+  async function refreshCosmeticsUsers(userIds) {
+    const ids = [...new Set((Array.isArray(userIds) ? userIds : [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0))].slice(0, 100);
+    if (!ids.length) return {};
+    const state = await readCosmeticsCache();
+    const idsToFetch = ids.filter((id) => !state.records[id] || !isFresh(state.fetchedAt[id], PROFILE_CACHE_TTL_MS));
+    const now = Date.now();
+    const cooledIdsToFetch = idsToFetch.filter((id) => now - Number(lastRefreshAttemptAt.get(id) || 0) >= REFRESH_RETRY_MS);
+    const skipped = idsToFetch.filter((id) => !cooledIdsToFetch.includes(id));
+    if (skipped.length) {
+      const cached = {};
+      for (const id of ids) if (state.records[id]) cached[id] = state.records[id];
+      if (!cooledIdsToFetch.length) return normalizeRecords(cached);
+    }
+    for (const id of cooledIdsToFetch) lastRefreshAttemptAt.set(id, now);
+    if (!cooledIdsToFetch.length) {
+      const cached = {};
+      for (const id of ids) if (state.records[id]) cached[id] = state.records[id];
+      return normalizeRecords(cached);
+    }
+    const key = cooledIdsToFetch.slice().sort((a, b) => a - b).join(",");
+    if (inflightUsersRefreshes.has(key)) return inflightUsersRefreshes.get(key);
+    const refresh = (async () => {
+      const serverRecords = await fetchCosmeticsRecords(cooledIdsToFetch).catch(() => ({}));
+      await markCosmeticsChecked(cooledIdsToFetch, Date.now());
+      if (Object.keys(serverRecords).length) {
+        const before = await readCosmeticsCache();
+        await cacheCosmeticsRecords(serverRecords, Date.now());
+        for (const [id, record] of Object.entries(serverRecords)) {
+          if (JSON.stringify(before.records?.[id] || null) !== JSON.stringify(record)) {
+            dispatchCosmeticsUpdate(Number(id), record);
+          }
+        }
+      }
+      const latest = await readCosmeticsCache();
+      const out = {};
+      for (const id of ids) {
+        if (serverRecords[id]) out[id] = serverRecords[id];
+        else if (latest.records[id]) out[id] = latest.records[id];
+      }
+      return normalizeRecords(out);
+    })().finally(() => inflightUsersRefreshes.delete(key));
+    inflightUsersRefreshes.set(key, refresh);
+    return refresh;
+  }
+
+  async function readCosmeticsCache() {
     const stored = await readStorage([STORAGE_KEY]);
-    const saved = stored[STORAGE_KEY] || {};
-    const records = { ...(saved.records || {}), [userId]: serverSaved || next };
-    await writeStorage({ [STORAGE_KEY]: { ...saved, records } });
-    return loadCosmeticsState();
+    return normalizeCache(stored[STORAGE_KEY] || {});
+  }
+
+  async function writeCosmeticsCache(cache) {
+    const normalized = normalizeCache(cache);
+    await writeStorage({
+      [STORAGE_KEY]: {
+        ownUserId: normalized.ownUserId,
+        ownUserFetchedAt: normalized.ownUserFetchedAt,
+        version: CACHE_VERSION,
+        records: normalized.records,
+        fetchedAt: normalized.fetchedAt
+      }
+    });
+    return normalized;
+  }
+
+  async function cacheCosmeticsRecords(records, fetchedAt) {
+    const saved = await readCosmeticsCache();
+    const nextRecords = { ...(saved.records || {}) };
+    const nextFetchedAt = { ...(saved.fetchedAt || {}) };
+    for (const [userId, record] of Object.entries(records || {})) {
+      const normalized = normalizeRecord({ ...record, userId: Number(userId) || Number(record?.userId) });
+      if (!normalized) continue;
+      nextRecords[normalized.userId] = normalized;
+      nextFetchedAt[normalized.userId] = Number(fetchedAt) || Date.now();
+    }
+    return writeCosmeticsCache({ ...saved, records: nextRecords, fetchedAt: nextFetchedAt });
+  }
+
+  async function markCosmeticsChecked(userIds, fetchedAt) {
+    const saved = await readCosmeticsCache();
+    const nextFetchedAt = { ...(saved.fetchedAt || {}) };
+    for (const userId of userIds || []) {
+      const id = Number(userId);
+      if (Number.isFinite(id) && id > 0) {
+        nextFetchedAt[id] = Number(fetchedAt) || Date.now();
+      }
+    }
+    return writeCosmeticsCache({ ...saved, fetchedAt: nextFetchedAt });
+  }
+
+  async function removeCosmeticsRecord(userId) {
+    const id = Number(userId);
+    if (!Number.isFinite(id) || id <= 0) return readCosmeticsCache();
+    const saved = await readCosmeticsCache();
+    const nextRecords = { ...(saved.records || {}) };
+    const nextFetchedAt = { ...(saved.fetchedAt || {}) };
+    delete nextRecords[id];
+    delete nextFetchedAt[id];
+    return writeCosmeticsCache({ ...saved, records: nextRecords, fetchedAt: nextFetchedAt });
+  }
+
+  function normalizeCache(saved) {
+    if (Number(saved.version || 0) !== CACHE_VERSION) {
+      return {
+        version: CACHE_VERSION,
+        ownUserId: Number.isFinite(Number(saved.ownUserId)) ? Number(saved.ownUserId) : null,
+        ownUserFetchedAt: Number.isFinite(Number(saved.ownUserFetchedAt)) ? Number(saved.ownUserFetchedAt) : 0,
+        records: normalizeRecords(DEFAULT_RECORDS),
+        fetchedAt: {}
+      };
+    }
+    const records = { ...DEFAULT_RECORDS };
+    for (const [userId, record] of Object.entries(saved.records || {})) {
+      records[userId] = mergeRecord(records[userId], record, { replaceBadges: true });
+    }
+    return {
+      version: CACHE_VERSION,
+      ownUserId: Number.isFinite(Number(saved.ownUserId)) ? Number(saved.ownUserId) : null,
+      ownUserFetchedAt: Number.isFinite(Number(saved.ownUserFetchedAt)) ? Number(saved.ownUserFetchedAt) : 0,
+      records: normalizeRecords(records),
+      fetchedAt: normalizeFetchedAt(saved.fetchedAt || {})
+    };
+  }
+
+  function normalizeFetchedAt(value) {
+    const out = {};
+    for (const [userId, timestamp] of Object.entries(value || {})) {
+      const id = Number(userId);
+      const time = Number(timestamp);
+      if (Number.isFinite(id) && id > 0 && Number.isFinite(time) && time > 0) {
+        out[id] = time;
+      }
+    }
+    return out;
+  }
+
+  function isFresh(timestamp, ttlMs) {
+    const time = Number(timestamp);
+    return Number.isFinite(time) && time > 0 && Date.now() - time <= ttlMs;
+  }
+
+  function dispatchCosmeticsUpdate(userId, record) {
+    try {
+      globalThis.dispatchEvent(new CustomEvent("vortex-web-cosmetics-updated", {
+        detail: { userId: Number(userId), record }
+      }));
+    } catch {}
   }
 
   async function fetchCosmeticsRecord(userId) {
@@ -143,7 +423,61 @@
 
   async function saveCosmeticsRecordRemote(userId, record) {
     if (!record) return null;
+    let token = await profileAuthToken(userId);
+    if (!token) return null;
     const res = await fetch(`${API_BASE}/community/profile/${encodeURIComponent(userId)}`, {
+      method: "POST",
+      credentials: "omit",
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(remoteRecordPayload(record))
+    });
+    if (res.status === 401 || res.status === 403) {
+      await clearProfileAuthToken(userId);
+      token = await requestProfileAuthToken(userId).catch(() => "");
+      if (!token) return null;
+      const retry = await fetch(`${API_BASE}/community/profile/${encodeURIComponent(userId)}`, {
+        method: "POST",
+        credentials: "omit",
+        cache: "no-store",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(remoteRecordPayload(record))
+      });
+      if (!retry.ok) return null;
+      const retryData = await retry.json();
+      return normalizeRecord(retryData.profile);
+    }
+    if (!res.ok) return null;
+    const data = await res.json();
+    return normalizeRecord(data.profile);
+  }
+
+  async function profileAuthToken(userId) {
+    const id = Number(userId);
+    if (!Number.isFinite(id) || id <= 0) return "";
+    const auth = await readProfileAuth();
+    const current = auth.records?.[id];
+    if (current?.token && Number(current.expiresAt || 0) > Math.floor(Date.now() / 1000) + 60) {
+      return String(current.token);
+    }
+    return requestProfileAuthToken(id);
+  }
+
+  async function requestProfileAuthToken(userId) {
+    const id = Number(userId);
+    if (!Number.isFinite(id) || id <= 0) return "";
+    const config = await readLicenseConfig();
+    if (!config.licenseKey && !config.lease) return "";
+    const fingerprintHash = await browserFingerprintHash();
+    const res = await fetch(`${API_BASE}/community/auth/token`, {
       method: "POST",
       credentials: "omit",
       cache: "no-store",
@@ -151,26 +485,131 @@
         accept: "application/json",
         "content-type": "application/json"
       },
-      body: JSON.stringify(remoteRecordPayload(record))
+      body: JSON.stringify({
+        license_key: config.licenseKey,
+        fingerprint_hash: fingerprintHash,
+        lease: config.lease || null,
+        userId: id
+      })
     });
-    if (!res.ok) return null;
+    if (!res.ok) return "";
     const data = await res.json();
-    return normalizeRecord(data.profile);
+    const token = String(data.token || "");
+    const expiresAt = Number(data.expiresAt || 0);
+    if (!token || !expiresAt) return "";
+    const auth = await readProfileAuth();
+    await writeStorage({
+      [PROFILE_AUTH_KEY]: {
+        ...auth,
+        records: {
+          ...(auth.records || {}),
+          [id]: { token, expiresAt, userId: id, username: String(data.username || "") }
+        }
+      }
+    });
+    return token;
+  }
+
+  async function unlinkProfileAuth(userId) {
+    const id = Number(userId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    const token = await profileAuthToken(id);
+    if (!token) return false;
+    const res = await fetch(`${API_BASE}/community/auth/unlink`, {
+      method: "POST",
+      credentials: "omit",
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ userId: id })
+    });
+    await clearProfileAuthToken(id);
+    return res.ok;
+  }
+
+  async function hasProfileAuth(userId) {
+    const id = Number(userId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    const auth = await readProfileAuth();
+    const current = auth.records?.[id];
+    return !!(current?.token && Number(current.expiresAt || 0) > Math.floor(Date.now() / 1000) + 60);
+  }
+
+  async function readProfileAuth() {
+    const stored = await readStorage([PROFILE_AUTH_KEY]);
+    const saved = stored[PROFILE_AUTH_KEY] || {};
+    return {
+      records: saved && typeof saved === "object" && saved.records && typeof saved.records === "object"
+        ? saved.records
+        : {}
+    };
+  }
+
+  async function clearProfileAuthToken(userId) {
+    const auth = await readProfileAuth();
+    const records = { ...(auth.records || {}) };
+    delete records[Number(userId)];
+    await writeStorage({ [PROFILE_AUTH_KEY]: { ...auth, records } });
+  }
+
+  async function readLicenseConfig() {
+    const fallback = { licenseKey: "", [LAST_LICENSE_LEASE_KEY]: null };
+    const api = globalThis.chrome || globalThis.browser;
+    if (!api?.storage?.local) return fallback;
+    let stored = await api.storage.local.get(fallback);
+    if (!stored.licenseKey && api.storage.sync) {
+      try {
+        const synced = await api.storage.sync.get(fallback);
+        stored = {
+          ...synced,
+          ...Object.fromEntries(Object.entries(stored).filter(([, value]) => value !== "" && value != null))
+        };
+      } catch {}
+    }
+    const savedLease = stored[LAST_LICENSE_LEASE_KEY];
+    const lease = savedLease && typeof savedLease === "object" ? savedLease.lease || null : null;
+    return { licenseKey: String(stored.licenseKey || "").trim(), lease };
+  }
+
+  async function browserFingerprintHash() {
+    const api = globalThis.chrome || globalThis.browser;
+    let installId = "";
+    if (api?.storage?.local) {
+      const stored = await api.storage.local.get({ v22InstallId: "" });
+      installId = String(stored.v22InstallId || "");
+      if (!installId) {
+        installId = crypto.randomUUID ? crypto.randomUUID() : randomHex(16);
+        await api.storage.local.set({ v22InstallId: installId });
+      }
+    }
+    const material = `vortex-web-install\n${installId}`;
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function randomHex(bytes) {
+    const values = new Uint8Array(bytes);
+    crypto.getRandomValues(values);
+    return [...values].map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
   function remoteRecordPayload(record) {
     const selectedBadge = (Array.isArray(record.badges) ? record.badges : []).find((badge) => badge?.selected);
-    return {
+    const payload = {
       userId: record.userId,
       badges: Array.isArray(record.badges) ? record.badges : [],
-      selectedBadgeId: selectedBadge ? String(selectedBadge.id || selectedBadge.kind || "") : "",
-      nameEffect: record.nameEffect || "",
-      nameGradient: Array.isArray(record.nameGradient) ? record.nameGradient : [],
-      badgeEffect: record.badgeEffect || "",
-      badgeGradient: Array.isArray(record.badgeGradient) ? record.badgeGradient : [],
-      nameplateUrl: record.nameplateUrl || "",
-      profileBackgroundUrl: record.profileBackgroundUrl || ""
+      selectedBadgeId: selectedBadge ? String(selectedBadge.id || selectedBadge.kind || "") : ""
     };
+    if (hasOwn(record, "nameEffect")) payload.nameEffect = record.nameEffect || "";
+    if (hasOwn(record, "nameGradient")) payload.nameGradient = Array.isArray(record.nameGradient) ? record.nameGradient : [];
+    if (hasOwn(record, "badgeEffect")) payload.badgeEffect = record.badgeEffect || "";
+    if (hasOwn(record, "badgeGradient")) payload.badgeGradient = Array.isArray(record.badgeGradient) ? record.badgeGradient : [];
+    if (hasOwn(record, "nameplateUrl")) payload.nameplateUrl = record.nameplateUrl || "";
+    if (hasOwn(record, "profileBackgroundUrl")) payload.profileBackgroundUrl = record.profileBackgroundUrl || "";
+    return payload;
   }
 
   function mergeRecord(base, patch, options = {}) {
@@ -279,8 +718,16 @@
     return null;
   }
 
+  async function fetchOwnUserIdOnce() {
+    if (inflightOwnUserId) return inflightOwnUserId;
+    inflightOwnUserId = fetchOwnUserId().finally(() => {
+      inflightOwnUserId = null;
+    });
+    return inflightOwnUserId;
+  }
+
   function selectedBadge(record) {
-    return record?.badges?.find((badge) => badge.selected) || record?.badges?.[0] || null;
+    return record?.badges?.find((badge) => badge.selected) || null;
   }
 
   function hasCosmeticData(record) {
@@ -330,7 +777,8 @@
   }
 
   function normalizeNameEffect(effectId, badges) {
-    const id = String(effectId || "none").toLowerCase();
+    const rawId = String(effectId || "none").toLowerCase();
+    const id = LEGACY_NAME_EFFECTS[rawId] || rawId;
     if (id === "none" || !NAME_EFFECTS[id]) return null;
     const kinds = new Set((badges || []).map((badge) => badge.kind));
     return NAME_EFFECTS[id].requires.some((kind) => kinds.has(kind)) ? id : null;
@@ -364,9 +812,14 @@
       NAME_GRADIENTS,
       BADGE_EFFECTS,
       load: loadCosmeticsState,
+      loadCached: loadCachedCosmeticsState,
       loadUser: loadCosmeticsUser,
       loadUsers: loadCosmeticsUsers,
+      refreshUser: refreshCosmeticsUser,
+      refreshUsers: refreshCosmeticsUsers,
       saveRecord: saveCosmeticsRecord,
+      unlinkProfileAuth,
+      hasProfileAuth,
       normalizeRecord,
       selectedBadge,
       unlockedNameEffects,
@@ -378,5 +831,50 @@
     };
   }
 
-  globalThis.VortexWebCosmetics = cosmeticsApi();
+  const api = cosmeticsApi();
+  globalThis.VortexWebCosmetics = api;
+
+  globalThis.addEventListener("message", async (event) => {
+    const message = event.data;
+    if (!message || message.source !== "vortex-web-page" || message.type !== "vortex-web-cosmetics:load-users") return;
+    const requestId = String(message.requestId || "");
+    const ids = Array.isArray(message.userIds) ? message.userIds : [];
+    if (!requestId || !ids.length) return;
+    const cleanIds = [...new Set(ids.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0))]
+      .slice(0, 100)
+      .sort((a, b) => a - b);
+    if (!cleanIds.length) return;
+    const key = cleanIds.join(",");
+    try {
+      const cached = bridgeResponseCache.get(key);
+      if (cached && Date.now() - cached.at <= BRIDGE_RESPONSE_TTL_MS) {
+        globalThis.postMessage({
+          source: "vortex-web-extension",
+          type: "vortex-web-cosmetics:users",
+          requestId,
+          records: cached.records
+        }, globalThis.location.origin);
+        return;
+      }
+      if (!inflightBridgeRequests.has(key)) {
+        inflightBridgeRequests.set(key, api.loadUsers(cleanIds).finally(() => inflightBridgeRequests.delete(key)));
+      }
+      const records = await inflightBridgeRequests.get(key);
+      bridgeResponseCache.set(key, { at: Date.now(), records });
+      globalThis.postMessage({
+        source: "vortex-web-extension",
+        type: "vortex-web-cosmetics:users",
+        requestId,
+        records
+      }, globalThis.location.origin);
+    } catch (error) {
+      globalThis.postMessage({
+        source: "vortex-web-extension",
+        type: "vortex-web-cosmetics:users",
+        requestId,
+        records: {},
+        error: String(error?.message || error || "failed")
+      }, globalThis.location.origin);
+    }
+  });
 })();

@@ -1,15 +1,15 @@
 {
-  "version": "0.4.4",
-  "date": "2026-06-23",
+  "version": "0.4.5",
+  "date": "2026-06-24",
   "url": "https://github.com/craighulme/Vortex-Web",
-  "title": "Vortex Web rebrand begins",
-  "summary": "Vortex2+2 is beginning its transition into Vortex Web: an unofficial, extension-powered browser client focused on native multiplayer relay support, optimisation, modular runtime work, and future scripting.",
+  "title": "Vortex Web runtime and community update",
+  "summary": "Vortex Web continues the move away from the old 2+2 client with runtime migration work, profile cosmetics, cleaner in-game UI foundations, and hosted multiplayer improvements.",
   "changelog": [
-    "Renamed the extension branding from Vortex2+2 toward Vortex Web.",
-    "Update checks now try the new Vortex-Web repo first and fall back to the old Vortex2plus2 repo during the transition.",
-    "Added the first TypeScript/Vite runtime shell for future modular engine, asset, physics, avatar, scripting, UI, and protocol work.",
-    "Kept existing gameplay behaviour on the legacy engine while the rewrite is migrated incrementally.",
-    "Documented the direction: native multiplayer relay support, better optimisation, safer extension boundaries, and future game API/Lua support.",
-    "Added a best-effort game-focus guard for common browser shortcuts and tab-close prompts while playing."
+    "Added Vortex Web profile cosmetics, including badges, name gradients, effects, nameplates, and profile backgrounds.",
+    "Added badge selection controls, including the option to hide your selected badge, with more reliable profile-page controls.",
+    "Improved leaderboard cosmetic rendering so selected badges and nameplates can appear in game.",
+    "Continued moving input, settings, HUD, physics, chat, and leaderboard foundations into the new web-client runtime.",
+    "Added Rapier-backed runtime physics plumbing and client-side test utilities while keeping gameplay compatibility first.",
+    "Tightened hosted relay and community-profile flows without exposing implementation details in the client."
   ]
 }

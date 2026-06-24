@@ -1,6 +1,6 @@
 {
   "name": "Vortex Web",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "manifest_version": 3,
   "description": "Unofficial Vortex browser client with native multiplayer relay support and web-first enhancements.",
   "icons": {
@@ -42,8 +42,7 @@
       ],
       "js": [
         "js/inject/InjectMapLoader.js",
-        "js/features/fetchCSPBypass.js",
-        "js/features/ProfileCosmetics.js"
+        "js/features/fetchCSPBypass.js"
       ],
       "run_at": "document_idle"
     },
@@ -63,6 +62,7 @@
       ],
       "js": [
         "js/features/VortexWebCosmetics.js",
+        "js/features/ProfileCosmetics.js",
         "js/webVortexLoader.js",
         "js/lightMode.js",
         "js/features/UpdateNotifier.js",

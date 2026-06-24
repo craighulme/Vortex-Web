@@ -4,6 +4,7 @@
     const HOSTED_RELAY_URL = "wss://v22-relay.116.203.155.30.sslip.io/ws";
     const DEV_LOCAL_RELAY_KEY = "v22DevLocalRelay";
     const DEV_FEATURES_KEY = "v22DevFeatures";
+    const LAST_LICENSE_LEASE_KEY = "v22LastLicenseLease";
     const LICENSE_HELP_MESSAGE = 'Vortex Web license key is invalid or not set.\nContact "quackduck." on Discord for access.';
     const REQUESTED_FEATURES = [
         "vortex-native-bridge",
@@ -207,13 +208,7 @@
                 await api.storage.local.set({ v22InstallId: installId });
             }
         }
-        const material = [
-            installId,
-            navigator.userAgent || "",
-            navigator.platform || "",
-            (navigator.languages || []).join(","),
-            `${screen.width || 0}x${screen.height || 0}x${screen.colorDepth || 0}`
-        ].join("\n");
+        const material = `vortex-web-install\n${installId}`;
         const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
         return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
     }
@@ -251,7 +246,16 @@
             err.status = res.status;
             throw err;
         }
+        await storeLastLicenseLease(raw.lease);
         return raw.lease;
+    }
+
+    async function storeLastLicenseLease(lease) {
+        const api = globalThis.chrome || globalThis.browser;
+        if (!api?.storage?.local || !lease) return;
+        try {
+            await api.storage.local.set({ [LAST_LICENSE_LEASE_KEY]: { lease, savedAt: Date.now() } });
+        } catch {}
     }
 
     function launchLocalRelay(gameId) {
