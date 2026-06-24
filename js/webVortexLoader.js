@@ -75,6 +75,15 @@ const overrides = new Map([
 let v22LaunchConfig = null;
 const v22BrokerSockets = new Map();
 
+function isLocalRelayUrl(value) {
+    try {
+        const u = new URL(value);
+        return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(u.hostname);
+    } catch {
+        return false;
+    }
+}
+
 function sameRelayPath(left, right) {
     try {
         const a = new URL(left);
@@ -219,9 +228,15 @@ function stripLaunchParams() {
 async function rewritePlayDocument(html) {
     const parsed = new DOMParser().parseFromString(html, "text/html");
     const launchConfig = await readLaunchConfig(url.searchParams.get("V22Launch"));
+    const cosmeticsState = globalThis.VortexWebCosmetics?.load
+        ? await globalThis.VortexWebCosmetics.load().catch(() => null)
+        : null;
     v22LaunchConfig = launchConfig;
     const launchToken = launchConfig?.token || "";
-    const hubUrl = launchConfig?.hubUrl || "";
+    const requestedHubUrl = launchConfig?.hubUrl || "";
+    const devLocalRelay = !!launchConfig?.devLocalRelay;
+    const devFeatures = !!launchConfig?.devFeatures;
+    const hubUrl = isLocalRelayUrl(requestedHubUrl) && !devLocalRelay ? "" : requestedHubUrl;
     const identity = launchConfig?.identity || null;
     stripLaunchParams();
 
@@ -246,11 +261,15 @@ async function rewritePlayDocument(html) {
     appendMeta("_vortexBridgeConfig", {
         officialGameId: Number(url.searchParams.get("VortexGameId") || 0),
         customGameId: url.searchParams.get("V22GameId"),
-        launchToken: launchConfig?.brokered === false ? launchToken : "",
+        launchToken: launchConfig?.brokered === false && devLocalRelay ? launchToken : "",
         hubUrl,
-        brokered: Boolean(launchConfig && launchConfig.brokered !== false),
+        brokered: Boolean(launchConfig && (launchConfig.brokered !== false || !devLocalRelay)),
+        devLocalRelay,
+        devFeatures,
         identity: pageSafeIdentity(identity)
     });
+    appendMeta("_vortexWebCosmetics", cosmeticsState || { ownUserId: null, records: {} });
+    appendMeta("_vortexCommunityApi", globalThis.VortexWebCosmetics?.API_BASE || "https://v22.irongiant.vip");
 
     for (const scriptInfo of scripts) {
         const script = document.createElement("script");

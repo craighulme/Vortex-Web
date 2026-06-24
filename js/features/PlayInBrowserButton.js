@@ -1,17 +1,22 @@
 (() => {
     const BTN_ID = "v22-play-browser-btn";
     const HOSTED_LICENSE_API = "https://v22.irongiant.vip";
+    const HOSTED_RELAY_URL = "wss://v22-relay.116.203.155.30.sslip.io/ws";
+    const DEV_LOCAL_RELAY_KEY = "v22DevLocalRelay";
+    const DEV_FEATURES_KEY = "v22DevFeatures";
     const LICENSE_HELP_MESSAGE = 'Vortex Web license key is invalid or not set.\nContact "quackduck." on Discord for access.';
     const REQUESTED_FEATURES = [
         "vortex-native-bridge",
-        "avatar-spoof",
         "teleport-commands",
         "bring-command",
-        "packet-debug",
         "fly-command",
         "noclip-command",
         "gravity-command",
         "airwalk-command"
+    ];
+    const DEV_REQUESTED_FEATURES = [
+        "avatar-spoof",
+        "packet-debug"
     ];
 
     function gameIdFromPath() {
@@ -124,7 +129,7 @@
     async function getStoredConfig() {
         const api = globalThis.chrome || globalThis.browser;
         const fallback = {
-            hubUrl: "wss://v22-relay.116.203.155.30.sslip.io/ws",
+            hubUrl: HOSTED_RELAY_URL,
             licenseApiUrl: HOSTED_LICENSE_API,
             licenseKey: ""
         };
@@ -141,11 +146,44 @@
             } catch {}
         }
         const storedHubUrl = String(stored.hubUrl || "").trim().replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+        const devLocalRelay = await isDevLocalRelayEnabled();
+        const devFeatures = await isDevFeaturesEnabled();
+        const localRelay = isLocalRelayUrl(storedHubUrl);
         return {
-            hubUrl: isLocalRelayUrl(storedHubUrl) ? storedHubUrl : fallback.hubUrl,
+            hubUrl: localRelay && devLocalRelay ? storedHubUrl : fallback.hubUrl,
             licenseApiUrl: HOSTED_LICENSE_API,
-            licenseKey: String(stored.licenseKey || "").trim()
+            licenseKey: String(stored.licenseKey || "").trim(),
+            devLocalRelay,
+            devFeatures
         };
+    }
+
+    async function isDevLocalRelayEnabled() {
+        const api = globalThis.chrome || globalThis.browser;
+        try {
+            if (api?.storage?.local) {
+                const stored = await api.storage.local.get({ [DEV_LOCAL_RELAY_KEY]: false });
+                return stored[DEV_LOCAL_RELAY_KEY] === true || stored[DEV_LOCAL_RELAY_KEY] === "1";
+            }
+        } catch {}
+        return false;
+    }
+
+    async function isDevFeaturesEnabled() {
+        const api = globalThis.chrome || globalThis.browser;
+        try {
+            if (api?.storage?.local) {
+                const stored = await api.storage.local.get({ [DEV_FEATURES_KEY]: false });
+                return stored[DEV_FEATURES_KEY] === true || stored[DEV_FEATURES_KEY] === "1";
+            }
+        } catch {}
+        return false;
+    }
+
+    function requestedFeatures(config) {
+        return config?.devFeatures
+            ? [...REQUESTED_FEATURES, ...DEV_REQUESTED_FEATURES]
+            : REQUESTED_FEATURES;
     }
 
     function isLocalRelayUrl(hubUrl) {
@@ -199,7 +237,7 @@
             body: JSON.stringify({
                 license_key: config.licenseKey,
                 fingerprint_hash: await browserFingerprintHash(),
-                features: REQUESTED_FEATURES
+                features: requestedFeatures(config)
             })
         });
         const text = await res.text();
@@ -273,7 +311,7 @@
         try {
             const config = await getStoredConfig();
             const hubUrl = config.hubUrl;
-            if (isLocalRelayUrl(hubUrl)) {
+            if (config.devLocalRelay && isLocalRelayUrl(hubUrl)) {
                 btn.textContent = "Checking relay...";
                 const alreadyRunning = await waitForRelay(hubUrl, 900);
                 if (!alreadyRunning) {
@@ -305,7 +343,9 @@
                 token,
                 hubUrl,
                 identity: merged,
-                brokered: !isLocalRelayUrl(hubUrl)
+                brokered: !(config.devLocalRelay && isLocalRelayUrl(hubUrl)),
+                devLocalRelay: !!config.devLocalRelay,
+                devFeatures: !!config.devFeatures
             });
 
             const playUrl = new URL(`/games/${gameId}`, location.origin);

@@ -591,7 +591,10 @@ function getBridgeConfig() {
         officialGameId: Number(window.GAME_ID || 0),
         customGameId: null,
         launchToken: "",
-        hubUrl: "ws://127.0.0.1:27822/ws"
+        hubUrl: "",
+        brokered: true,
+        devLocalRelay: false,
+        devFeatures: false
     };
     const meta = document.getElementById("_vortexBridgeConfig");
     if (!meta?.content) {
@@ -708,6 +711,8 @@ const _packetDebug = {
     pendingSpoofs: [],
     latencies: [],
     probes: [],
+    leaves: [],
+    messages: [],
     lastProbePrintKey: "",
     lastProbePrintAt: 0
 };
@@ -850,7 +855,7 @@ function _joinAvatarOverride() {
 }
 
 function _setJoinAvatarOverride(patch = {}) {
-    if (!_hasLicenseFeature("avatar-spoof")) throw new Error("avatar spoofing is not enabled on this license");
+    if (!_hasAvatarSpoofAccess()) throw new Error("avatar spoofing is not enabled on this license");
     const next = _normalizeAvatarFields({ ..._currentLaunchAvatar(), ...patch });
     localStorage.setItem("v22JoinAvatar", JSON.stringify(next));
     return next;
@@ -872,7 +877,7 @@ function _applyJoinAvatarToLaunchInfo(avatar) {
 }
 
 function _setOutboundAvatar(patch = {}, rememberOriginal = true, options = {}) {
-    if (!_hasLicenseFeature("avatar-spoof")) throw new Error("avatar spoofing is not enabled on this license");
+    if (!_hasAvatarSpoofAccess()) throw new Error("avatar spoofing is not enabled on this license");
     if (!launchInfo) throw new Error("not connected yet");
     if (rememberOriginal && !_packetDebug.originalAvatar) _packetDebug.originalAvatar = _currentLaunchAvatar();
     const next = _normalizeAvatarFields({ ..._currentLaunchAvatar(), ...patch });
@@ -1076,15 +1081,11 @@ function _randomAvatarPatch(options = {}) {
 }
 
 function _startRandomSpoof(options = {}) {
-    // Lowered the minimum interval to 50ms so you can push it much harder
     const intervalMs = Math.max(50, Number(options.intervalMs ?? options.interval ?? 1000) || 1000);
     const count = Math.max(0, Number(options.count || 0) || 0);
-
-    // New Options
     const threadCount = Math.max(1, Number(options.MultiThread || 1));
     const posRand = !!options.PosRand;
 
-    // Clean up any existing legacy timer or new thread arrays
     if (_packetDebug.randomTimer) {
         clearInterval(_packetDebug.randomTimer);
         _packetDebug.randomTimer = null;
@@ -1096,23 +1097,17 @@ function _startRandomSpoof(options = {}) {
     let sent = 0;
 
     for (let i = 0; i < threadCount; i++) {
-        // Jitter: Offset the start of each interval by a random fraction of the interval time
-        // This ensures the "threads" don't fire at the exact same millisecond, maximizing choke potential
         const jitterMs = Math.random() * (intervalMs / 2);
 
         setTimeout(() => {
             const tick = () => {
                 sent += 1;
 
-                // 1. Positional Randomization (PosRand)
                 if (posRand && bridgeOpen()) {
-                    // Generate extreme coordinates (e.g., between -100,000 and 100,000)
                     const rx = (Math.random() - 0.5) * 200000;
                     const ry = (Math.random() - 0.5) * 200000;
                     const rz = (Math.random() - 0.5) * 200000;
 
-                    // Send a movement state packet immediately before the avatar spoof.
-                    // This updates the relay's "lastState", ensuring the UDP flush uses these wild coordinates.
                     bridgeSend({
                         type: 'state',
                         x: rx,
@@ -1123,11 +1118,10 @@ function _startRandomSpoof(options = {}) {
                     });
                 }
 
-                // 2. Avatar Spoofing
                 const patch = _randomAvatarPatch(options);
                 _setOutboundAvatar(patch, true, {
                     measure: true,
-                    flush: true, // Crucial: forces the relay to immediately push the UDP packet
+                    flush: true,
                     rebuild: options.rebuild !== false && options.applyLocal !== false,
                     rebuildRemotes: false
                 });
@@ -1136,14 +1130,13 @@ function _startRandomSpoof(options = {}) {
                     console.log(`[packet-debug] thread ${i} spoof #${_packetDebug.spoofSeq}`, patch);
                 }
 
-                // Stop conditions
                 if (count && sent >= count * threadCount) {
                     _packetDebug.randomTimers.forEach(clearInterval);
                     _packetDebug.randomTimers = [];
                 }
             };
 
-            tick(); // Execute the first tick immediately after the jitter delay
+            tick();
 
             if (!count || count > 1) {
                 const timer = setInterval(tick, intervalMs);
@@ -1162,6 +1155,7 @@ function _startRandomSpoof(options = {}) {
 }
 
 function _sendProbe(options = {}) {
+    _assertPacketDebugAccess();
     if (!hubMode || !bridgeOpen()) throw new Error("probe requires the local relay connection");
     const probeCase = String(options.case || options.probe || "append_tail");
     const payload = { ...options, type: "probe_packet", case: probeCase };
@@ -1171,26 +1165,53 @@ function _sendProbe(options = {}) {
 
 window.VortexPacketDebug = {
     enable(value = true) {
-        if (!_hasLicenseFeature("packet-debug")) throw new Error("packet debug is not enabled on this license");
+        _assertPacketDebugAccess();
         _packetDebug.enabled = !!value;
         localStorage.setItem("v22PacketDebug", _packetDebug.enabled ? "1" : "0");
         return _packetDebug.enabled;
     },
     table() {
-        if (!_hasLicenseFeature("packet-debug")) throw new Error("packet debug is not enabled on this license");
+        _assertPacketDebugAccess();
         console.table([..._packetDebug.players.values()]);
         return [..._packetDebug.players.values()];
     },
     players() {
-        if (!_hasLicenseFeature("packet-debug")) throw new Error("packet debug is not enabled on this license");
+        _assertPacketDebugAccess();
         return [..._packetDebug.players.values()];
     },
+    remotes() {
+        _assertPacketDebugAccess();
+        const rows = _remoteDebugRows();
+        console.table(rows.map((r) => ({
+            id: r.id,
+            username: r.username,
+            visible: r.visible,
+            hasPosition: r.hasPosition,
+            ageMs: r.ageMs,
+            received: r.received,
+            accepted: r.accepted,
+            rejected: r.rejected,
+            hiddenReason: r.hiddenReason,
+            lastRejectedReason: r.lastRejectedReason
+        })));
+        return rows;
+    },
+    leaves() {
+        _assertPacketDebugAccess();
+        console.table(_packetDebug.leaves);
+        return [..._packetDebug.leaves];
+    },
+    messages() {
+        _assertPacketDebugAccess();
+        console.table(_packetDebug.messages);
+        return [..._packetDebug.messages];
+    },
     last(id) {
-        if (!_hasLicenseFeature("packet-debug")) throw new Error("packet debug is not enabled on this license");
+        _assertPacketDebugAccess();
         return _packetDebug.players.get(Number(id));
     },
     history() {
-        if (!_hasLicenseFeature("packet-debug")) throw new Error("packet debug is not enabled on this license");
+        _assertPacketDebugAccess();
         return [..._packetDebug.history];
     },
     setJoinAvatar(patch = {}) {
@@ -1224,6 +1245,7 @@ window.VortexPacketDebug = {
         return _spoofAvatarRejoin(patch || {}, options);
     },
     setMovementFormat(format = "native-auto") {
+        _assertPacketDebugAccess();
         return _setMovementFormat(format);
     },
     spoofShirt(id) {
@@ -1250,6 +1272,7 @@ window.VortexPacketDebug = {
         return true;
     },
     latencies() {
+        _assertPacketDebugAccess();
         console.table(_packetDebug.latencies);
         return [..._packetDebug.latencies];
     },
@@ -1257,6 +1280,7 @@ window.VortexPacketDebug = {
         return _sendProbe(options);
     },
     probeCases() {
+        _assertPacketDebugAccess();
         return [
             "append_tail",
             "random_tail",
@@ -1275,6 +1299,7 @@ window.VortexPacketDebug = {
         ];
     },
     probes() {
+        _assertPacketDebugAccess();
         console.table(_packetDebug.probes);
         return [..._packetDebug.probes];
     },
@@ -1406,8 +1431,37 @@ function launchInfoFromBridgeIdentity(cfg) {
 
 function _hasLicenseFeature(feature) {
     if (!feature) return true;
-    if (!launchInfo?.licenseLease && !Array.isArray(launchInfo?.licenseFeatures)) return true;
+    if (!launchInfo?.licenseLease && !Array.isArray(launchInfo?.licenseFeatures)) return _isLocalDevRelay();
     return Array.isArray(launchInfo.licenseFeatures) && launchInfo.licenseFeatures.includes(feature);
+}
+
+function _hasPacketDebugAccess() {
+    return _hasDevToolsEnabled() && _hasLicenseFeature("packet-debug");
+}
+
+function _hasAvatarSpoofAccess() {
+    return _hasDevToolsEnabled() && _hasLicenseFeature("avatar-spoof");
+}
+
+function _syncPacketDebugAccess() {
+    if (!_hasPacketDebugAccess()) {
+        _packetDebug.enabled = false;
+        return false;
+    }
+    _packetDebug.enabled = localStorage.getItem("v22PacketDebug") === "1";
+    return true;
+}
+
+function _assertPacketDebugAccess() {
+    if (_hasPacketDebugAccess()) return true;
+    _packetDebug.enabled = false;
+    localStorage.removeItem("v22PacketDebug");
+    throw new Error("packet debug is not enabled on this license");
+}
+
+function _hasDevToolsEnabled() {
+    const cfg = getBridgeConfig();
+    return !!(cfg.devFeatures || _isLocalDevRelay());
 }
 
 function _requireLicenseFeature(feature, label) {
@@ -1830,9 +1884,15 @@ async function connect() {
 
 async function connectOnce() {
     const cfg = getBridgeConfig();
-    const localRelay = cfg.hubUrl && _isLocalRelayUrl(cfg.hubUrl);
-    const hostedRelay = cfg.hubUrl && !localRelay;
+    const blockedLocalRelay = cfg.hubUrl && _isLocalRelayUrl(cfg.hubUrl) && !cfg.devLocalRelay;
+    const localRelay = cfg.devLocalRelay && cfg.hubUrl && _isLocalRelayUrl(cfg.hubUrl);
+    const hostedRelay = cfg.hubUrl && !localRelay && !blockedLocalRelay;
     const brokeredRelay = hostedRelay && cfg.brokered !== false;
+    if (blockedLocalRelay) {
+        Chat.system("Vortex Web multiplayer is offline: local relay is disabled in this build.");
+        connectFinished = true;
+        return;
+    }
     if (!cfg.launchToken && !brokeredRelay) {
         Chat.system("Vortex Web multiplayer is offline: missing launch token.");
         return;
@@ -1856,6 +1916,7 @@ async function connectOnce() {
             return;
         }
     }
+    _syncPacketDebugAccess();
     if (!launchInfo) {
         Chat.system("Vortex Web multiplayer auth failed: missing launch identity.");
         connectFinished = true;
@@ -1887,7 +1948,7 @@ async function connectOnce() {
                 is_staff: false,
                 is_booster: false
             };
-            const joinAvatar = _hasLicenseFeature("avatar-spoof") ? _applyJoinAvatarToLaunchInfo(_joinAvatarOverride()) : null;
+            const joinAvatar = _hasAvatarSpoofAccess() ? _applyJoinAvatarToLaunchInfo(_joinAvatarOverride()) : null;
             if (joinAvatar) {
                 hello.shirt_id = joinAvatar.shirt_id;
                 hello.pant_id = joinAvatar.pant_id;
@@ -2147,7 +2208,144 @@ function removeBlocks(userid) {
 
 const url = new URL(document.URL);
 const gamei = url.searchParams.get("V22GameId");
-function decodeNetworkData(playerData, r) {
+const REMOTE_MIN_SCENE_Y = -250;
+const REMOTE_MAX_ABS_COORD = 100000;
+const _badRemoteStateLog = new Map();
+
+function readRemoteScenePositionResult(playerData) {
+    if (![playerData?.x, playerData?.y, playerData?.z, playerData?.ry].every(Number.isFinite)) {
+        return { state: null, reason: "non-finite-position" };
+    }
+    const x = Number(playerData.x);
+    const y = _nativeYToSceneY(Number(playerData.y));
+    const z = Number(playerData.z);
+    const ry = Number(playerData.ry);
+    if (![x, y, z, ry].every(Number.isFinite)) return { state: null, reason: "converted-non-finite-position" };
+    if (Math.abs(x) > REMOTE_MAX_ABS_COORD || Math.abs(y) > REMOTE_MAX_ABS_COORD || Math.abs(z) > REMOTE_MAX_ABS_COORD) {
+        return { state: null, reason: "out-of-range-position" };
+    }
+    if (y < REMOTE_MIN_SCENE_Y) return { state: null, reason: "below-scene-floor" };
+    return { state: { pos: new THREE.Vector3(x, y, z), ry }, reason: "" };
+}
+
+function _recordMultiplayerMessage(message) {
+    const runtimeMultiplayer = window.VortexRuntime?.multiplayer;
+    if (runtimeMultiplayer?.recordMessage) {
+        runtimeMultiplayer.recordMessage(message, _packetDebug.enabled);
+        return;
+    }
+    if (!_packetDebug.enabled || !message?.type) return;
+    const players = Array.isArray(message.players) ? message.players : [];
+    _packetDebug.messages.push({
+        type: String(message.type),
+        at: new Date().toISOString(),
+        playerCount: players.length,
+        ids: players.slice(0, 16).map((p) => Number(p?.id || 0) || 0).filter(Boolean),
+        id: Number(message.id || 0) || undefined
+    });
+    while (_packetDebug.messages.length > 200) _packetDebug.messages.shift();
+}
+
+function _remoteDebugRows() {
+    const runtimeMultiplayer = window.VortexRuntime?.multiplayer;
+    if (runtimeMultiplayer?.remoteDebugRows) return runtimeMultiplayer.remoteDebugRows(remotes);
+    const now = performance.now();
+    return [...remotes.entries()].map(([id, r]) => {
+        const grp = r.meshes?.grp || null;
+        return {
+            id: Number(id),
+            username: r.username || "",
+            visible: !!grp?.visible,
+            hasPosition: !!r.hasPosition,
+            ageMs: r.seen ? Math.round(now - r.seen) : null,
+            received: r.stateDebug?.received || 0,
+            accepted: r.stateDebug?.accepted || 0,
+            rejected: r.stateDebug?.rejected || 0,
+            lastRejectedReason: r.stateDebug?.lastRejectedReason || "",
+            hiddenReason: r.stateDebug?.hiddenReason || "",
+            lastSource: r.stateDebug?.lastSource || "",
+            lastRaw: r.stateDebug?.lastRaw || null,
+            target: r.hasPosition && r.tPos ? { x: r.tPos.x, y: r.tPos.y, z: r.tPos.z } : null,
+            mesh: grp ? { x: grp.position.x, y: grp.position.y, z: grp.position.z } : null
+        };
+    });
+}
+
+function readRemoteScenePosition(playerData) {
+    return readRemoteScenePositionResult(playerData).state;
+}
+
+function logBadRemoteState(playerData, reason) {
+    if (!_packetDebug.enabled) return;
+    const id = Number(playerData?.id || 0) || "unknown";
+    const now = performance.now();
+    const last = _badRemoteStateLog.get(id) || 0;
+    if (now - last < 3000) return;
+    _badRemoteStateLog.set(id, now);
+    console.warn("[mp] ignored invalid remote state", {
+        reason,
+        id,
+        x: playerData?.x,
+        y: playerData?.y,
+        z: playerData?.z,
+        ry: playerData?.ry
+    });
+}
+
+function noteRemoteState(r, status, reason, playerData, source) {
+    const runtimeMultiplayer = window.VortexRuntime?.multiplayer;
+    if (runtimeMultiplayer?.noteRemoteState) {
+        runtimeMultiplayer.noteRemoteState(r, status, reason || "", playerData || null, source || "");
+        return;
+    }
+    if (!r) return;
+    if (!r.stateDebug) {
+        r.stateDebug = {
+            received: 0,
+            accepted: 0,
+            rejected: 0,
+            lastReceivedAt: 0,
+            lastAcceptedAt: 0,
+            lastRejectedAt: 0,
+            lastRejectedReason: "",
+            lastSource: "",
+            lastRaw: null,
+            hiddenReason: ""
+        };
+    }
+    const now = performance.now();
+    const raw = playerData ? {
+        x: playerData.x,
+        y: playerData.y,
+        z: playerData.z,
+        ry: playerData.ry,
+        anim: playerData.anim
+    } : null;
+    r.stateDebug.lastSource = source || "";
+    r.stateDebug.lastRaw = raw;
+    if (status === "received") {
+        r.stateDebug.received++;
+        r.stateDebug.lastReceivedAt = now;
+    } else if (status === "accepted") {
+        r.stateDebug.accepted++;
+        r.stateDebug.lastAcceptedAt = now;
+        r.stateDebug.hiddenReason = "";
+    } else if (status === "rejected") {
+        r.stateDebug.rejected++;
+        r.stateDebug.lastRejectedAt = now;
+        r.stateDebug.lastRejectedReason = reason || "unknown";
+    } else if (status === "hidden") {
+        r.stateDebug.hiddenReason = reason || "hidden";
+    }
+}
+
+function _isLocalDevRelay() {
+    const cfg = getBridgeConfig();
+    return !!(cfg.devLocalRelay && cfg.hubUrl && _isLocalRelayUrl(cfg.hubUrl));
+}
+
+function decodeNetworkData(playerData, r, source = "states") {
+    noteRemoteState(r, "received", "", playerData, source);
     const hasAvatarField = playerData.shirt_id !== undefined ||
         playerData.pant_id !== undefined ||
         playerData.body_type !== undefined ||
@@ -2170,8 +2368,11 @@ function decodeNetworkData(playerData, r) {
     }
 
     if (![playerData.x, playerData.y, playerData.z, playerData.ry].every(Number.isFinite)) {
+        noteRemoteState(r, "rejected", "non-finite-position", playerData, source);
         return;
     }
+    const remoteResult = readRemoteScenePositionResult(playerData);
+    const remoteState = remoteResult.state;
 
     let fractional = (playerData.ry * 100) % 1;
     let specialState = Math.round(fractional * 1024);
@@ -2201,10 +2402,18 @@ function decodeNetworkData(playerData, r) {
             syncNormalData = true;
         }
         if (syncNormalData) {
-            r.tPos.set(playerData.x, _nativeYToSceneY(playerData.y), playerData.z);
+            if (!remoteState) {
+                const reason = `invalid-sword-position:${remoteResult.reason}`;
+                noteRemoteState(r, "rejected", reason, playerData, source);
+                logBadRemoteState(playerData, reason);
+                return;
+            }
+            r.tPos.copy(remoteState.pos);
             r.tRy = Math.round(playerData.ry * 100) / 100;
             r.anim = playerData.anim;
             r.seen = performance.now();
+            r.hasPosition = true;
+            noteRemoteState(r, "accepted", "", playerData, source);
             if (r.meshes && !r.meshes.grp.visible) {
                 r.meshes.grp.position.copy(r.tPos);
                 r.meshes.grp.rotation.y = playerData.ry;
@@ -2217,10 +2426,18 @@ function decodeNetworkData(playerData, r) {
             syncNormalData = true;
         }
         if (syncNormalData) {
-            r.tPos.set(playerData.x, _nativeYToSceneY(playerData.y), playerData.z);
+            if (!remoteState) {
+                const reason = `invalid-build-position:${remoteResult.reason}`;
+                noteRemoteState(r, "rejected", reason, playerData, source);
+                logBadRemoteState(playerData, reason);
+                return;
+            }
+            r.tPos.copy(remoteState.pos);
             r.tRy = Math.round(playerData.ry * 100) / 100;
             r.anim = playerData.anim;
             r.seen = performance.now();
+            r.hasPosition = true;
+            noteRemoteState(r, "accepted", "", playerData, source);
             if (r.meshes && !r.meshes.grp.visible) {
                 r.meshes.grp.position.copy(r.tPos);
                 r.meshes.grp.rotation.y = playerData.ry;
@@ -2237,10 +2454,18 @@ function decodeNetworkData(playerData, r) {
             _setBlockState(playerData.id, x_block, y_block, z_block, state_block);
         }
     } else {
-        r.tPos.set(playerData.x, _nativeYToSceneY(playerData.y), playerData.z);
+        if (!remoteState) {
+            const reason = `invalid-position:${remoteResult.reason}`;
+            noteRemoteState(r, "rejected", reason, playerData, source);
+            logBadRemoteState(playerData, reason);
+            return;
+        }
+        r.tPos.copy(remoteState.pos);
         r.tRy = playerData.ry;
         r.anim = playerData.anim;
         r.seen = performance.now();
+        r.hasPosition = true;
+        noteRemoteState(r, "accepted", "", playerData, source);
         if (r.meshes && !r.meshes.grp.visible) {
             r.meshes.grp.position.copy(r.tPos);
             r.meshes.grp.rotation.y = playerData.ry;
@@ -2251,6 +2476,7 @@ function decodeNetworkData(playerData, r) {
 }
 
 function handle(d) {
+    _recordMultiplayerMessage(d);
     switch (d.type) {
 
         case 'kicked': {
@@ -2311,6 +2537,12 @@ function handle(d) {
         }
 
         case 'leave': {
+            _packetDebug.leaves.push({
+                id: Number(d.id || 0) || 0,
+                username: String(d.username || ""),
+                at: new Date().toISOString()
+            });
+            while (_packetDebug.leaves.length > 100) _packetDebug.leaves.shift();
             Chat.systemPlayer(d.username, `${d.username} left.`);
             removeRemote(d.id);
             if (window.BUILD_MODE) removeBlocks(d.id)
@@ -2333,7 +2565,7 @@ function handle(d) {
                 }
                 const r = remotes.get(p.id);
                 if (!r) continue;
-                decodeNetworkData(p, r)
+                decodeNetworkData(p, r, "states")
             }
             break;
         }
@@ -2465,27 +2697,42 @@ function addRemote(id, username, is_staff, is_booster, avatarData) {
         r.username = username || r.username;
         r.is_staff = is_staff ?? r.is_staff;
         r.is_booster = is_booster ?? r.is_booster;
-        decodeNetworkData(avatarData || {}, r);
+        decodeNetworkData(avatarData || {}, r, "addRemote");
         return;
     }
     const avatar = _normalizeAvatarFields(avatarData);
+    const initialState = readRemoteScenePosition(avatarData || {});
     let meshes = null;
     if (_vortex.getCharacter()) { try { meshes = makeRemote(username, id, avatar); } catch (e) { console.error('[mp] makeRemote failed:', e); } }
     if (!meshes) _pendingAvatars.set(id, { username, is_staff, is_booster, ...avatar });
 
-    remotes.set(id, {
+    const remote = {
         meshes,
-        tPos: new THREE.Vector3(0, -999, 0),
-        tRy: 0,
+        tPos: initialState?.pos?.clone?.() || new THREE.Vector3(),
+        tRy: initialState?.ry || 0,
         anim: 'idle',
         animTime: 0,
-        seen: performance.now(),
+        seen: initialState ? performance.now() : 0,
+        hasPosition: !!initialState,
         id: id,
         username,
         is_staff,
         is_booster,
         avatar,
-    });
+    };
+    if (initialState) {
+        noteRemoteState(remote, "accepted", "", avatarData || {}, "addRemote");
+    }
+    if (remote.meshes) {
+        if (initialState) {
+            remote.meshes.grp.position.copy(remote.tPos);
+            remote.meshes.grp.rotation.y = remote.tRy;
+            remote.meshes.grp.visible = true;
+        } else {
+            remote.meshes.grp.visible = false;
+        }
+    }
+    remotes.set(id, remote);
     Leaderboard.addPlayer({ id, username, is_staff, is_booster });
     Leaderboard.setFriendStatus(id, _statusFor(id));
     if (!avatar.shirt_id) hydrateRemoteShirt(id);
@@ -2671,7 +2918,15 @@ window._mpUpdate = function (dt) {
                     console.error('[mp] makeRemote failed:', e);
                 }
 
-                if (r.meshes) r.meshes.grp.visible = false;
+                if (r.meshes) {
+                    if (r.hasPosition) {
+                        r.meshes.grp.position.copy(r.tPos);
+                        r.meshes.grp.rotation.y = r.tRy;
+                        r.meshes.grp.visible = true;
+                    } else {
+                        r.meshes.grp.visible = false;
+                    }
+                }
                 const pendingBubbles = _pendingBubbles.get(id);
                 if (pendingBubbles?.length) {
                     for (const msg of pendingBubbles) _showBubble(id, msg);
@@ -2690,7 +2945,16 @@ window._mpUpdate = function (dt) {
         if (!r.meshes) continue;
 
         const g = r.meshes.grp;
-        if (now - r.seen > 5000) { g.visible = false; continue; }
+        if (!r.hasPosition) {
+            noteRemoteState(r, "hidden", "no-position");
+            g.visible = false;
+            continue;
+        }
+        if (now - r.seen > 5000) {
+            noteRemoteState(r, "hidden", "stale-position");
+            g.visible = false;
+            continue;
+        }
 
         g.position.lerp(r.tPos, Math.min(1, LERP * dt));
 
@@ -2728,7 +2992,7 @@ function _commandPlayerList() {
             id,
             username: r.username || String(id),
             self: false,
-            pos: r.tPos?.clone?.() || r.meshes?.grp?.position?.clone?.() || null
+            pos: r.hasPosition ? (r.tPos?.clone?.() || r.meshes?.grp?.position?.clone?.() || null) : null
         });
     }
     return out;
