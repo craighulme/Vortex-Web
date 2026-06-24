@@ -594,9 +594,8 @@
   }
 
   function chooseGradient(presetId, presetGradient, customGradient) {
-    if (presetId === "none") return [];
+    if (presetId === "none") return customGradient.length === 2 ? customGradient : [];
     if (Array.isArray(presetGradient?.colors)) return presetGradient.colors;
-    return customGradient.length === 2 ? customGradient : [];
   }
 
   function selectedGradientPreset(record, gradients) {

@@ -5,6 +5,7 @@ import * as THRE from "./libs/three.module.js";
 import * as BufferGeometryUtils from "./libs/BufferGeometryUtils.js";
 import { FBXLoader } from "./libs/FBXLoader.js";
 import { GLTFLoader } from "./libs/GLTFLoader.js";
+import { CSM } from './libs/CSM.js';
 
 const THREE = {
     ...THRE,
@@ -74,7 +75,7 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setClearColor(0x87CEEB);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = enableShadows;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, readStorageNumber('v22PixelRatioCap', 1, 0.5, 1)));
 document.getElementById("scene").appendChild(renderer.domElement);
 window.addEventListener('resize', () => {
@@ -115,23 +116,48 @@ function setToneMappingMode(mode) {
     return toneMappingMode;
 }
 
+const shadowMapSize = readStorageNumber('v22ShadowMapSize', 512, 256, 4096);
+
+const csm = new CSM({
+    maxFar: 500,
+    cascades: 4,
+    mode: "practical",
+    parent: scene,
+    shadowMapSize: shadowMapSize,
+    lightDirection: new THREE.Vector3(-1, -2, -1).normalize(),
+    lightIntensity: 3,
+    lightColor: new THREE.Color(0xffffff),
+    fade: true,
+    camera,
+});
+csm.lights.forEach((light, i) => {
+    const idiv = (i/(csm.lights.length - 1));
+    light.shadow.bias = -0.00003-0.0025*Math.pow(idiv,2.);
+});
+
+function patchMaterialsInObjectForCSM(obj) {
+    if (!obj.isMesh || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+        if (mat.userData.__csmPatched) continue;
+        console.log('patching')
+        csm.setupMaterial(mat);
+        mat.userData.__csmPatched = true;
+    }
+}
+scene.traverse(patchMaterialsInObjectForCSM);
+const originalAdd = scene.add.bind(scene);
+scene.add = function(...objs){
+    for (const obj of objs) {
+        obj.traverse?.(patchMaterialsInObjectForCSM);
+    }
+    return originalAdd(...objs);
+}
+
 const ambient = new THREE.AmbientLight(0xffffff, 0.45);
 scene.add(ambient);
 
 const sun = new THREE.DirectionalLight(0xffffff, 3);
-sun.castShadow = enableShadows;
-const shadowMapSize = readStorageNumber('v22ShadowMapSize', 1024, 256, 4096);
-sun.shadow.mapSize.width = shadowMapSize;
-sun.shadow.mapSize.height = shadowMapSize;
-sun.shadow.camera.near = 0.1;
-const s = 350;
-sun.shadow.camera.far = 2 * s;
-sun.shadow.camera.left = -s;
-sun.shadow.camera.right = s;
-sun.shadow.camera.top = s;
-sun.shadow.camera.bottom = -s;
-sun.shadow.autoUpdate = enableShadows;
-sun.shadow.bias = -0.000002;
 scene.add(sun);
 const sunTarget = new THREE.Object3D();
 sunTarget.position.set(0, 0, 0);
@@ -158,21 +184,16 @@ function syncSceneShadowFlags(root = scene) {
 
 function setShadowsEnabled(value) {
     enableShadows = !!value;
-    sun.castShadow = enableShadows;
-    sun.shadow.autoUpdate = enableShadows;
     renderer.shadowMap.enabled = enableShadows;
-    renderer.shadowMap.needsUpdate = enableShadows;
-    localStorage.setItem('enableShadows', enableShadows ? 'yes' : 'no');
+    if (enableShadows) csm.updateFrustums();
+    localStorage.setItem("enableShadows", enableShadows ? "yes" : "no");
     syncSceneShadowFlags();
     return enableShadows;
 }
 
 function updateLightingForFrame() {
     if (!shadowsActive()) return;
-    sun.position.set(camera.position.x + 50, camera.position.y + 100, camera.position.z + 50);
-    sunTarget.position.copy(camera.position);
-    sunTarget.updateMatrixWorld();
-    sun.updateMatrixWorld();
+    csm.update();
 }
 
 const VortexPerf = window.VortexPerf || {};
@@ -404,8 +425,8 @@ function makeCylinder(radiusTop, radiusBottom, height, radialSegs, heightSegs) {
             const nx = cos;
             const ny = slope;
             const nz = sin;
-            const nLen = Math.sqrt(nx*nx + ny*ny + nz*nz);
-            normals.push(nx/nLen, ny/nLen, nz/nLen);
+            const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz);
+            normals.push(nx / nLen, ny / nLen, nz / nLen);
             uvs.push((x / radialSegs) * Math.PI * 2 * Math.max(radiusTop, radiusBottom), t * height);
         }
     }
@@ -444,7 +465,7 @@ function makeCylinder(radiusTop, radiusBottom, height, radialSegs, heightSegs) {
             }
         }
     }
-    addCap(radiusTop,    halfH,  1);
+    addCap(radiusTop, halfH, 1);
     addCap(radiusBottom, -halfH, -1);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -531,12 +552,12 @@ function getCachedGeo(sw, sh, sd, shape = "Block") {
     } else if (shape == "Cylinder") {
         const radi = Math.min(sh, sd);
         const key = `${shape},${radi},${sw}`;
-        if (!geoCache.has(key)) geoCache.set(key, makeCylinder(radi*0.5,radi*0.5,sw,20,1));
+        if (!geoCache.has(key)) geoCache.set(key, makeCylinder(radi * 0.5, radi * 0.5, sw, 20, 1));
         return geoCache.get(key);
     } else if (shape == "Cylinder2") {
         const radi = Math.min(sw, sd);
         const key = `${shape},${radi},${sh}`;
-        if (!geoCache.has(key)) geoCache.set(key, makeCylinder(radi*0.5,radi*0.5,sh,20,1));
+        if (!geoCache.has(key)) geoCache.set(key, makeCylinder(radi * 0.5, radi * 0.5, sh, 20, 1));
         return geoCache.get(key);
     } else if (shape == "Wedge") {
         const key = `${shape},${sw},${sh},${sd}`;
@@ -1557,7 +1578,7 @@ function setSettingsOpen(open, options = {}) {
     if (runtimeInput && typeof runtimeInput.setPauseOpen === 'function') runtimeInput.setPauseOpen(settingsOpen);
     if (settingsOpen) {
         refreshSettingsStatus();
-        populateAudioDevices().catch(() => {});
+        populateAudioDevices().catch(() => { });
         if (document.pointerLockElement) {
             document.exitPointerLock?.();
         }
@@ -1931,7 +1952,7 @@ function microphoneAllowedByPolicy() {
     try {
         if (typeof policy.allowsFeature === 'function') return policy.allowsFeature('microphone');
         if (typeof policy.allowedFeatures === 'function') return policy.allowedFeatures().includes('microphone');
-    } catch {}
+    } catch { }
     return true;
 }
 
@@ -2018,7 +2039,7 @@ makeSettingsSlider('Chat volume', 0, 1, 1, 0.05, function (slider, val) {
 }, { target: settingsTargets.audio, formatter: volumeLabel });
 
 makeButtonRow([
-    { label: 'Refresh devices', onclick: () => populateAudioDevices().catch(() => {}) },
+    { label: 'Refresh devices', onclick: () => populateAudioDevices().catch(() => { }) },
     { label: 'Enable microphone list', onclick: () => requestMicrophoneDeviceList(), requiresUserGesture: true },
     { label: 'Test output', primary: true, onclick: () => testAudioOutput(), requiresUserGesture: true },
 ], settingsTargets.audio);
@@ -2092,7 +2113,7 @@ makeButtonRow([
     { label: 'Stop stress', onclick: () => window.VortexRuntime?.sandbox?.clear?.(window.VortexRuntime) },
 ], settingsTargets.dev);
 
-populateAudioDevices().catch(() => {});
+populateAudioDevices().catch(() => { });
 applyAudioOutputTo(slashSound);
 applyAudioOutputTo(clickSound);
 applyAudioOutputTo(oofSound);
@@ -3257,7 +3278,7 @@ function resetCharacterToSpawn() {
                 _spawnPoint.z = Number(sp.z ?? _spawnPoint.z);
                 _spawnPoint.ry = Number(sp.ry ?? _spawnPoint.ry ?? Math.PI);
             }
-        } catch {}
+        } catch { }
     }
     const spawnY = _spawnPoint.y !== null ? _spawnPoint.y : CHAR_STAND_Y;
     character.position.set(_spawnPoint.x, spawnY, _spawnPoint.z);
