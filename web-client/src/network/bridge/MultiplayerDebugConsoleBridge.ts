@@ -133,8 +133,8 @@ export function installMultiplayerDebugConsole(context) {
         nativeFootOffset: roundNumber(typeof nativeFootOffset === "function" ? nativeFootOffset() : null),
         sceneFootOffset: roundNumber(typeof sceneFootOffset === "function" ? sceneFootOffset() : null),
         remoteYOffset: roundNumber(typeof getRemoteYOffset === "function" ? getRemoteYOffset() : null),
-        engineCharFootOffset: roundNumber(vortex?.getCharFootOffset?.()),
-        engineCharHeight: roundNumber(vortex?.getCharHeight?.()),
+        runtimeCharFootOffset: roundNumber(vortex?.getCharFootOffset?.()),
+        runtimeCharHeight: roundNumber(vortex?.getCharHeight?.()),
         localY: roundNumber(vortex?.getCharacter?.()?.position?.y)
       };
       console.table([values]);

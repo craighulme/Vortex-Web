@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { EngineRuntimeBridgeService } from "../runtime/EngineRuntimeBridgeService";
+import { RuntimeBridgeService } from "../runtime/RuntimeBridgeService";
 
-describe("EngineRuntimeBridgeService", () => {
+describe("RuntimeBridgeService", () => {
   it("installs quality, runtime exports, frame loop, and vortex api", () => {
     const windowRef = { requestAnimationFrame: () => 0 } as unknown as Window & Record<string, unknown>;
     const localMovement = {
@@ -37,7 +37,7 @@ describe("EngineRuntimeBridgeService", () => {
     };
     const character = { position: { y: 10 } };
 
-    const api = new EngineRuntimeBridgeService().install({
+    const api = new RuntimeBridgeService().install({
       windowRef,
       localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } as unknown as Storage,
       three: {

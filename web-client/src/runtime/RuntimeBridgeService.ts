@@ -1,13 +1,13 @@
-import type { EngineRuntimeExportsApi } from "./EngineRuntimeExportsService";
-import { EngineQualityApiService } from "./EngineQualityApiService";
-import { EngineVortexApiService } from "./EngineVortexApiService";
-import type { EngineRuntimeBridgeConfig } from "./EngineRuntimeBridgeTypes";
+import type { RuntimeExportsApi } from "./RuntimeExportsService";
+import { QualityApiService } from "./QualityApiService";
+import { VortexApiService } from "./VortexApiService";
+import type { RuntimeBridgeConfig } from "./RuntimeBridgeTypes";
 
-export class EngineRuntimeBridgeService {
-  private readonly qualityApi = new EngineQualityApiService();
-  private readonly vortexApi = new EngineVortexApiService();
+export class RuntimeBridgeService {
+  private readonly qualityApi = new QualityApiService();
+  private readonly vortexApi = new VortexApiService();
 
-  install(config: EngineRuntimeBridgeConfig): EngineRuntimeExportsApi {
+  install(config: RuntimeBridgeConfig): RuntimeExportsApi {
     const vortexApi = this.vortexApi.create(config);
     config.windowRef.VortexQuality = this.qualityApi.install(config);
 

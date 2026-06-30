@@ -1,6 +1,6 @@
 import { createVortexRuntime } from "./runtime/createRuntime";
 import { installWindowRuntimeBridge } from "./runtime/WindowRuntimeBridge";
-import { launchEngine } from "./engine/EngineLauncher";
+import { launchRuntime } from "./runtime/RuntimeLauncher";
 import { readRuntimeDisplaySettings } from "./ui/RuntimeDisplaySettings";
 
 declare const __VWEB_RUNTIME_VERSION__: string;
@@ -44,13 +44,13 @@ declare global {
   });
   runtime.worldBootstrap.installGlobals(runtime);
   window.dispatchEvent(new CustomEvent("vweb-runtime-ready", { detail: runtime }));
-  void launchEngine(runtime)
+  void launchRuntime(runtime)
     .then(() => runtime.worldBootstrap.boot(runtime, window.fetch.bind(window)))
     .catch((error) => {
-      runtime.diagnostics.warn("engine.launch.failed", {
+      runtime.diagnostics.warn("runtime.launch.failed", {
         error: error instanceof Error ? error.message : String(error)
       });
-      console.error("[Vortex Web] engine launch failed", error);
+      console.error("[Vortex Web] runtime launch failed", error);
     });
 })();
 
@@ -157,7 +157,7 @@ function mountRuntimeMultiplayer(runtime: ReturnType<typeof createVortexRuntime>
     }
   };
   runtime.events.on("vortex:ready", mount);
-  window.addEventListener("vortex-engine-ready", mount);
+  window.addEventListener("vweb-runtime-exports-ready", mount);
   if (runtime.vortex.get()) mount();
 }
 

@@ -8,7 +8,7 @@ import type { LocalMovementRuntimeService } from "../movement/LocalMovementRunti
 import type { QualityService } from "../renderer/QualityService";
 import type { RendererService } from "../renderer/RendererService";
 import type { SceneSettingsService } from "../renderer/SceneSettingsService";
-import type { EngineRuntimeExportsService } from "./EngineRuntimeExportsService";
+import type { RuntimeExportsService } from "./RuntimeExportsService";
 import type { FrameLoopService } from "./FrameLoopService";
 
 export type ThreeLike = {
@@ -33,7 +33,7 @@ export type WorldRuntimeLike = {
   textureDiagnostics(): unknown;
 };
 
-export type EngineRuntimeBridgeConfig = {
+export type RuntimeBridgeConfig = {
   windowRef: Window & Record<string, unknown>;
   localStorage: Storage;
   three: ThreeLike & Record<string, unknown>;
@@ -61,7 +61,7 @@ export type EngineRuntimeBridgeConfig = {
   sceneSettings: SceneSettingsService;
   rendererService: RendererService;
   quality: QualityService;
-  runtimeExports: EngineRuntimeExportsService;
+  runtimeExports: RuntimeExportsService;
   frameLoop: FrameLoopService;
   profiler: { begin(now: number): unknown; mark(frame: unknown, label: string): void; end(frame: unknown): void };
   worldService: {

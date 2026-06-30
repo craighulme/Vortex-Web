@@ -2,7 +2,7 @@ type ThreeLike = {
   Vector3: new () => unknown;
 };
 
-export type EngineLocalPlayerRuntimeOptions = {
+export type LocalPlayerRuntimeBridgeOptions = {
   THREE: ThreeLike;
   runtime: Record<string, any>;
   cameraObject: unknown;
@@ -17,13 +17,13 @@ export type EngineLocalPlayerRuntimeOptions = {
   setFirstPerson(value: boolean): void;
 };
 
-export type EngineLocalPlayerRuntimeHandles = {
+export type LocalPlayerRuntimeBridgeHandles = {
   localMovement: any;
   cameraState: unknown;
 };
 
-export class EngineLocalPlayerRuntimeService {
-  configure(options: EngineLocalPlayerRuntimeOptions): EngineLocalPlayerRuntimeHandles {
+export class LocalPlayerRuntimeBridgeService {
+  configure(options: LocalPlayerRuntimeBridgeOptions): LocalPlayerRuntimeBridgeHandles {
     const localMovement = options.runtime.localMovement.configure?.({
       movement: requireRuntimeService(options.runtime.movement, "movement"),
       collision: requireRuntimeService(options.runtime.characterCollision, "character collision"),
@@ -47,7 +47,7 @@ export class EngineLocalPlayerRuntimeService {
       setFirstPerson: options.setFirstPerson
     });
     if (!localMovement) {
-      throw new Error("[movement] VortexRuntime local movement service is required before the engine starts.");
+      throw new Error("[movement] VortexRuntime local movement service is required before the runtime starts.");
     }
 
     return {
@@ -59,7 +59,7 @@ export class EngineLocalPlayerRuntimeService {
 
 function requireRuntimeService<T>(service: T | null | undefined, name: string): T {
   if (!service) {
-    throw new Error(`[movement] VortexRuntime ${name} service is required before the engine starts.`);
+    throw new Error(`[movement] VortexRuntime ${name} service is required before the runtime starts.`);
   }
   return service;
 }

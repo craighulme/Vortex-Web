@@ -3,7 +3,7 @@ import * as THRE from "../../public/vendor/three.webgpu.js";
 import * as BufferGeometryUtils from "../../public/vendor/BufferGeometryUtils.js";
 import { GLTFLoader } from "../../public/vendor/GLTFLoader.js";
 import { CSMShadowNode } from "../../public/vendor/CSMShadowNode.js";
-import type { VortexRuntime } from "../runtime/types";
+import type { VortexRuntime } from "./types";
 
 const VortexBufferGeometryUtils = {
     ...BufferGeometryUtils,
@@ -15,7 +15,7 @@ const THREE = {
     BufferGeometryUtils: VortexBufferGeometryUtils,
 };
 
-export async function launchEngine(VortexRuntime: VortexRuntime): Promise<void> {
+export async function launchRuntime(VortexRuntime: VortexRuntime): Promise<void> {
 const STUDS_PER_TILE = 4;
 const scene = new THREE.Scene();
 
@@ -24,17 +24,17 @@ const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.inner
 const renderChunkForward = new THREE.Vector3();
 const cameraService = VortexRuntime.camera;
 if (!cameraService) {
-    throw new Error('[camera] VortexRuntime camera service is required before the engine starts.');
+    throw new Error('[camera] VortexRuntime camera service is required before the runtime starts.');
 }
 VortexRuntime.loading?.mount?.();
 VortexRuntime.loading?.attachThreeLoadingManager?.(THREE.DefaultLoadingManager);
 
 const runtimeRendererService = VortexRuntime.renderer;
 if (!runtimeRendererService) {
-    throw new Error('[renderer] VortexRuntime renderer service is required before the engine starts.');
+    throw new Error('[renderer] VortexRuntime renderer service is required before the runtime starts.');
 }
 
-const sceneRuntime = await VortexRuntime.engineScene.configure({
+const sceneRuntime = await VortexRuntime.sceneBridge.configure({
     windowRef: window,
     document,
     localStorage,
@@ -66,7 +66,7 @@ const sceneSettings = VortexRuntime.sceneSettings;
 
 const runtimeAssets = VortexRuntime.assets;
 const cursorService = VortexRuntime.cursor;
-const worldRuntime = VortexRuntime.engineWorld.configure({
+const worldRuntime = VortexRuntime.worldBridge.configure({
     THREE,
     scene,
     renderer,
@@ -103,7 +103,7 @@ window.locked = false;
 const anim = { time: 0, bones: {}, rest: {} };
 
 const gltfLoader = new THREE.GLTFLoader();
-const avatarRuntime = VortexRuntime.engineAvatar.configure({
+const avatarRuntime = VortexRuntime.avatarBridge.configure({
     THREE,
     scene,
     document,
@@ -145,7 +145,7 @@ function setMouseLock(sl) {
     hudRuntime?.setMouseLock(!!sl);
 }
 
-const localPlayerRuntime = VortexRuntime.engineLocalPlayer.configure({
+const localPlayerRuntime = VortexRuntime.localPlayerBridge.configure({
     THREE,
     runtime: VortexRuntime,
     cameraObject: camera,
@@ -164,7 +164,7 @@ const cam = localPlayerRuntime.cameraState;
 
 const runtimeInput = VortexRuntime.input;
 if (!runtimeInput || typeof runtimeInput.attachTarget !== 'function') {
-    throw new Error('[input] VortexRuntime input service is required before the engine starts.');
+    throw new Error('[input] VortexRuntime input service is required before the runtime starts.');
 }
 const keys = runtimeInput.keys;
 
@@ -172,7 +172,7 @@ function _cursorOver(el) {
     return hudRuntime?.cursorOver(el) || false;
 }
 
-hudRuntime = VortexRuntime.engineHud.configure({
+hudRuntime = VortexRuntime.hudBridge.configure({
     document,
     windowRef: window,
     runtime: VortexRuntime,
@@ -206,7 +206,7 @@ hudRuntime = VortexRuntime.engineHud.configure({
     onToggleDebug: toggleDebug,
 });
 
-VortexRuntime.engineRuntimeBridge.install({
+VortexRuntime.runtimeBridge.install({
     windowRef: window,
     localStorage,
     three: THREE,
@@ -234,7 +234,7 @@ VortexRuntime.engineRuntimeBridge.install({
     sceneSettings,
     rendererService: runtimeRendererService,
     quality: VortexRuntime.quality,
-    runtimeExports: VortexRuntime.engineExports,
+    runtimeExports: VortexRuntime.runtimeExports,
     frameLoop: VortexRuntime.frameLoop,
     profiler: VortexPerf,
     worldService: VortexRuntime.world,

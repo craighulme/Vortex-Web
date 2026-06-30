@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { EngineRuntimeExportsService } from "../runtime/EngineRuntimeExportsService";
+import { RuntimeExportsService } from "../runtime/RuntimeExportsService";
 
-describe("EngineRuntimeExportsService", () => {
-  it("installs engine globals and runtime handles in one place", () => {
-    const service = new EngineRuntimeExportsService();
+describe("RuntimeExportsService", () => {
+  it("installs runtime globals and adapter handles in one place", () => {
+    const service = new RuntimeExportsService();
     const windowRef = new EventTarget() as Window & Record<string, unknown>;
     const rendererHandles: unknown[] = [];
     const worldHandles: Record<string, unknown>[] = [];
     let readyDetail: unknown = null;
-    windowRef.addEventListener("vortex-engine-ready", (event) => {
+    windowRef.addEventListener("vweb-runtime-exports-ready", (event) => {
       readyDetail = (event as CustomEvent).detail;
     });
     const vortexApi = {

@@ -1,8 +1,8 @@
-import type { EngineRuntimeExportsApi } from "./EngineRuntimeExportsService";
-import type { EngineRuntimeBridgeConfig } from "./EngineRuntimeBridgeTypes";
+import type { RuntimeExportsApi } from "./RuntimeExportsService";
+import type { RuntimeBridgeConfig } from "./RuntimeBridgeTypes";
 
-export class EngineVortexApiService {
-  create(config: EngineRuntimeBridgeConfig): EngineRuntimeExportsApi {
+export class VortexApiService {
+  create(config: RuntimeBridgeConfig): RuntimeExportsApi {
     return {
       scene: config.scene,
       getCharacter: config.getCharacter,

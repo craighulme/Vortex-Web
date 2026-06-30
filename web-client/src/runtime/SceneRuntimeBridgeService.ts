@@ -1,6 +1,6 @@
 type ThreeLike = Record<string, any>;
 
-export type EngineSceneRuntimeOptions = {
+export type SceneRuntimeBridgeOptions = {
   windowRef: Window & Record<string, any>;
   document: Document;
   localStorage: Storage;
@@ -18,7 +18,7 @@ export type EngineSceneRuntimeOptions = {
   };
 };
 
-export type EngineSceneRuntimeHandles = {
+export type SceneRuntimeBridgeHandles = {
   renderer: any;
   rendererBackend: string;
   isWebGpuRuntime: boolean;
@@ -40,8 +40,8 @@ export type EngineSceneRuntimeHandles = {
   readShadowsEnabled(): boolean;
 };
 
-export class EngineSceneRuntimeService {
-  async configure(options: EngineSceneRuntimeOptions): Promise<EngineSceneRuntimeHandles> {
+export class SceneRuntimeBridgeService {
+  async configure(options: SceneRuntimeBridgeOptions): Promise<SceneRuntimeBridgeHandles> {
     const readStorageFlag = (key: string, fallback = false): boolean => options.settingsStore.readFlag(key, fallback);
     const readStorageNumber = (key: string, fallback: number, min = -Infinity, max = Infinity): number => {
       return options.settingsStore.readNumber(key, fallback, min, max);
@@ -75,7 +75,7 @@ export class EngineSceneRuntimeService {
       THREE: options.THREE
     });
     if (!sceneSettingsHandles) {
-      throw new Error("[renderer] VortexRuntime scene settings service is required before the engine starts.");
+      throw new Error("[renderer] VortexRuntime scene settings service is required before the runtime starts.");
     }
 
     const shadowHandles = options.shadowRuntime.configure({
@@ -91,7 +91,7 @@ export class EngineSceneRuntimeService {
       enabled: enableShadows
     });
     if (!shadowHandles) {
-      throw new Error("[renderer] VortexRuntime shadow runtime service is required before the engine starts.");
+      throw new Error("[renderer] VortexRuntime shadow runtime service is required before the runtime starts.");
     }
 
     options.windowRef.backLight = shadowHandles.backLight;
@@ -104,7 +104,7 @@ export class EngineSceneRuntimeService {
       readQuality: () => options.windowRef.VortexQuality?.get?.() || null
     });
     if (!profiler) {
-      throw new Error("[diagnostics] VortexRuntime performance service is required before the engine starts.");
+      throw new Error("[diagnostics] VortexRuntime performance service is required before the runtime starts.");
     }
     options.windowRef.VortexPerf = profiler;
 

@@ -9,7 +9,7 @@ type CharacterDebugMetrics = {
   footOffset: number;
 };
 
-export type EngineWorldRuntimeOptions = {
+export type WorldRuntimeBridgeOptions = {
   THREE: ThreeLike;
   scene: unknown;
   renderer: unknown;
@@ -32,7 +32,7 @@ export type EngineWorldRuntimeOptions = {
   studsPerTile: number;
 };
 
-export type EngineWorldRuntimeHandles = {
+export type WorldRuntimeBridgeHandles = {
   debugVisuals: any;
   worldRuntime: any;
   objects: unknown[];
@@ -45,10 +45,10 @@ export type EngineWorldRuntimeHandles = {
   updateDebug(character: unknown, metrics: CharacterDebugMetrics): void;
 };
 
-export class EngineWorldRuntimeService {
-  configure(options: EngineWorldRuntimeOptions): EngineWorldRuntimeHandles {
+export class WorldRuntimeBridgeService {
+  configure(options: WorldRuntimeBridgeOptions): WorldRuntimeBridgeHandles {
     if (!options.assets) {
-      throw new Error("[assets] VortexRuntime asset manager is required before the engine starts.");
+      throw new Error("[assets] VortexRuntime asset manager is required before the runtime starts.");
     }
 
     const resolver = options.assetResolver.configure({
@@ -70,7 +70,7 @@ export class EngineWorldRuntimeService {
       worldToChunk: (value: number) => worldRuntimeHandles?.colliderService?.worldToChunk?.(value) || 0
     });
     if (!debugVisuals) {
-      throw new Error("[diagnostics] VortexRuntime debug visual service is required before the engine starts.");
+      throw new Error("[diagnostics] VortexRuntime debug visual service is required before the runtime starts.");
     }
 
     worldRuntimeHandles = options.worldRuntime.configure?.({
@@ -88,12 +88,12 @@ export class EngineWorldRuntimeService {
       runtimeAsset
     });
     if (!worldRuntimeHandles) {
-      throw new Error("[world] VortexRuntime world runtime service is required before the engine starts.");
+      throw new Error("[world] VortexRuntime world runtime service is required before the runtime starts.");
     }
 
     const pickingService = options.worldPicking.configure?.(options.THREE);
     if (!pickingService) {
-      throw new Error("[world] VortexRuntime world picking service is required before the engine starts.");
+      throw new Error("[world] VortexRuntime world picking service is required before the runtime starts.");
     }
 
     return {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { EngineLocalPlayerRuntimeService } from "../movement/EngineLocalPlayerRuntimeService";
+import { LocalPlayerRuntimeBridgeService } from "../movement/LocalPlayerRuntimeBridgeService";
 
-describe("EngineLocalPlayerRuntimeService", () => {
+describe("LocalPlayerRuntimeBridgeService", () => {
   it("configures local movement with runtime-owned dependencies", () => {
     const configure = vi.fn((config) => ({ config, resetCharacterToSpawn: () => true }));
     const runtime = {
@@ -17,7 +17,7 @@ describe("EngineLocalPlayerRuntimeService", () => {
       input: { keys: { Space: true } }
     };
 
-    const handles = new EngineLocalPlayerRuntimeService().configure({
+    const handles = new LocalPlayerRuntimeBridgeService().configure({
       THREE: { Vector3: class Vector3 {} },
       runtime,
       cameraObject: "camera-object",

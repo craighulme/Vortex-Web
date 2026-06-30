@@ -14,7 +14,7 @@ type CharacterMetrics = {
   standY: number;
 };
 
-export type EngineAvatarRuntimeOptions = {
+export type AvatarRuntimeBridgeOptions = {
   THREE: ThreeLike;
   scene: unknown;
   document: Document;
@@ -35,7 +35,7 @@ export type EngineAvatarRuntimeOptions = {
   markShadowsDirty(): void;
 };
 
-export type EngineAvatarRuntimeHandles = {
+export type AvatarRuntimeBridgeHandles = {
   avatarMaterials: any;
   avatarAssets: any;
   avatarService: any;
@@ -49,24 +49,24 @@ export type EngineAvatarRuntimeHandles = {
   getCharStandY(): number;
 };
 
-export class EngineAvatarRuntimeService {
-  configure(options: EngineAvatarRuntimeOptions): EngineAvatarRuntimeHandles {
+export class AvatarRuntimeBridgeService {
+  configure(options: AvatarRuntimeBridgeOptions): AvatarRuntimeBridgeHandles {
     const avatarMaterials = options.avatarMaterials.configure?.({
       THREE: options.THREE,
       window: options.windowRef,
       document: options.document
     });
     if (!avatarMaterials) {
-      throw new Error("[avatar] VortexRuntime avatar material service is required before the engine starts.");
+      throw new Error("[avatar] VortexRuntime avatar material service is required before the runtime starts.");
     }
     if (!options.avatarAssets) {
-      throw new Error("[avatar] VortexRuntime avatar asset service is required before the engine starts.");
+      throw new Error("[avatar] VortexRuntime avatar asset service is required before the runtime starts.");
     }
     if (!options.avatarService) {
-      throw new Error("[avatar] VortexRuntime avatar service is required before the engine starts.");
+      throw new Error("[avatar] VortexRuntime avatar service is required before the runtime starts.");
     }
     if (!options.characterSpawn) {
-      throw new Error("[avatar] VortexRuntime character spawn service is required before the engine starts.");
+      throw new Error("[avatar] VortexRuntime character spawn service is required before the runtime starts.");
     }
 
     const footOffset = options.footOffset ?? 2.0;
@@ -105,7 +105,7 @@ export class EngineAvatarRuntimeService {
       isDebugEnabled: () => !!options.windowRef.VortexAvatarDebug
     });
     if (!localAvatar) {
-      throw new Error("[avatar] VortexRuntime local avatar service is required before the engine starts.");
+      throw new Error("[avatar] VortexRuntime local avatar service is required before the runtime starts.");
     }
 
     const remoteAvatarAppearance = options.remoteAvatarAppearance.configure?.({
@@ -116,7 +116,7 @@ export class EngineAvatarRuntimeService {
       isDebugEnabled: () => !!options.windowRef.VortexAvatarDebug
     });
     if (!remoteAvatarAppearance) {
-      throw new Error("[avatar] VortexRuntime remote avatar appearance service is required before the engine starts.");
+      throw new Error("[avatar] VortexRuntime remote avatar appearance service is required before the runtime starts.");
     }
 
     localAvatar.reload();

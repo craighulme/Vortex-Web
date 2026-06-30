@@ -7,7 +7,7 @@ import { CameraService } from "../camera/CameraService";
 import { AvatarMaterialService } from "../avatar/AvatarMaterialService";
 import { AvatarAssetService } from "../avatar/AvatarAssetService";
 import { CharacterSpawnService } from "../avatar/CharacterSpawnService";
-import { EngineAvatarRuntimeService } from "../avatar/EngineAvatarRuntimeService";
+import { AvatarRuntimeBridgeService } from "../avatar/AvatarRuntimeBridgeService";
 import { LocalAvatarService } from "../avatar/LocalAvatarService";
 import { AvatarService } from "../avatar/AvatarService";
 import { RemoteAvatarAppearanceService } from "../avatar/RemoteAvatarAppearanceService";
@@ -19,11 +19,11 @@ import { DiagnosticsService } from "../diagnostics/DiagnosticsService";
 import { PerformanceService } from "../diagnostics/PerformanceService";
 import { GameSession } from "../game/GameSession";
 import { CursorService } from "../input/CursorService";
-import { EngineInputRuntimeService } from "../input/EngineInputRuntimeService";
+import { InputRuntimeBridgeService } from "../input/InputRuntimeBridgeService";
 import { InputService } from "../input/InputService";
 import { CharacterCollisionService } from "../movement/CharacterCollisionService";
 import { ClimbService } from "../movement/ClimbService";
-import { EngineLocalPlayerRuntimeService } from "../movement/EngineLocalPlayerRuntimeService";
+import { LocalPlayerRuntimeBridgeService } from "../movement/LocalPlayerRuntimeBridgeService";
 import { LocalMovementRuntimeService } from "../movement/LocalMovementRuntimeService";
 import { MovementService } from "../movement/MovementService";
 import { MultiplayerService } from "../network/MultiplayerService";
@@ -48,7 +48,7 @@ import { ChatCommandService } from "../ui/ChatCommandService";
 import { ChatService } from "../ui/ChatService";
 import { ChatBubbleService } from "../ui/ChatBubbleService";
 import { CoreHudService } from "../ui/CoreHudService";
-import { EngineHudRuntimeService } from "../ui/EngineHudRuntimeService";
+import { HudRuntimeBridgeService } from "../ui/HudRuntimeBridgeService";
 import { HudInteractionService } from "../ui/HudInteractionService";
 import { LeaderboardService } from "../ui/LeaderboardService";
 import { LeaderboardDomService } from "../ui/LeaderboardDomService";
@@ -56,7 +56,7 @@ import { NotificationService } from "../ui/NotificationService";
 import { RuntimeSettingsPresenterService } from "../ui/RuntimeSettingsPresenter";
 import { SettingsMenuService } from "../ui/SettingsMenuService";
 import { ThemeService } from "../ui/ThemeService";
-import { EngineWorldRuntimeService } from "../world/EngineWorldRuntimeService";
+import { WorldRuntimeBridgeService } from "../world/WorldRuntimeBridgeService";
 import { WorldBootstrapService } from "../world/WorldBootstrapService";
 import { WorldService } from "../world/WorldService";
 import { WorldColliderService } from "../world/WorldColliderService";
@@ -66,9 +66,9 @@ import { WorldPartService } from "../world/WorldPartService";
 import { WorldPickingService } from "../world/WorldPickingService";
 import { WorldRuntimeService } from "../world/WorldRuntimeService";
 import { EventBus } from "./EventBus";
-import { EngineRuntimeExportsService } from "./EngineRuntimeExportsService";
-import { EngineRuntimeBridgeService } from "./EngineRuntimeBridgeService";
-import { EngineSceneRuntimeService } from "./EngineSceneRuntimeService";
+import { RuntimeExportsService } from "./RuntimeExportsService";
+import { RuntimeBridgeService } from "./RuntimeBridgeService";
+import { SceneRuntimeBridgeService } from "./SceneRuntimeBridgeService";
 import { FrameLoopService } from "./FrameLoopService";
 import { LoadingScreenService } from "./LoadingScreenService";
 import { RuntimeSettingsStore } from "./RuntimeSettingsStore";
@@ -97,9 +97,9 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     access: new AccessService(),
     platform,
     events,
-    engineExports: new EngineRuntimeExportsService(),
-    engineRuntimeBridge: new EngineRuntimeBridgeService(),
-    engineScene: new EngineSceneRuntimeService(),
+    runtimeExports: new RuntimeExportsService(),
+    runtimeBridge: new RuntimeBridgeService(),
+    sceneBridge: new SceneRuntimeBridgeService(),
     frameLoop: new FrameLoopService(),
     loading: new LoadingScreenService(options.document),
     settingsStore: new RuntimeSettingsStore(options.window.localStorage),
@@ -111,7 +111,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     renderer: new RendererService(),
     sceneSettings: new SceneSettingsService(),
     shadowRuntime: new ShadowRuntimeService(),
-    engineWorld: new EngineWorldRuntimeService(),
+    worldBridge: new WorldRuntimeBridgeService(),
     world: new WorldService(),
     worldBootstrap: new WorldBootstrapService(options.document, options.window, options.location),
     worldColliders: new WorldColliderService(),
@@ -121,11 +121,11 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     worldPicking: new WorldPickingService(),
     worldRuntime: new WorldRuntimeService(),
     cursor: new CursorService(options.window),
-    engineInput: new EngineInputRuntimeService(),
+    inputBridge: new InputRuntimeBridgeService(),
     input,
     characterCollision: new CharacterCollisionService(),
     climb: new ClimbService(),
-    engineLocalPlayer: new EngineLocalPlayerRuntimeService(),
+    localPlayerBridge: new LocalPlayerRuntimeBridgeService(),
     localMovement: new LocalMovementRuntimeService(),
     movement: new MovementService(),
     gameSession,
@@ -133,7 +133,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     avatarMaterials: new AvatarMaterialService(),
     avatarAssets: new AvatarAssetService(options.window),
     avatar: new AvatarService(),
-    engineAvatar: new EngineAvatarRuntimeService(),
+    avatarBridge: new AvatarRuntimeBridgeService(),
     characterSpawn: new CharacterSpawnService(),
     localAvatar: new LocalAvatarService(),
     remoteAvatarAppearance: new RemoteAvatarAppearanceService(),
@@ -151,7 +151,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     packetDebug: new PacketDebugService(options.window.localStorage),
     protocol: createProtocolService(),
     ui: new CoreHudService(options.document),
-    engineHud: new EngineHudRuntimeService(),
+    hudBridge: new HudRuntimeBridgeService(),
     hudInteractions: new HudInteractionService(options.document),
     chatCommands: new ChatCommandService(),
     chat: new ChatService(options.document, options.window),

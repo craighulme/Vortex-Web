@@ -47,7 +47,7 @@ describe("QualityService", () => {
     ]);
   });
 
-  it("builds the runtime quality API from engine service handles", () => {
+  it("builds the runtime quality API from runtime service handles", () => {
     const calls: string[] = [];
     const storage = new Map<string, string>();
     const service = new QualityService().configureRuntime({

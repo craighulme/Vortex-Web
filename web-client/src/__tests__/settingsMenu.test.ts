@@ -151,7 +151,7 @@ describe("SettingsMenuService", () => {
     expect(select.disabled).toBe(true);
   });
 
-  it("routes locked-cursor menu clicks through controls without duplicating engine logic", () => {
+  it("routes locked-cursor menu clicks through controls without duplicating runtime logic", () => {
     const documentRef = makeDocument();
     const panel = new FakeElement();
     const service = new SettingsMenuService(documentRef, makeStorage());

@@ -23,7 +23,7 @@ type SettingsPresenterLike = {
   panel(): HTMLElement | null;
 };
 
-export type EngineInputRuntimeConfig = {
+export type InputRuntimeBridgeConfig = {
   document: Document;
   rendererElement: RendererElement;
   overlay: HTMLElement | null;
@@ -42,7 +42,7 @@ export type EngineInputRuntimeConfig = {
   getCharacter(): CharacterLike | null;
 };
 
-export type EngineInputRuntimeHandles = {
+export type InputRuntimeBridgeHandles = {
   keys: InputService["keys"];
   cursor: CursorService;
   requestPointerLock(): void;
@@ -56,10 +56,10 @@ export type EngineInputRuntimeHandles = {
   panel(): HTMLElement | null;
 };
 
-export class EngineInputRuntimeService {
+export class InputRuntimeBridgeService {
   private cleanups: Array<() => void> = [];
 
-  configure(config: EngineInputRuntimeConfig): EngineInputRuntimeHandles {
+  configure(config: InputRuntimeBridgeConfig): InputRuntimeBridgeHandles {
     this.dispose();
     const {
       document,

@@ -1,7 +1,7 @@
-import type { EngineRuntimeBridgeConfig } from "./EngineRuntimeBridgeTypes";
+import type { RuntimeBridgeConfig } from "./RuntimeBridgeTypes";
 
-export class EngineQualityApiService {
-  install(config: EngineRuntimeBridgeConfig): unknown {
+export class QualityApiService {
+  install(config: RuntimeBridgeConfig): unknown {
     return config.quality.configureRuntime({
       windowRef: config.windowRef,
       localStorage: config.localStorage,

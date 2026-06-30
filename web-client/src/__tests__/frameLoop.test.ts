@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FrameLoopService } from "../runtime/FrameLoopService";
 
 describe("FrameLoopService", () => {
-  it("runs frame callbacks in engine order and clamps dt", () => {
+  it("runs frame callbacks in runtime order and clamps dt", () => {
     const service = new FrameLoopService();
     const calls: string[] = [];
     service.start({

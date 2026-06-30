@@ -118,10 +118,6 @@ export class MultiplayerService {
     return this.pendingRuntimeExportMessages.length;
   }
 
-  pendingEngineMessageCount(): number {
-    return this.pendingRuntimeExportMessageCount();
-  }
-
   isPlaceholderPlayerName(id: unknown, value: unknown): boolean {
     return this.names.isPlaceholder(id, value);
   }

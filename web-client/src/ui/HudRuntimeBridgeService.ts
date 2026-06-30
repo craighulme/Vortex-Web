@@ -1,4 +1,4 @@
-export type EngineHudRuntimeOptions = {
+export type HudRuntimeBridgeOptions = {
   document: Document;
   windowRef: Window & Record<string, any>;
   runtime: Record<string, any>;
@@ -32,7 +32,7 @@ export type EngineHudRuntimeOptions = {
   onToggleDebug(): void;
 };
 
-export type EngineHudRuntimeHandles = {
+export type HudRuntimeBridgeHandles = {
   requestPointerLock(): void;
   setMouseLock(value: boolean): void;
   cursorOver(element: Element | null): boolean;
@@ -43,8 +43,8 @@ export type EngineHudRuntimeHandles = {
   refreshSettingsStatus(): void;
 };
 
-export class EngineHudRuntimeService {
-  configure(options: EngineHudRuntimeOptions): EngineHudRuntimeHandles {
+export class HudRuntimeBridgeService {
+  configure(options: HudRuntimeBridgeOptions): HudRuntimeBridgeHandles {
     const overlay = options.document.getElementById("overlay");
     const crosshair = options.document.getElementById("crosshair");
     const cursorElement = options.document.getElementById("cursor");
@@ -94,7 +94,7 @@ export class EngineHudRuntimeService {
       markSceneMaterialsForShaderUpdate: options.markSceneMaterialsForShaderUpdate
     });
 
-    inputRuntimeHandles = options.runtime.engineInput.configure({
+    inputRuntimeHandles = options.runtime.inputBridge.configure({
       document: options.document,
       rendererElement: options.renderer.domElement,
       overlay,
@@ -113,7 +113,7 @@ export class EngineHudRuntimeService {
       getCharacter: options.getCharacter
     });
     if (!inputRuntimeHandles) {
-      throw new Error("[input] VortexRuntime engine input service is required before the engine starts.");
+      throw new Error("[input] VortexRuntime input bridge service is required before the runtime starts.");
     }
 
     options.runtime.hudInteractions.configure({

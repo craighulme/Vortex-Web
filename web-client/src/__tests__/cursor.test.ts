@@ -36,7 +36,7 @@ describe("CursorService", () => {
     expect(onLook).toHaveBeenCalledWith(5, -2);
   });
 
-  it("updates slider drags without duplicating engine math", () => {
+  it("updates slider drags without duplicating runtime math", () => {
     const service = new CursorService(windowLike()).configure({ cursorElement: element(), crosshairElement: element() });
     const slider = {
       min: "0",

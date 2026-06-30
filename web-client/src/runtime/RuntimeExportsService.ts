@@ -1,6 +1,6 @@
-export type EngineRuntimeExportsApi = Record<string, unknown>;
+export type RuntimeExportsApi = Record<string, unknown>;
 
-export type EngineRuntimeExportsOptions = {
+export type RuntimeExportsOptions = {
   windowRef: Window & Record<string, unknown>;
   detailTarget?: EventTarget;
   three: unknown;
@@ -12,7 +12,7 @@ export type EngineRuntimeExportsOptions = {
   objects: unknown[];
   camera: unknown;
   cam: unknown;
-  vortexApi: EngineRuntimeExportsApi;
+  vortexApi: RuntimeExportsApi;
   rendererService: {
     attachRuntimeAdapter(handles: { scene?: unknown; camera?: unknown; renderer?: unknown }): void;
   };
@@ -32,8 +32,8 @@ export type EngineRuntimeExportsOptions = {
   cursorOver(element: Element | null | undefined): boolean;
 };
 
-export class EngineRuntimeExportsService {
-  install(options: EngineRuntimeExportsOptions): EngineRuntimeExportsApi {
+export class RuntimeExportsService {
+  install(options: RuntimeExportsOptions): RuntimeExportsApi {
     const windowRef = options.windowRef;
     windowRef._vortex = options.vortexApi;
     windowRef.THREE = options.three;
@@ -60,8 +60,9 @@ export class EngineRuntimeExportsService {
       getColliders: options.vortexApi.getColliders
     });
 
-    const event = new CustomEvent("vortex-engine-ready", { detail: options.vortexApi });
-    (options.detailTarget || windowRef).dispatchEvent(event);
+    const target = options.detailTarget || windowRef;
+    target.dispatchEvent(new CustomEvent("vweb-runtime-exports-ready", { detail: options.vortexApi }));
+    target.dispatchEvent(new CustomEvent("vortex-engine-ready", { detail: options.vortexApi }));
     return options.vortexApi;
   }
 }

@@ -61,7 +61,7 @@ export class MultiplayerBridgeService {
         _runtimeMultiplayer().flushQueuedRuntimeExportMessages(_hasRuntimeExports, handle);
     }
     
-    window.addEventListener("vortex-engine-ready", _flushPendingRuntimeExportMessages);
+    window.addEventListener("vweb-runtime-exports-ready", _flushPendingRuntimeExportMessages);
     window.addEventListener("vweb-runtime-ready", () => setTimeout(_flushPendingRuntimeExportMessages, 0));
     
     function _normalizeAvatarFields(data = {}) {

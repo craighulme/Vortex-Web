@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { RuntimeAssetResolverService } from "../assets/RuntimeAssetResolverService";
-import { EngineWorldRuntimeService } from "../world/EngineWorldRuntimeService";
+import { WorldRuntimeBridgeService } from "../world/WorldRuntimeBridgeService";
 
-describe("EngineWorldRuntimeService", () => {
+describe("WorldRuntimeBridgeService", () => {
   it("wires assets, world runtime, debug visuals, and picking", () => {
     const debugToggle = vi.fn();
     const debugUpdate = vi.fn();
@@ -18,7 +18,7 @@ describe("EngineWorldRuntimeService", () => {
       refreshStudMaterialTextures: vi.fn()
     };
 
-    const service = new EngineWorldRuntimeService().configure({
+    const service = new WorldRuntimeBridgeService().configure({
       THREE: {},
       scene: {},
       renderer: {},
