@@ -86,8 +86,8 @@ export function createMultiplayerAvatarSpoofBridge(context) {
   function setMovementFormat(format = "native-auto") {
     const requested = String(format || "").toLowerCase();
     const next = requested === "compact" ? "compact"
-      : requested === "lite" || requested === "legacy-lite" || requested === "native-lite" || requested === "no-pants" ? "native-lite"
-      : requested === "legacy" || requested === "full" || requested === "native-full" ? "native-full"
+      : requested === "lite" || requested === "native-lite" || requested === "no-pants" ? "native-lite"
+      : requested === "full" || requested === "native-full" ? "native-full"
       : "native-auto";
     if (runtimeSession().hubMode && bridgeOpen()) {
       runtimeSession().sendJson({ type: "set_movement_format", format: next });
@@ -202,7 +202,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
       if (original) holdBroadcastState({ ...original, anim: "idle" }, intervalMs * burst + 80);
       if (original) sendStateBurst({ ...original, anim: "idle" }, burst, intervalMs);
       if (!keepCompact) {
-        setTimeout(() => setMovementFormat("legacy"), Math.max(80, intervalMs * burst));
+        setTimeout(() => setMovementFormat("native-full"), Math.max(80, intervalMs * burst));
       }
     }, returnDelayMs);
 

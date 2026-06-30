@@ -1,5 +1,6 @@
 import type { AudioService } from "../audio/AudioService";
 import type { InputService } from "../input/InputService";
+import { matchesKeybind } from "../input/KeybindSettings";
 import type { SettingsMenuService } from "./SettingsMenuService";
 
 type RuntimeSettingsElementMap = {
@@ -13,11 +14,12 @@ type RuntimeSettingsElementMap = {
   audioOutput: HTMLSelectElement | null;
   audioInput: HTMLSelectElement | null;
   audioStatus: HTMLElement | null;
-  targets: {
-    audio: HTMLElement;
-    graphics: HTMLElement;
-    advanced: HTMLElement;
-    dev: HTMLElement;
+      targets: {
+        audio: HTMLElement;
+        controls: HTMLElement;
+        graphics: HTMLElement;
+        advanced: HTMLElement;
+        dev: HTMLElement;
   };
 };
 
@@ -79,6 +81,15 @@ export class RuntimeSettingsPresenter {
   private elements: RuntimeSettingsElementMap | null = null;
   private open = false;
   private gameSounds: Record<string, unknown> = {};
+  private graphicsControls: {
+    shadows?: HTMLInputElement;
+    shadowQuality?: HTMLSelectElement;
+    toneMapping?: HTMLSelectElement;
+    studTextures?: HTMLInputElement;
+    fog?: HTMLInputElement;
+    fogDistance?: ReturnType<SettingsMenuService["createSlider"]>;
+    renderDistance?: ReturnType<SettingsMenuService["createSlider"]>;
+  } = {};
 
   constructor(private readonly options: RuntimeSettingsPresenterOptions) {}
 
@@ -105,6 +116,7 @@ export class RuntimeSettingsPresenter {
     });
     this.installWindowApi();
     this.installMenuHandlers();
+    this.installHudHandlers();
     this.buildControls();
     void this.options.audio.populateDevices().catch(() => {});
     this.setOpen(false);
@@ -174,6 +186,7 @@ export class RuntimeSettingsPresenter {
     const playerCount = this.options.document.querySelectorAll("#lb-body [data-player-id]").length || 1;
     const fog = this.options.readFogSettings();
     const renderChunks = quality?.caches?.renderChunks;
+    const profile = this.readGraphicsPreset(quality);
     this.options.menu.renderStatus([
       ["Game", `#${gameId}`],
       ["Players", String(playerCount)],
@@ -183,7 +196,7 @@ export class RuntimeSettingsPresenter {
       ["Shadows", this.options.shadows.snapshot().technique],
       ["Fog", fog.enabled ? `${fog.far} studs` : "Off"],
       ["Render distance", renderChunks?.cullDistance ? `${renderChunks.cullDistance} studs` : "-"],
-      ["Graphics", quality?.shadows ? "Visual" : "Performance"]
+      ["Graphics", formatPresetLabel(profile)]
     ]);
   }
 
@@ -218,12 +231,18 @@ export class RuntimeSettingsPresenter {
     });
 
     this.options.document.addEventListener("keydown", (event) => {
-      if (event.code !== "Escape") return;
+      if (!matchesKeybind(event, "settings", this.options.localStorage)) return;
       if ((this.options.windowRef as any)._chatFocused) return;
-      if (!this.open) return;
       event.preventDefault();
-      this.setOpen(false, { resume: true });
+      if (this.open) this.setOpen(false, { resume: true });
+      else if (this.options.input.gameHasFocus()) this.setOpen(true);
     }, true);
+  }
+
+  private installHudHandlers(): void {
+    this.options.document.getElementById("settings-btn")?.addEventListener("click", () => {
+      this.setOpen(true);
+    });
   }
 
   private buildControls(): void {
@@ -272,16 +291,32 @@ export class RuntimeSettingsPresenter {
     const makeButtons = (buttons: Parameters<SettingsMenuService["createButtonRow"]>[0], target = elements.targets.dev) => menu.createButtonRow(buttons, target);
 
     const shadowDisabledReason = this.options.shadows.snapshot().disabledReason;
-    menu.createToggle({
+    let shadowQualitySelect: HTMLSelectElement | null = null;
+    const syncShadowControls = (enabled = this.options.readShadowsEnabled()) => {
+      const field = shadowQualitySelect?.closest(".vw-field") as HTMLElement | null;
+      if (field) field.hidden = !enabled;
+    };
+    this.graphicsControls.shadows = menu.createToggle({
       label: shadowDisabledReason ? "Dynamic shadows (disabled for WebGPU)" : "Dynamic shadows",
       checked: this.options.readShadowsEnabled(),
       target: elements.targets.graphics,
       disabled: Boolean(shadowDisabledReason),
       onChange: (checked, input) => {
         input.checked = this.options.setShadowsEnabled(checked);
+        syncShadowControls(input.checked);
         this.refreshStatus();
       }
     });
+    shadowQualitySelect = makeSelect("Shadow quality", this.options.rendererService?.getShadowQuality?.() || this.options.shadowConfig.quality || "medium", [
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+      { value: "ultra", label: "Ultra" }
+    ], (value) => this.options.setShadowQuality(value), elements.targets.graphics);
+    this.graphicsControls.shadowQuality = shadowQualitySelect;
+    shadowQualitySelect.title = "Applies immediately. Higher quality uses larger cascaded shadow maps.";
+    shadowQualitySelect.closest(".vw-field")?.classList.add("vw-dependent-setting");
+    syncShadowControls();
 
     makeSlider("Master volume", 0, 1, 1, 0.05, (_slider, value) => audio.setMasterVolume(value), { target: elements.targets.audio, storageKey: "Master volume", formatter: (value) => audio.volumeLabel(value) });
     makeSlider("Music volume", 0, 1, 0.9, 0.05, (_slider, value) => audio.setMusicVolume(value), { target: elements.targets.audio, storageKey: "Music volume", formatter: (value) => audio.volumeLabel(value) });
@@ -294,49 +329,56 @@ export class RuntimeSettingsPresenter {
       { label: "Test output", primary: true, onclick: () => audio.testOutput(), requiresUserGesture: true }
     ], elements.targets.audio);
 
-    makeSelect("Tone mapping", this.options.readToneMappingMode(), [
+    this.graphicsControls.toneMapping = makeSelect("Tone mapping", this.options.readToneMappingMode(), [
       { value: "none", label: "None - fastest" },
       { value: "agx", label: "AgX - richer colour" },
       { value: "aces", label: "ACES - cinematic" }
     ], (value) => this.options.setToneMappingMode(value), elements.targets.graphics);
 
-    makeButtons([
-      { label: "Performance preset", primary: true, onclick: () => { (this.options.windowRef as any).VortexQuality?.performance?.(); this.showReloadNotice(); this.refreshStatus(); } },
-      { label: "Visual preset", onclick: () => { (this.options.windowRef as any).VortexQuality?.visual?.(); this.showReloadNotice(); this.refreshStatus(); } }
+    const presetRow = makeButtons([
+      { label: "Performance", primary: this.readGraphicsPreset() === "performance", onclick: () => this.applyGraphicsPreset("performance") },
+      { label: "Balanced", primary: this.readGraphicsPreset() === "balanced", onclick: () => this.applyGraphicsPreset("balanced") },
+      { label: "Visual", primary: this.readGraphicsPreset() === "visual", onclick: () => this.applyGraphicsPreset("visual") }
     ], elements.targets.graphics);
+    presetRow.classList.add("vw-preset-row");
+    this.syncPresetButtons(this.readGraphicsPreset());
 
-    makeSelect("Shadow quality", this.options.rendererService?.getShadowQuality?.() || this.options.shadowConfig.quality || "medium", [
-      { value: "low", label: "Low" },
-      { value: "medium", label: "Medium" },
-      { value: "high", label: "High" },
-      { value: "ultra", label: "Ultra" }
-    ], (value) => this.options.setShadowQuality(value), elements.targets.graphics).title = "Applies immediately. Higher quality uses larger cascaded shadow maps.";
-
-    makeToggle("Stud textures", this.options.readStudTexturesEnabled(), (checked) => {
+    this.graphicsControls.studTextures = makeToggle("Stud textures", this.options.readStudTexturesEnabled(), (checked) => {
       this.options.localStorage.setItem("vwebStudTextures", checked ? "1" : "0");
       this.options.refreshStudMaterialTextures();
       this.options.markSceneMaterialsForShaderUpdate();
-    }, elements.targets.graphics).title = "Uses loaded stud diffuse/normal textures. Disable if texture state causes dark map rendering.";
+    }, elements.targets.graphics);
+    this.graphicsControls.studTextures.title = "Uses loaded stud diffuse/normal textures. Disable if texture state causes dark map rendering.";
 
-    makeToggle("Render fog", this.options.readFogSettings().enabled, (checked) => this.options.setRenderFog(checked), elements.targets.graphics);
+    let fogDistanceControl: ReturnType<typeof makeSlider> | null = null;
+    const syncFogControls = (enabled = this.options.readFogSettings().enabled) => {
+      if (fogDistanceControl) fogDistanceControl.container.hidden = !enabled;
+    };
+    this.graphicsControls.fog = makeToggle("Render fog", this.options.readFogSettings().enabled, (checked) => {
+      this.options.setRenderFog(checked);
+      syncFogControls(checked);
+    }, elements.targets.graphics);
+    fogDistanceControl = makeSlider("Fog distance", 160, 4000, this.options.readFogSettings().far, 20, (_slider, value) => this.options.setFogDistance(value), {
+      target: elements.targets.graphics,
+      storageKey: "vwebFogDistance",
+      formatter: (value) => `${Math.round(Number(value))} studs`
+    });
+    this.graphicsControls.fogDistance = fogDistanceControl;
+    fogDistanceControl.container.classList.add("vw-dependent-setting");
+    syncFogControls();
     const currentRenderDistance = Number((this.options.windowRef as any).VortexQuality?.get?.()?.caches?.renderChunks?.cullDistance)
       || Number(this.options.localStorage.getItem("vwebRenderDistance"))
       || 1200;
     const renderDistanceControl = makeSlider("Render distance", 200, 2600, currentRenderDistance, 50, (_slider, value) => {
       this.options.localStorage.setItem("vwebRenderDistance", String(Math.round(value)));
-      this.options.localStorage.setItem("vwebRenderDistanceProfile", "balanced");
-      this.options.setRenderDistance(value, "balanced");
+      this.options.setRenderDistance(value, this.readGraphicsPreset());
     }, {
       target: elements.targets.graphics,
       storageKey: "vwebRenderDistance",
       formatter: (value) => `${Math.round(Number(value))} studs`
     });
+    this.graphicsControls.renderDistance = renderDistanceControl;
     renderDistanceControl.container.title = "Controls chunk streaming distance. Nearby chunks stay visible; farther chunks can hide outside camera view.";
-    makeSlider("Fog distance", 160, 4000, this.options.readFogSettings().far, 20, (_slider, value) => this.options.setFogDistance(value), {
-      target: elements.targets.graphics,
-      storageKey: "vwebFogDistance",
-      formatter: (value) => `${Math.round(Number(value))} studs`
-    });
     makeToggle("Hide first-person body", this.options.readStorageFlag("vwebHideFirstPersonBody", true), (checked) => {
       this.options.localStorage.setItem("vwebHideFirstPersonBody", checked ? "1" : "0");
     }, elements.targets.graphics).title = "Hides your local avatar and its shadow while the camera is in first person.";
@@ -368,22 +410,82 @@ export class RuntimeSettingsPresenter {
     makeToggle("Frame profiler", Boolean(this.options.perf.enabled), (checked) => this.options.perf.setEnabled(checked), elements.targets.dev);
     makeToggle("Console timing log", Boolean(this.options.perf.log), (checked) => this.options.perf.setLog(checked), elements.targets.dev);
 
-    makeButtons([
+    const devRow = makeButtons([
       {
         label: "Sample FPS",
         primary: true,
         onclick: async () => this.sampleFps()
       },
-      { label: "Runtime panel", onclick: () => (this.options.windowRef as any).VortexRuntimeDevTools?.enable?.() },
-      { label: "Hide runtime panel", onclick: () => (this.options.windowRef as any).VortexRuntimeDevTools?.disable?.() },
+      { label: "Show runtime panel", onclick: () => {} },
+      { label: "Chunk boxes", onclick: () => {} },
+      { label: "Dump chunks", onclick: () => this.dumpChunks() },
       { label: "Scene diagnose", onclick: () => this.diagnoseScene() }
     ], elements.targets.dev);
+    this.installDevToggleButton(devRow, 1, "Show runtime panel", "Hide runtime panel", (enabled) => {
+      const tools = (this.options.windowRef as any).VortexRuntimeDevTools;
+      if (enabled) tools?.enable?.();
+      else tools?.disable?.();
+    });
+    this.installDevToggleButton(devRow, 2, "Show chunk boxes", "Hide chunk boxes", (enabled) => {
+      const chunks = (this.options.windowRef as any).VortexChunkDebug;
+      if (enabled) chunks?.show?.();
+      else chunks?.hide?.();
+    });
 
-    makeButtons([
+    const stressRow = makeButtons([
       { label: "Spawn football", onclick: () => this.options.runtime.sandbox?.spawnFootball?.(this.options.runtime) },
-      { label: "Stress 250/s", onclick: () => { (this.options.windowRef as any).VortexRuntimeDevTools?.enable?.(); this.options.runtime.sandbox?.startStress?.(this.options.runtime, 250); } },
-      { label: "Stop stress", onclick: () => this.options.runtime.sandbox?.clear?.(this.options.runtime) }
+      { label: "Start stress 250/s", onclick: () => {} },
+      { label: "Chunk view culling", onclick: () => this.toggleChunkViewCulling() }
     ], elements.targets.dev);
+    this.installDevToggleButton(stressRow, 1, "Start stress 250/s", "Stop stress", (enabled) => {
+      if (enabled) {
+        (this.options.windowRef as any).VortexRuntimeDevTools?.enable?.();
+        this.options.runtime.sandbox?.startStress?.(this.options.runtime, 250);
+      } else {
+        this.options.runtime.sandbox?.clear?.(this.options.runtime);
+      }
+    });
+  }
+
+  private installDevToggleButton(row: HTMLElement, index: number, offLabel: string, onLabel: string, apply: (enabled: boolean) => void): void {
+    const button = row.querySelectorAll<HTMLButtonElement>("button").item(index);
+    if (!button) return;
+    let enabled = false;
+    const sync = () => {
+      button.textContent = enabled ? onLabel : offLabel;
+      button.classList.toggle("primary", enabled);
+      button.setAttribute("aria-pressed", enabled ? "true" : "false");
+    };
+    button.onclick = () => {
+      enabled = !enabled;
+      apply(enabled);
+      sync();
+      this.refreshStatus();
+    };
+    sync();
+  }
+
+  private dumpChunks(): void {
+    const chunks = (this.options.windowRef as any).VortexChunkDebug;
+    const rows = chunks?.rows?.() || [];
+    const snapshot = chunks?.snapshot?.() || this.options.runtime.world?.renderChunkSnapshot?.() || null;
+    const output = this.elements?.output;
+    if (output) {
+      output.textContent = JSON.stringify({
+        snapshot,
+        rows: rows.slice?.(0, 30) || rows
+      }, null, 2);
+    }
+  }
+
+  private toggleChunkViewCulling(): void {
+    const chunks = (this.options.windowRef as any).VortexChunkDebug;
+    const snapshot = chunks?.snapshot?.() || this.options.runtime.world?.renderChunkSnapshot?.();
+    const next = !snapshot?.viewCullingEnabled;
+    const result = chunks?.setViewCulling?.(next);
+    const output = this.elements?.output;
+    if (output) output.textContent = JSON.stringify(result || { viewCullingEnabled: next }, null, 2);
+    this.refreshStatus();
   }
 
   private async sampleFps(): Promise<void> {
@@ -402,6 +504,59 @@ export class RuntimeSettingsPresenter {
       this.refreshStatus();
     } catch (error: any) {
       output.textContent = `Sample failed: ${error?.message || error}`;
+    }
+  }
+
+  private readGraphicsPreset(quality = (this.options.windowRef as any).VortexQuality?.get?.()): "performance" | "balanced" | "visual" {
+    const value = this.options.localStorage.getItem("vwebRenderDistanceProfile") || quality?.renderDistanceProfile;
+    return value === "performance" || value === "visual" ? value : "balanced";
+  }
+
+  private applyGraphicsPreset(profile: "performance" | "balanced" | "visual"): void {
+    const quality = (this.options.windowRef as any).VortexQuality;
+    if (profile === "performance") quality?.performance?.();
+    else if (profile === "visual") quality?.visual?.();
+    else quality?.balanced?.();
+    this.syncPresetButtons(profile);
+    this.syncGraphicsControls();
+    this.refreshStatus();
+  }
+
+  private syncGraphicsControls(): void {
+    const quality = (this.options.windowRef as any).VortexQuality?.get?.();
+    const renderChunks = quality?.caches?.renderChunks;
+    const controls = this.graphicsControls;
+
+    if (controls.shadows) controls.shadows.checked = this.options.readShadowsEnabled();
+    if (controls.shadowQuality) controls.shadowQuality.value = this.options.rendererService?.getShadowQuality?.() || this.options.shadowConfig.quality || "medium";
+    if (controls.toneMapping) controls.toneMapping.value = this.options.readToneMappingMode();
+    if (controls.studTextures) controls.studTextures.checked = this.options.readStudTexturesEnabled();
+
+    const fog = this.options.readFogSettings();
+    if (controls.fog) controls.fog.checked = fog.enabled;
+    if (controls.fogDistance) {
+      controls.fogDistance.container.hidden = !fog.enabled;
+      controls.fogDistance.input.value = String(fog.far);
+      controls.fogDistance.value.textContent = `${Math.round(Number(fog.far))} studs`;
+    }
+
+    const renderDistance = Number(renderChunks?.cullDistance)
+      || Number(this.options.localStorage.getItem("vwebRenderDistance"))
+      || 1200;
+    if (controls.renderDistance) {
+      controls.renderDistance.input.value = String(renderDistance);
+      controls.renderDistance.value.textContent = `${Math.round(renderDistance)} studs`;
+    }
+  }
+
+  private syncPresetButtons(profile: "performance" | "balanced" | "visual"): void {
+    const row = this.elements?.targets.graphics.querySelector(".vw-preset-row");
+    if (!row) return;
+    for (const button of row.querySelectorAll<HTMLButtonElement>("button")) {
+      const value = button.textContent?.trim().toLowerCase();
+      const active = value === profile;
+      button.classList.toggle("primary", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
     }
   }
 
@@ -444,6 +599,7 @@ export class RuntimeSettingsPresenter {
       audioStatus: this.options.document.getElementById("vw-audio-status"),
       targets: {
         audio: this.options.document.getElementById("vw-audio-controls") || panel,
+        controls: this.options.document.getElementById("vw-controls") || panel,
         graphics: this.options.document.getElementById("vw-graphics-controls") || panel,
         advanced: this.options.document.getElementById("vw-advanced-controls") || panel,
         dev: this.options.document.getElementById("vw-dev-controls") || panel
@@ -455,4 +611,8 @@ export class RuntimeSettingsPresenter {
     if (!this.elements) throw new Error("[settings] RuntimeSettingsPresenter is not mounted.");
     return this.elements;
   }
+}
+
+function formatPresetLabel(value: "performance" | "balanced" | "visual"): string {
+  return value === "performance" ? "Performance" : value === "visual" ? "Visual" : "Balanced";
 }

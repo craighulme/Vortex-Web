@@ -102,12 +102,92 @@
                         <h2>Controls</h2>
                         <p>Camera and input preferences.</p>
                     </div>
-                    <div class="vw-settings-stack">
+                    <div id="vw-controls" class="vw-settings-stack vw-controls-panel">
                         <div class="sp-row">
                             <span class="sp-label">Camera Sensitivity</span>
                             <input type="range" id="sp-sens" min="0.1" max="3" step="0.05" value="1">
                             <span class="sp-val" id="sp-sens-val">1.0x</span>
                         </div>
+                        <section class="vw-keybind-group" aria-label="UI keybinds">
+                            <h3>UI</h3>
+                            <div class="vw-keybind-grid">
+                                <div class="vw-keybind-row">
+                                    <span><strong>Settings</strong><small>Open or close the menu</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="settings" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="settings" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Toggle chat</strong><small>Show or hide the chat panel</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="chatToggle" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="chatToggle" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Focus chat</strong><small>Start typing a message</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="chatFocus" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="chatFocus" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Player list</strong><small>Show or hide players</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="playerList" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="playerList" data-bind-index="1"></button>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="vw-keybind-group" aria-label="Character movement keybinds">
+                            <h3>Character / Movement</h3>
+                            <div class="vw-keybind-grid">
+                                <div class="vw-keybind-row">
+                                    <span><strong>Move forward</strong><small>Walk toward the camera direction</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveForward" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveForward" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Move backward</strong><small>Walk away from camera direction</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveBackward" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveBackward" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Move left</strong><small>Strafe left</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveLeft" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveLeft" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Move right</strong><small>Strafe right</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveRight" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="moveRight" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Jump</strong><small>Request a character jump</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="jump" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="jump" data-bind-index="1"></button>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="vw-keybind-group" aria-label="Camera keybinds">
+                            <h3>Camera</h3>
+                            <div class="vw-keybind-grid">
+                                <div class="vw-keybind-row">
+                                    <span><strong>Rotate left</strong><small>Turn camera left</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraLeft" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraLeft" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Rotate right</strong><small>Turn camera right</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraRight" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraRight" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Snap left</strong><small>Snap camera angle left</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraSnapLeft" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraSnapLeft" data-bind-index="1"></button>
+                                </div>
+                                <div class="vw-keybind-row">
+                                    <span><strong>Snap right</strong><small>Snap camera angle right</small></span>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraSnapRight" data-bind-index="0"></button>
+                                    <button type="button" class="vw-bind" data-keybind-action="cameraSnapRight" data-bind-index="1"></button>
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </section>
 
@@ -151,10 +231,10 @@
 
     <div id="hud">
         <div id="hud-topbar">
-            <button class="hud-btn" id="settings-btn" title="Settings">
+            <button class="hud-btn" id="settings-btn" title="Settings (Esc)" data-vw-tooltip="Settings" data-vw-shortcut="Esc">
                 <i class="fa-solid fa-gear"></i>
             </button>
-            <button class="hud-btn" id="chat-toggle-btn" title="Chat">
+            <button class="hud-btn" id="chat-toggle-btn" title="Chat (H or /)" data-vw-tooltip="Chat" data-vw-shortcut="H or /">
                 <i class="fa-solid fa-message"></i>
                 <span id="unread-badge" class="hidden">0</span>
             </button>

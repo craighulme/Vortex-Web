@@ -47,8 +47,9 @@ import type { LeaderboardDomService } from "../ui/LeaderboardDomService";
 import type { NotificationService } from "../ui/NotificationService";
 import type { RuntimeSettingsPresenterService } from "../ui/RuntimeSettingsPresenter";
 import type { SettingsMenuService } from "../ui/SettingsMenuService";
+import type { ThemeService } from "../ui/ThemeService";
 import type { EventBus } from "./EventBus";
-import type { EngineCompatibilityService } from "./EngineCompatibilityService";
+import type { EngineRuntimeExportsService } from "./EngineRuntimeExportsService";
 import type { EngineRuntimeBridgeService } from "./EngineRuntimeBridgeService";
 import type { EngineSceneRuntimeService } from "./EngineSceneRuntimeService";
 import type { FrameLoopService } from "./FrameLoopService";
@@ -83,7 +84,7 @@ export type VortexRuntime = {
   access: AccessService;
   platform: PlatformBridge;
   events: EventBus<RuntimeEventMap>;
-  engineCompatibility: EngineCompatibilityService;
+  engineExports: EngineRuntimeExportsService;
   engineRuntimeBridge: EngineRuntimeBridgeService;
   engineScene: EngineSceneRuntimeService;
   frameLoop: FrameLoopService;
@@ -147,6 +148,7 @@ export type VortexRuntime = {
   notifications: NotificationService;
   runtimeSettings: RuntimeSettingsPresenterService;
   settingsMenu: SettingsMenuService;
+  theme: ThemeService;
   debugVisuals: DebugVisualService;
   diagnostics: DiagnosticsService;
   perf: PerformanceService;

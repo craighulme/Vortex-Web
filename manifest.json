@@ -31,6 +31,7 @@
   "action": {
     "default_popup": "popup/popup.html"
   },
+  "options_page": "options/settings.html",
   "content_scripts": [
     {
       "matches": [

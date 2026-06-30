@@ -1,6 +1,6 @@
 import type { AvatarAssetService } from "./AvatarAssetService";
 import type { AvatarMaterialService } from "./AvatarMaterialService";
-import { DEFAULT_BODY_COLORS, type AvatarService, type LegacyAvatarState } from "./AvatarService";
+import { DEFAULT_BODY_COLORS, type AvatarService, type NativeAvatarState } from "./AvatarService";
 
 type ThreeLike = Record<string, any>;
 
@@ -50,7 +50,7 @@ export type LocalAvatarOptions = {
   isDebugEnabled?(): boolean;
 };
 
-const DEFAULT_AVATAR: LegacyAvatarState = {
+const DEFAULT_AVATAR: NativeAvatarState = {
   shirt_id: 0,
   pant_id: 0,
   body_type: "male",
@@ -64,7 +64,7 @@ export class LocalAvatarService {
   private shirtMesh: any = null;
   private pantsMesh: any = null;
   private faceMesh: any = null;
-  private avatarState: LegacyAvatarState = cloneAvatar(DEFAULT_AVATAR);
+  private avatarState: NativeAvatarState = cloneAvatar(DEFAULT_AVATAR);
 
   configure(options: LocalAvatarOptions): this {
     this.options = options;
@@ -75,7 +75,7 @@ export class LocalAvatarService {
     return this.character;
   }
 
-  getAvatar(): LegacyAvatarState {
+  getAvatar(): NativeAvatarState {
     return cloneAvatar(this.avatarState);
   }
 
@@ -95,7 +95,7 @@ export class LocalAvatarService {
   async applyAvatar(avatar: Record<string, unknown> = {}): Promise<void> {
     const options = this.requireOptions();
     const previousBodyType = this.avatarState.body_type;
-    this.avatarState = options.avatarService.normalizeLegacy(avatar, this.avatarState);
+    this.avatarState = options.avatarService.normalizeNative(avatar, this.avatarState);
     if (options.isDebugEnabled?.()) console.debug("[avatar] local", JSON.stringify(this.avatarState));
     if (this.character && previousBodyType !== this.avatarState.body_type) {
       this.reload();
@@ -240,6 +240,6 @@ function canonicalBoneName(name: unknown): string {
   return String(name || "").replace(/\s+/g, "_");
 }
 
-function cloneAvatar(avatar: LegacyAvatarState): LegacyAvatarState {
+function cloneAvatar(avatar: NativeAvatarState): NativeAvatarState {
   return { ...avatar, body_colors: [...avatar.body_colors] };
 }

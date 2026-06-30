@@ -30,7 +30,7 @@ function makeWindow() {
 }
 
 describe("PerformanceService", () => {
-  it("keeps the legacy profiler API while reporting renderer and cadence stats", () => {
+  it("keeps the profiler API while reporting renderer and cadence stats", () => {
     const windowRef = makeWindow();
     const perf = new PerformanceService(windowRef).configure({
       renderer: {

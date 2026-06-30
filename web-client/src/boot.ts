@@ -1,6 +1,7 @@
 import { createVortexRuntime } from "./runtime/createRuntime";
-import { installCompatibilityShim } from "./runtime/compatibility";
+import { installWindowRuntimeBridge } from "./runtime/WindowRuntimeBridge";
 import { launchEngine } from "./engine/EngineLauncher";
+import { readRuntimeDisplaySettings } from "./ui/RuntimeDisplaySettings";
 
 declare const __VWEB_RUNTIME_VERSION__: string;
 
@@ -30,7 +31,10 @@ declare global {
     location
   });
 
-  installCompatibilityShim(window, runtime);
+  installWindowRuntimeBridge(window, runtime);
+  hydrateCommunityCosmetics(runtime);
+  applyRuntimeThemeCss();
+  installRuntimeThemeListener();
   mountRuntimeUi(runtime);
   mountRuntimeMultiplayer(runtime);
   installRuntimeDevTools(runtime);
@@ -49,6 +53,55 @@ declare global {
       console.error("[Vortex Web] engine launch failed", error);
     });
 })();
+
+function applyRuntimeThemeCss(): void {
+  setRuntimeThemeCss(readRuntimeDisplaySettings(document).runtimeThemeCss);
+}
+
+function installRuntimeThemeListener(): void {
+  window.addEventListener("message", (event: MessageEvent) => {
+    if (event.source !== window || event.origin !== location.origin) return;
+    const data = event.data as { vwebRuntimeTheme?: unknown; css?: unknown } | null;
+    if (!data?.vwebRuntimeTheme) return;
+    setRuntimeThemeCss(typeof data.css === "string" ? data.css : "");
+  });
+}
+
+function setRuntimeThemeCss(value: string): void {
+  const css = normalizeRuntimeThemeCss(value);
+  const oldStyle = document.getElementById("vweb-custom-runtime-theme");
+  if (!css) {
+    oldStyle?.remove();
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = "vweb-custom-runtime-theme";
+  style.textContent = css;
+  oldStyle?.remove();
+  document.documentElement.appendChild(style);
+}
+
+function normalizeRuntimeThemeCss(value: string): string {
+  const css = String(value || "").trim();
+  if (!css) return "";
+  if (!css.replace(/\/\*[\s\S]*?\*\//g, "").trim()) return "";
+  return css;
+}
+
+function hydrateCommunityCosmetics(runtime: ReturnType<typeof createVortexRuntime>): void {
+  const meta = document.getElementById("_vortexWebCosmetics") as HTMLMetaElement | null;
+  if (!meta?.content) return;
+  try {
+    const parsed = JSON.parse(meta.content);
+    if (Number.isFinite(Number(parsed?.ownUserId))) runtime.community.setOwnUserId(Number(parsed.ownUserId));
+    const records = parsed?.records && typeof parsed.records === "object" ? parsed.records : {};
+    for (const record of Object.values(records)) {
+      if (record && typeof record === "object") runtime.community.applyCosmetics(record as never);
+    }
+  } catch {
+    runtime.diagnostics.warn("community.cosmetics.hydrate.failed");
+  }
+}
 
 function mountRuntimeUi(runtime: ReturnType<typeof createVortexRuntime>): void {
   const mount = () => {

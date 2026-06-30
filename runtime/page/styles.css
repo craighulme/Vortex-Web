@@ -215,6 +215,15 @@ body.vw-menu-open {
 }
 .msg-self .msg-name { color: #fff; }
 
+.msg-name.msg-vweb-gradient {
+    color: transparent;
+    background: linear-gradient(90deg, var(--msg-name-gradient-from, #60a5fa), var(--msg-name-gradient-to, #a78bfa));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+}
+
 .msg-system {
     color: rgba(255,255,255,0.4);
     font-style: italic;
@@ -1649,4 +1658,769 @@ body.vw-menu-open #cursor {
     background: #fff;
     width: 0%;
     transition: width 0.1s linear;
+}
+
+/* Vortex Web default theme tokens. Keep UI styling layered here so custom themes can override variables cleanly. */
+:root {
+    --vw-ui-font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --vw-ui-glass: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08));
+    --vw-ui-glass-strong: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.07));
+    --vw-ui-glass-menu: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.045));
+    --vw-ui-border: rgba(255, 255, 255, 0.24);
+    --vw-ui-border-soft: rgba(255, 255, 255, 0.16);
+    --vw-ui-text: rgba(255, 255, 255, 0.92);
+    --vw-ui-muted: rgba(255, 255, 255, 0.58);
+    --vw-ui-faint: rgba(255, 255, 255, 0.34);
+    --vw-ui-accent: #3b82f6;
+    --vw-ui-accent-hover: #60a5fa;
+    --vw-ui-danger: #ef4444;
+    --vw-ui-radius: 8px;
+    --vw-ui-radius-sm: 6px;
+    --vw-ui-shadow: 0 18px 55px rgba(0, 0, 0, 0.18);
+    --vw-ui-blur: blur(16px) saturate(1.12);
+    --vw-menu-surface: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.045));
+    --vw-menu-bar-surface: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.035));
+    --vw-panel-surface: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.075));
+    --vw-panel-border: rgba(255,255,255,0.18);
+    --vw-dependent-surface: linear-gradient(135deg, rgba(255,255,255,0.13), rgba(255,255,255,0.055));
+    --vw-control-surface: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.095));
+    --vw-control-border: rgba(255,255,255,0.22);
+    --vw-control-hover-surface: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.14));
+    --vw-tab-surface: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.055));
+    --vw-active-surface: linear-gradient(135deg, rgba(59,130,246,0.52), rgba(96,165,250,0.24));
+    --vw-active-border: rgba(147,197,253,0.46);
+    --vw-ui-fast: 140ms cubic-bezier(.2, .8, .2, 1);
+    --vw-ui-med: 220ms cubic-bezier(.2, .8, .2, 1);
+}
+
+#hud,
+#leaderboard,
+#chat-window,
+#settings-panel,
+#lb-player-panel,
+#notif-container {
+    font-family: var(--vw-ui-font);
+}
+
+#overlay {
+    background: rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(4px);
+}
+
+#hud-topbar {
+    gap: 8px;
+    padding: 14px;
+}
+
+#hud-topbar .hud-btn {
+    position: relative;
+}
+
+#hud-topbar .hud-btn::after {
+    content: attr(data-vw-tooltip) "  " attr(data-vw-shortcut);
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 9px);
+    transform: translate(-50%, -4px);
+    white-space: nowrap;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: rgba(15, 20, 28, 0.78);
+    color: rgba(255,255,255,0.92);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.20);
+    backdrop-filter: var(--vw-ui-blur);
+    font-size: 12px;
+    font-weight: 760;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--vw-ui-fast), transform var(--vw-ui-fast);
+}
+
+#hud-topbar .hud-btn:hover::after,
+#hud-topbar .hud-btn:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.hud-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--vw-ui-radius);
+    background: rgba(248, 250, 252, 0.24);
+    border: 1px solid var(--vw-ui-border-soft);
+    color: var(--vw-ui-text);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
+    backdrop-filter: var(--vw-ui-blur);
+    transition: transform var(--vw-ui-fast), background var(--vw-ui-fast), border-color var(--vw-ui-fast), color var(--vw-ui-fast);
+}
+
+.hud-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.34);
+    border-color: rgba(255,255,255,0.38);
+    color: #fff;
+}
+
+.hud-btn i {
+    font-size: 15px;
+    opacity: 0.9;
+}
+
+#unread-badge {
+    background: var(--vw-ui-danger);
+    box-shadow: 0 0 0 2px rgba(12, 15, 22, 0.9);
+}
+
+#chat-window {
+    width: min(390px, calc(100vw - 28px));
+    height: auto;
+    max-height: 230px;
+    margin: 74px 0 0 14px;
+    border-radius: var(--vw-ui-radius);
+    background: rgba(15, 20, 28, 0.54);
+    border: 1px solid var(--vw-ui-border-soft);
+    box-shadow: var(--vw-ui-shadow);
+    backdrop-filter: var(--vw-ui-blur);
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity var(--vw-ui-med), transform var(--vw-ui-med), visibility var(--vw-ui-med);
+}
+
+#chat-window.hidden {
+    display: flex !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-8px);
+}
+
+#chat-messages {
+    padding: 10px;
+    gap: 5px;
+    flex: 0 1 auto;
+    max-height: 152px;
+}
+
+.msg,
+.msg-system {
+    width: fit-content;
+    max-width: 100%;
+    padding: 3px 0;
+    background: transparent;
+    border-radius: 0;
+    color: var(--vw-ui-text);
+    font-size: 13px;
+    text-shadow: 0 1px 5px rgba(0,0,0,0.5);
+}
+
+.msg-system {
+    color: var(--vw-ui-muted);
+}
+
+#chat-input-row {
+    padding: 6px 8px;
+    gap: 8px;
+    border-top: 1px solid var(--vw-ui-border-soft);
+    background: rgba(255,255,255,0.035);
+}
+
+#chat-input {
+    min-height: 24px;
+    max-height: 76px;
+    padding: 4px 9px;
+    line-height: 1.25;
+    overflow-y: auto;
+    border-radius: var(--vw-ui-radius-sm);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.10);
+    transition: border-color var(--vw-ui-fast), background var(--vw-ui-fast);
+}
+
+#chat-input.chat-active {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.24);
+}
+
+#chat-send,
+.vw-small-button,
+.lbp-btn,
+.notif-btn {
+    border-radius: var(--vw-ui-radius-sm);
+    transition: background var(--vw-ui-fast), color var(--vw-ui-fast), transform var(--vw-ui-fast), border-color var(--vw-ui-fast);
+}
+
+#chat-send {
+    min-height: 28px;
+    min-width: 52px;
+    background: rgba(255,255,255,0.24);
+    border: 1px solid rgba(255,255,255,0.20);
+    color: rgba(255,255,255,0.88);
+    font-weight: 700;
+}
+
+#chat-send:hover {
+    background: rgba(255,255,255,0.34);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+#leaderboard {
+    top: 14px;
+    right: 14px;
+    width: 246px;
+}
+
+.lb-panel {
+    border-radius: var(--vw-ui-radius);
+    background: rgba(15, 20, 28, 0.54);
+    border: 1px solid var(--vw-ui-border-soft);
+    box-shadow: var(--vw-ui-shadow);
+    backdrop-filter: var(--vw-ui-blur);
+}
+
+.lb-header {
+    min-height: 22px;
+    padding: 2px 9px;
+    background: rgba(255,255,255,0.055);
+    border-bottom: 1px solid var(--vw-ui-border-soft);
+}
+
+.lb-title,
+.lb-col-label {
+    color: var(--vw-ui-muted);
+    letter-spacing: 0.08em;
+}
+
+.lb-title {
+    font-size: 9px;
+    line-height: 1;
+}
+
+.lb-col-label {
+    font-size: 8px;
+}
+
+.lb-row {
+    min-height: 30px;
+    padding: 4px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background var(--vw-ui-fast), transform var(--vw-ui-fast);
+}
+
+#leaderboard {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity var(--vw-ui-med), transform var(--vw-ui-med), visibility var(--vw-ui-med);
+}
+
+#leaderboard.lb-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(16px);
+}
+
+.lb-clickable:hover {
+    background: rgba(255,255,255,0.07);
+}
+
+.lb-self {
+    background: rgba(59,130,246,0.16);
+}
+
+.lb-name {
+    color: var(--vw-ui-text);
+    font-size: 12.5px;
+}
+
+.lb-col-val {
+    color: var(--vw-ui-muted);
+}
+
+.lb-vw-badge {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.24), 0 4px 14px rgba(0,0,0,0.18);
+}
+
+#settings-panel {
+    width: min(880px, calc(100vw - 38px));
+    height: min(620px, calc(100vh - 38px));
+}
+
+.vw-menu {
+    background: var(--vw-ui-glass-menu);
+    border: 1px solid var(--vw-ui-border);
+    border-radius: 10px;
+    box-shadow: 0 24px 90px rgba(0,0,0,0.30);
+    backdrop-filter: blur(22px) saturate(1.15);
+}
+
+.vw-menu-top {
+    height: 62px;
+    padding: 0 18px;
+    background: rgba(255,255,255,0.055);
+    border-bottom: 1px solid var(--vw-ui-border-soft);
+}
+
+.vw-menu-title {
+    font-size: 21px;
+    font-weight: 760;
+}
+
+.vw-menu-layout {
+    height: calc(100% - 62px);
+    grid-template-columns: 172px minmax(0, 1fr);
+}
+
+.vw-menu-tabs {
+    padding: 10px;
+    background: rgba(255,255,255,0.045);
+}
+
+.vw-tab {
+    min-height: 38px;
+    margin-bottom: 4px;
+    border-radius: var(--vw-ui-radius-sm);
+    color: var(--vw-ui-muted);
+    transition: background var(--vw-ui-fast), color var(--vw-ui-fast), transform var(--vw-ui-fast);
+}
+
+.vw-tab:hover {
+    background: rgba(255,255,255,0.075);
+}
+
+.vw-tab.active {
+    background: rgba(255,255,255,0.18);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
+}
+
+.vw-menu-content {
+    padding: 18px;
+    overflow-x: hidden;
+}
+
+.vw-menu-section.active {
+    animation: vw-panel-in var(--vw-ui-med);
+}
+
+.vw-action-card,
+.vw-status,
+.sp-row,
+.vw-field,
+.vw-toggle-row,
+.vw-dev-output,
+.vw-menu-note {
+    background: rgba(255,255,255,0.11);
+    border: 1px solid var(--vw-ui-border-soft);
+    border-radius: var(--vw-ui-radius);
+}
+
+.vw-dependent-setting {
+    position: relative;
+    box-sizing: border-box;
+    margin: 4px 0 0 18px;
+    width: auto;
+    max-width: calc(100% - 18px);
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.14);
+}
+
+.vw-dependent-setting::before {
+    display: none;
+    content: none;
+}
+
+.vw-action-card:hover,
+.vw-small-button:hover {
+    background: rgba(255,255,255,0.18);
+    transform: translateY(-1px);
+}
+
+.vw-menu-button,
+.vw-small-button.primary,
+.notif-accept,
+.lbp-btn.lbp-add {
+    background: rgba(59, 130, 246, 0.88);
+    border: 1px solid rgba(147, 197, 253, 0.45);
+}
+
+.vw-menu-button:hover,
+.vw-small-button.primary:hover,
+.notif-accept:hover,
+.lbp-btn.lbp-add:hover {
+    background: var(--vw-ui-accent-hover);
+}
+
+.vw-menu-button-muted {
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.18);
+}
+
+.vw-menu-button-muted:hover {
+    background: rgba(255,255,255,0.27);
+}
+
+.vw-inline-buttons {
+    gap: 8px;
+}
+
+.vw-small-button:not(.primary) {
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.16);
+    color: rgba(255,255,255,0.9);
+}
+
+.vw-preset-row .vw-small-button {
+    min-width: 104px;
+}
+
+.sp-row[hidden],
+.vw-field[hidden],
+.vw-toggle-row[hidden] {
+    display: none !important;
+}
+
+.sp-row,
+.vw-field,
+.vw-toggle-row {
+    min-height: 44px;
+    padding: 9px 11px;
+}
+
+.sp-row input[type=range] {
+    accent-color: var(--vw-ui-accent);
+}
+
+.vw-toggle:checked {
+    background: var(--vw-ui-accent);
+    border-color: var(--vw-ui-accent-hover);
+}
+
+.vw-controls-panel {
+    gap: 14px;
+}
+
+.vw-keybind-group {
+    display: grid;
+    gap: 8px;
+}
+
+.vw-keybind-group h3 {
+    margin: 0;
+    color: var(--vw-ui-text);
+    font-size: 15px;
+    font-weight: 860;
+}
+
+.vw-keybind-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.vw-keybind-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 50px;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: var(--vw-ui-radius);
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.08);
+}
+
+.vw-keybind-row span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vw-keybind-row strong {
+    color: var(--vw-ui-text);
+    font-weight: 820;
+}
+
+.vw-keybind-row small {
+    color: var(--vw-ui-muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.vw-bind {
+    min-width: 86px;
+    min-height: 34px;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 9px;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.14);
+    color: var(--vw-ui-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 820;
+    cursor: pointer;
+}
+
+.vw-bind:hover,
+.vw-bind:focus-visible {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.32);
+    outline: none;
+}
+
+.vw-bind.empty {
+    color: var(--vw-ui-muted);
+}
+
+.vw-bind.listening {
+    color: #fff;
+    background: color-mix(in srgb, var(--vw-ui-accent) 65%, transparent);
+    border-color: var(--vw-ui-accent-hover);
+}
+
+.hud-btn,
+#chat-send,
+.vw-menu-button,
+.vw-menu-button-muted,
+.vw-small-button,
+.vw-action-card,
+.lbp-btn,
+.notif-btn {
+    color: rgba(255,255,255,0.92);
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+}
+
+.hud-btn,
+#chat-send,
+.vw-menu-button,
+.vw-menu-button-muted,
+.vw-small-button,
+.lbp-btn,
+.notif-btn {
+    backdrop-filter: var(--vw-ui-blur);
+}
+
+.hud-btn:hover,
+#chat-send:hover,
+.vw-menu-button:hover,
+.vw-menu-button-muted:hover,
+.vw-small-button:hover,
+.vw-action-card:hover,
+.lbp-btn:hover,
+.notif-btn:hover {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.28);
+    color: #fff;
+}
+
+.vw-small-button.primary,
+.vw-menu-button.primary,
+.notif-accept,
+.lbp-btn.lbp-add {
+    background: rgba(59,130,246,0.58);
+    border-color: rgba(147,197,253,0.42);
+}
+
+.vw-small-button.primary:hover,
+.vw-menu-button.primary:hover,
+.notif-accept:hover,
+.lbp-btn.lbp-add:hover {
+    background: rgba(96,165,250,0.72);
+}
+
+#lb-player-panel,
+.notif {
+    background: var(--vw-ui-glass-strong);
+    border: 1px solid var(--vw-ui-border-soft);
+    box-shadow: var(--vw-ui-shadow);
+    backdrop-filter: var(--vw-ui-blur);
+}
+
+.notif {
+    border-radius: var(--vw-ui-radius);
+}
+
+@keyframes vw-panel-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #chat-window,
+    .hud-btn,
+    .lb-row,
+    .vw-tab,
+    .vw-menu-section.active,
+    .vw-action-card,
+    .vw-small-button {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    #leaderboard.lb-hidden {
+        transform: none;
+    }
+}
+
+/* Final surface pass: keep controls on the translucent glass system without flattening settings rows. */
+body #hud .hud-btn,
+body #chat-send,
+body .vw-menu .vw-tab,
+body .vw-menu .vw-menu-button,
+body .vw-menu .vw-menu-button-muted,
+body .vw-menu .vw-small-button,
+body .vw-menu .vw-action-card,
+body .vw-menu .vw-bind,
+body .vw-menu .vw-select,
+body .vw-menu select,
+body .vw-menu input[type="text"],
+body #lb-player-panel .lbp-btn,
+body #notif-container .notif-btn {
+    background: rgba(255,255,255,0.12) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    color: var(--vw-ui-text) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.10) !important;
+    backdrop-filter: var(--vw-ui-blur);
+}
+
+body .vw-menu .sp-row,
+body .vw-menu .vw-field,
+body .vw-menu .vw-toggle-row,
+body .vw-menu .vw-keybind-row {
+    background: var(--vw-settings-surface, linear-gradient(135deg, rgba(255,255,255,0.13), rgba(255,255,255,0.07))) !important;
+    border: 1px solid var(--vw-settings-border, rgba(255,255,255,0.16)) !important;
+    color: var(--vw-ui-text) !important;
+    box-shadow: var(--vw-settings-shadow, inset 0 1px 0 rgba(255,255,255,0.08), 0 10px 28px rgba(0,0,0,0.08)) !important;
+    backdrop-filter: var(--vw-ui-blur);
+}
+
+body .vw-menu .vw-bind,
+body .vw-menu .vw-select,
+body .vw-menu select,
+body .vw-menu input[type="text"] {
+    background: var(--vw-settings-control, linear-gradient(135deg, rgba(255,255,255,0.17), rgba(255,255,255,0.09))) !important;
+    border-color: var(--vw-settings-control-border, rgba(255,255,255,0.20)) !important;
+}
+
+body #hud .hud-btn:hover,
+body #chat-send:hover,
+body .vw-menu .vw-tab:hover,
+body .vw-menu .vw-menu-button:hover,
+body .vw-menu .vw-menu-button-muted:hover,
+body .vw-menu .vw-small-button:hover,
+body .vw-menu .vw-action-card:hover,
+body .vw-menu .vw-bind:hover,
+body .vw-menu .vw-bind:focus-visible,
+body .vw-menu .vw-select:focus,
+body .vw-menu select:focus,
+body #lb-player-panel .lbp-btn:hover,
+body #notif-container .notif-btn:hover {
+    background: rgba(255,255,255,0.20) !important;
+    border-color: rgba(255,255,255,0.30) !important;
+    color: var(--vw-ui-text) !important;
+}
+
+body .vw-menu .vw-tab.active,
+body .vw-menu .vw-small-button.primary,
+body .vw-menu .vw-menu-button.primary,
+body .vw-menu .vw-bind.listening,
+body #notif-container .notif-accept,
+body #lb-player-panel .lbp-btn.lbp-add {
+    background: rgba(96,165,250,0.34) !important;
+    border-color: rgba(147,197,253,0.44) !important;
+}
+
+body .vw-menu .vw-action-card {
+    min-height: 128px;
+}
+
+body .vw-menu .vw-dependent-setting {
+    margin-left: 18px;
+    max-width: calc(100% - 18px);
+    background: var(--vw-settings-dependent-surface, linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.045))) !important;
+}
+
+body .vw-menu .vw-dependent-setting.sp-row,
+body .vw-menu .vw-dependent-setting.vw-field,
+body .vw-menu .vw-dependent-setting.vw-toggle-row {
+    min-height: 38px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+}
+
+body .vw-menu input[type="range"] {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    box-shadow: none !important;
+}
+
+body .vw-menu .sp-val,
+body .vw-menu .vw-field label,
+body .vw-menu .vw-toggle-label,
+body .vw-menu .sp-label {
+    color: var(--vw-ui-text) !important;
+}
+
+/* Canonical default in-game glass theme. This must remain last so older migrated styles cannot repaint settings dark. */
+body .vw-menu {
+    background: var(--vw-menu-surface, var(--vw-ui-glass-menu)) !important;
+    border-color: var(--vw-ui-border) !important;
+    box-shadow: 0 24px 90px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+    backdrop-filter: blur(18px) saturate(1.12) !important;
+}
+
+body .vw-menu-top,
+body .vw-menu-tabs {
+    background: var(--vw-menu-bar-surface) !important;
+    border-color: rgba(255,255,255,0.14) !important;
+}
+
+body .vw-menu-content {
+    background: transparent !important;
+}
+
+body .vw-menu .vw-action-card,
+body .vw-menu .vw-status,
+body .vw-menu .sp-row,
+body .vw-menu .vw-field,
+body .vw-menu .vw-toggle-row,
+body .vw-menu .vw-keybind-row,
+body .vw-menu .vw-dev-output,
+body .vw-menu .vw-menu-note {
+    background: var(--vw-panel-surface) !important;
+    border: 1px solid var(--vw-panel-border) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.09), 0 12px 30px rgba(0,0,0,0.10) !important;
+    backdrop-filter: blur(14px) saturate(1.08) !important;
+}
+
+body .vw-menu .vw-dependent-setting {
+    background: var(--vw-dependent-surface) !important;
+}
+
+body .vw-menu .vw-bind,
+body .vw-menu .vw-select,
+body .vw-menu select,
+body .vw-menu input[type="text"],
+body .vw-menu .vw-small-button,
+body .vw-menu .vw-menu-button,
+body .vw-menu .vw-menu-button-muted {
+    background: var(--vw-control-surface) !important;
+    border-color: var(--vw-control-border) !important;
+    color: var(--vw-ui-text) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 22px rgba(0,0,0,0.10) !important;
+}
+
+body .vw-menu .vw-tab {
+    background: var(--vw-tab-surface) !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+}
+
+body .vw-menu .vw-tab.active,
+body .vw-menu .vw-small-button.primary,
+body .vw-menu .vw-menu-button.primary,
+body .vw-menu .vw-bind.listening {
+    background: var(--vw-active-surface) !important;
+    border-color: var(--vw-active-border) !important;
 }

@@ -55,6 +55,7 @@ import { LeaderboardDomService } from "../ui/LeaderboardDomService";
 import { NotificationService } from "../ui/NotificationService";
 import { RuntimeSettingsPresenterService } from "../ui/RuntimeSettingsPresenter";
 import { SettingsMenuService } from "../ui/SettingsMenuService";
+import { ThemeService } from "../ui/ThemeService";
 import { EngineWorldRuntimeService } from "../world/EngineWorldRuntimeService";
 import { WorldBootstrapService } from "../world/WorldBootstrapService";
 import { WorldService } from "../world/WorldService";
@@ -65,7 +66,7 @@ import { WorldPartService } from "../world/WorldPartService";
 import { WorldPickingService } from "../world/WorldPickingService";
 import { WorldRuntimeService } from "../world/WorldRuntimeService";
 import { EventBus } from "./EventBus";
-import { EngineCompatibilityService } from "./EngineCompatibilityService";
+import { EngineRuntimeExportsService } from "./EngineRuntimeExportsService";
 import { EngineRuntimeBridgeService } from "./EngineRuntimeBridgeService";
 import { EngineSceneRuntimeService } from "./EngineSceneRuntimeService";
 import { FrameLoopService } from "./FrameLoopService";
@@ -83,6 +84,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
   const audio = new AudioService(options.window, options.document);
   const input = new InputService(options.document, options.window);
   const settingsMenu = new SettingsMenuService(options.document);
+  const theme = new ThemeService(options.document, options.window.localStorage).installGlobal(options.window as Window & Record<string, unknown>);
   let vortexApi: unknown = null;
   let physicsSyncTimer: number | null = null;
   const animation = new AnimationService();
@@ -95,7 +97,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     access: new AccessService(),
     platform,
     events,
-    engineCompatibility: new EngineCompatibilityService(),
+    engineExports: new EngineRuntimeExportsService(),
     engineRuntimeBridge: new EngineRuntimeBridgeService(),
     engineScene: new EngineSceneRuntimeService(),
     frameLoop: new FrameLoopService(),
@@ -166,6 +168,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
       menu: settingsMenu
     }),
     settingsMenu,
+    theme,
     debugVisuals: new DebugVisualService(),
     diagnostics,
     perf: new PerformanceService(options.window),
@@ -196,7 +199,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
 
 function readPhysicsBackend(windowRef: Window): PhysicsBackend {
   if (windowRef.localStorage.getItem("vwebRapierEnabled") === "1") return "rapier";
-  return "legacy";
+  return "static";
 }
 
 function startPhysicsSync(
@@ -207,14 +210,14 @@ function startPhysicsSync(
   setTimer: (timer: number | null) => void
 ): void {
   if (runtime.physics.backend !== "rapier") return;
-  if (!runtime.physics.syncStaticCollidersFromLegacy) return;
+  if (!runtime.physics.syncStaticColliders) return;
   const sync = () => {
     const vortex = readVortex();
     const getColliders = vortex && typeof vortex === "object" ? (vortex as { getColliders?: unknown }).getColliders : null;
     if (typeof getColliders !== "function") return;
     try {
       const colliders = getColliders();
-      if (Array.isArray(colliders)) runtime.physics.syncStaticCollidersFromLegacy?.(colliders);
+      if (Array.isArray(colliders)) runtime.physics.syncStaticColliders?.(colliders);
     } catch (error) {
       runtime.diagnostics.warn("physics.sync.failed", { error: error instanceof Error ? error.message : String(error) });
     }
@@ -232,22 +235,22 @@ function attachVortexRuntimeHandles(runtime: VortexRuntime, vortex: unknown): vo
   if (!vortex || typeof vortex !== "object") return;
   const api = vortex as Record<string, unknown>;
 
-  const rendererHandles: Parameters<VortexRuntime["renderer"]["attachLegacy"]>[0] = {};
+  const rendererHandles: Parameters<VortexRuntime["renderer"]["attachRuntimeAdapter"]>[0] = {};
   if (api.scene) rendererHandles.scene = api.scene;
   if (typeof api.getCamera === "function") rendererHandles.camera = api.getCamera();
   const globalRenderer = (globalThis as typeof globalThis & { renderer?: unknown }).renderer;
   if (globalRenderer) rendererHandles.renderer = globalRenderer;
-  runtime.renderer.attachLegacy(rendererHandles);
+  runtime.renderer.attachRuntimeAdapter(rendererHandles);
   const domElement = readRendererDomElement(globalRenderer);
   if (domElement) runtime.input.attachTarget(domElement);
 
-  runtime.world.attachLegacy({
+  runtime.world.attachRuntimeAdapter({
     pick: api.pick,
     getObjects: api.getObjects,
     getColliders: api.getColliders
   });
 
-  runtime.avatar.attachLegacy({
+  runtime.avatar.attachRuntimeAdapter({
     applyAvatar: api.applyAvatar,
     getAvatar: api.getAvatar
   });

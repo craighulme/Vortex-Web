@@ -17,10 +17,10 @@ describe("avatar service", () => {
     expect(avatar.attachments.Hat).toBe("asset-hat");
   });
 
-  it("normalizes legacy snake_case and camelCase avatar packets", () => {
+  it("normalizes snake_case and camelCase avatar packets", () => {
     const service = new AvatarService();
 
-    expect(service.normalizeLegacy({
+    expect(service.normalizeNative({
       shirt_id: 8,
       pantId: 3,
       body_type: "female",
@@ -35,10 +35,10 @@ describe("avatar service", () => {
     });
   });
 
-  it("normalizes partial legacy avatar packets against a fallback", () => {
+  it("normalizes partial native avatar packets against a fallback", () => {
     const service = new AvatarService();
 
-    expect(service.normalizeLegacy({ body_colors: ["00ff00"] }, {
+    expect(service.normalizeNative({ body_colors: ["00ff00"] }, {
       shirt_id: 8,
       pant_id: 3,
       body_type: "female",
@@ -53,12 +53,12 @@ describe("avatar service", () => {
     });
   });
 
-  it("creates the VortexAvatar console API from legacy avatar callbacks", async () => {
+  it("creates the VortexAvatar console API from runtime avatar callbacks", async () => {
     const applied: unknown[] = [];
     const persisted: unknown[] = [];
     const synced: unknown[] = [];
     const service = new AvatarService();
-    service.attachLegacy({
+    service.attachRuntimeAdapter({
       getAvatar: () => ({ shirt_id: 1, pant_id: 2, body_type: "male", body_colors: ["#ffffff"], face_id: 3 }),
       applyAvatar: async (avatar: unknown) => applied.push(avatar)
     });
@@ -84,7 +84,7 @@ describe("avatar service", () => {
   it("uses the default Vortex body palette when avatar colors are absent", () => {
     const service = new AvatarService();
 
-    expect(service.normalizeLegacy({})).toMatchObject({
+    expect(service.normalizeNative({})).toMatchObject({
       shirt_id: 0,
       pant_id: 0,
       body_type: "male",

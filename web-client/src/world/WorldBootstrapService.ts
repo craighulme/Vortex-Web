@@ -69,11 +69,11 @@ export class WorldBootstrapService {
 
   ready(runtime: RuntimeWorldBootstrap): boolean {
     const world = runtime.world;
-    if (!world || typeof world.loadOfficialMap !== "function" || typeof world.getLegacyHandles !== "function") return false;
-    const handles = world.getLegacyHandles();
-    return typeof handles.addStud === "function" &&
-      typeof handles.removeStud === "function" &&
-      typeof handles.createMesh === "function" &&
+    if (!world || typeof world.loadOfficialMap !== "function" || typeof world.getsceneHandles !== "function") return false;
+    const handles = world.getsceneHandles();
+    return typeof handles.addPart === "function" &&
+      typeof handles.removePart === "function" &&
+      typeof handles.createRuntimeMesh === "function" &&
       typeof handles.setSpawn === "function" &&
       Boolean(handles.scene) &&
       Boolean(handles.bufferGeometryUtils);
@@ -108,7 +108,7 @@ export class WorldBootstrapService {
         { P: [0, 0, 0], S: [320, 3.2, 320], C: "4db84b", Sh: "Block" }
       ], 0, 0, 0, { preserveWorldCoords: true, rotationRadians: true, rotationOrder: "XYZ" });
       const spawn = { x: 0, y: 10, z: 0, ry: 0 };
-      const setSpawn = world.getLegacyHandles?.().setSpawn;
+      const setSpawn = world.getsceneHandles?.().setSpawn;
       if (typeof setSpawn === "function") setSpawn(spawn.x, spawn.y, spawn.z, spawn.ry);
       this.setCurrentMap(runtime, {
         name: fallback.name,

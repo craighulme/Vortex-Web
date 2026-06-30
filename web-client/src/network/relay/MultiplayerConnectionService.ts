@@ -115,7 +115,7 @@ export class MultiplayerConnectionService {
   ): void {
     const hubUrl = this.multiplayer.buildHubUrl(context.config, launchInfo, localRelay, context.fallbackGameId || 0);
     try {
-      context.chat.system(`Vortex Web connecting relay: ${new URL(hubUrl).host}`);
+      context.chat.system(`Vortex Web connecting to relay`);
     } catch {
       // Keep connection setup resilient if URL parsing fails in older browser contexts.
     }

@@ -1,4 +1,4 @@
-import type { LegacyAvatarState } from "./AvatarService";
+import type { NativeAvatarState } from "./AvatarService";
 import type { RemotePlayerRecord, RemotePlayerService } from "./RemotePlayerService";
 
 type RemoteState = {
@@ -21,11 +21,11 @@ type AddRemoteOptions = {
   isBooster?: unknown;
   avatarData?: Record<string, unknown>;
   displayName(id: unknown, username: unknown): string;
-  normalizeAvatar(data: Record<string, unknown>): LegacyAvatarState;
+  normalizeAvatar(data: Record<string, unknown>): NativeAvatarState;
   readInitialState(data: Record<string, unknown>): RemoteState | null;
   createPosition(): VectorLike;
   canCreateMeshes(): boolean;
-  makeRemote(username: string, id: unknown, avatar: LegacyAvatarState): unknown;
+  makeRemote(username: string, id: unknown, avatar: NativeAvatarState): unknown;
   setNameLabel(remote: RemotePlayerRecord, username: string): void;
   decodeRemoteState(data: Record<string, unknown>, remote: RemotePlayerRecord, source: string): void;
   noteState(remote: RemotePlayerRecord, status: string, reason: string, data?: Record<string, unknown>, source?: string): void;
@@ -48,12 +48,12 @@ type RemoteScenePositionResult = {
 
 type ApplyRemoteStateOptions = {
   source?: string;
-  normalizeAvatar(data: Record<string, unknown>): LegacyAvatarState;
+  normalizeAvatar(data: Record<string, unknown>): NativeAvatarState;
   avatarSignature(avatar: unknown): string;
   avatarPatch(data: unknown): Record<string, unknown> | null;
   readScenePosition(data: Record<string, unknown>): RemoteScenePositionResult;
   noteState(remote: RemotePlayerRecord, status: string, reason: string, data?: Record<string, unknown>, source?: string): void;
-  applyAvatar(remote: RemotePlayerRecord, avatar: LegacyAvatarState): void;
+  applyAvatar(remote: RemotePlayerRecord, avatar: NativeAvatarState): void;
   logRejected?(data: Record<string, unknown>, reason: string): void;
   now?: number;
 };
@@ -63,7 +63,7 @@ type FrameOptions = {
   dt: number;
   now?: number;
   shouldAnimate?: boolean;
-  normalizeAvatar(input: Record<string, unknown>): LegacyAvatarState;
+  normalizeAvatar(input: Record<string, unknown>): NativeAvatarState;
   displayName(id: unknown, username: unknown): string;
   noteState(remote: RemotePlayerRecord, status: string, reason: string): void;
   animate(id: unknown, remote: RemotePlayerRecord, dt: number): void;
@@ -250,7 +250,7 @@ export class RemoteSessionService {
 
   rebuildAll(options: {
     service: RemotePlayerService;
-    normalizeAvatar(input: Record<string, unknown>): LegacyAvatarState;
+    normalizeAvatar(input: Record<string, unknown>): NativeAvatarState;
     onError?: (error: unknown) => void;
   }): void {
     const payload: Parameters<RemotePlayerService["rebuildAll"]>[0] = {

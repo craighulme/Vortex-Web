@@ -35,8 +35,8 @@ export type WorldRuntimeHandles = {
   partService: WorldPartService;
   objects: WorldPartService["objects"];
   colliders: WorldColliderService["colliders"];
-  addStud: WorldPartService["addStud"];
-  removeStud: WorldPartService["removeStud"];
+  addPart: WorldPartService["addPart"];
+  removePart: WorldPartService["removePart"];
   getNearbyColliders(px: number, py: number, pz: number): Set<WorldCollider>;
   useStudTextures(): boolean;
   applyStudTexturesToMaterial(material: unknown): void;
@@ -95,8 +95,8 @@ export class WorldRuntimeService {
       partService,
       objects: partService.objects,
       colliders: colliderService.colliders,
-      addStud: partService.addStud.bind(partService) as WorldPartService["addStud"],
-      removeStud: partService.removeStud.bind(partService) as WorldPartService["removeStud"],
+      addPart: partService.addPart.bind(partService) as WorldPartService["addPart"],
+      removePart: partService.removePart.bind(partService) as WorldPartService["removePart"],
       getNearbyColliders: (px, py, pz) => colliderService.getNearbyColliders(px, py, pz),
       useStudTextures: () => textureService.useStudTextures(),
       applyStudTexturesToMaterial,

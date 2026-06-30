@@ -1,11 +1,11 @@
-import { applyInitialTheme } from "./theme";
+import { installCustomSiteTheme } from "./theme";
 import { installPlayDocumentLoader } from "./playDocumentLoader";
 import { installUpdateNotifier } from "./updateNotifier";
 import { installPlayInBrowserButton } from "./playInBrowserButton";
 import "../cosmetics/VortexWebCosmetics.js";
 import "../cosmetics/ProfileCosmetics.js";
 
-applyInitialTheme();
+installCustomSiteTheme();
 installPlayDocumentLoader();
 installUpdateNotifier();
 installPlayInBrowserButton();

@@ -35,7 +35,7 @@ export type MultiplayerMessageRouterContext = {
     systemRed(message: string): void;
     systemPlayer(username: unknown, message: string): void;
     clearPlayerMsg(username: unknown): void;
-    message(username: string, message: unknown, self: boolean, isStaff: unknown, isOwner: unknown, isBooster: unknown): void;
+    message(username: string, message: unknown, self: boolean, isStaff: unknown, isOwner: unknown, isBooster: unknown, playerId?: unknown): void;
     warn(message: string): void;
   };
   bubble(id: unknown, message: unknown): void;
@@ -210,7 +210,7 @@ export class MultiplayerMessageRouter {
       ctx.addRemote(message.id, message.username, message.is_staff, message.is_booster, {});
     }
     const chatName = ctx.displayName(message.id, message.username);
-    ctx.chat.message(chatName, message.msg, message.id === ctx.selfId(), message.is_staff, message.is_owner, message.is_booster);
+    ctx.chat.message(chatName, message.msg, message.id === ctx.selfId(), message.is_staff, message.is_owner, message.is_booster, message.id);
     ctx.bubble(message.id, message.msg);
   }
 

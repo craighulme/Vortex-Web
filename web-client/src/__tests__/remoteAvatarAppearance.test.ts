@@ -6,7 +6,7 @@ function makeService(isWebGpuRuntime: boolean) {
   const service = new RemoteAvatarAppearanceService().configure({
     isWebGpuRuntime,
     avatarService: {
-      normalizeLegacy: (avatar: Record<string, unknown>) => ({
+      normalizeNative: (avatar: Record<string, unknown>) => ({
         shirt_id: Number(avatar.shirt_id || 0),
         pant_id: Number(avatar.pant_id || 0),
         body_type: "male",
@@ -37,7 +37,7 @@ function makeFallbackService() {
   const service = new RemoteAvatarAppearanceService().configure({
     isWebGpuRuntime: true,
     avatarService: {
-      normalizeLegacy: (avatar: Record<string, unknown>) => ({
+      normalizeNative: (avatar: Record<string, unknown>) => ({
         shirt_id: Number(avatar.shirt_id || 0),
         pant_id: 0,
         body_type: "male",
@@ -67,7 +67,7 @@ describe("RemoteAvatarAppearanceService", () => {
     expect(service.buildFaceOverlay({})).toBe("faceMesh");
   });
 
-  it("prepares legacy materials instead of overlays outside WebGPU", () => {
+  it("prepares runtime materials instead of overlays outside WebGPU", () => {
     const { service, calls } = makeService(false);
 
     expect(service.buildShirtOverlay({})).toBeNull();

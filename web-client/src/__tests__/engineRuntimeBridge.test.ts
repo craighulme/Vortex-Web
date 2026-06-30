@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EngineRuntimeBridgeService } from "../runtime/EngineRuntimeBridgeService";
 
 describe("EngineRuntimeBridgeService", () => {
-  it("installs quality, compatibility, frame loop, and vortex api", () => {
+  it("installs quality, runtime exports, frame loop, and vortex api", () => {
     const windowRef = { requestAnimationFrame: () => 0 } as unknown as Window & Record<string, unknown>;
     const localMovement = {
       getGrounded: () => true,
@@ -14,7 +14,7 @@ describe("EngineRuntimeBridgeService", () => {
       setMovementMods: () => ({ fly: true }),
       getClimbState: () => "none"
     };
-    const compatibility = {
+    const runtimeExports = {
       installed: null as unknown,
       install(options: unknown) {
         this.installed = options;
@@ -88,10 +88,10 @@ describe("EngineRuntimeBridgeService", () => {
       } as any,
       rendererService: { detectRendererBackend: () => "webgpu", diagnoseScene: () => ({}) } as any,
       quality: quality as any,
-      compatibility: compatibility as any,
+      runtimeExports: runtimeExports as any,
       frameLoop: frameLoop as any,
       profiler: { begin: () => ({}), mark: () => {}, end: () => {} },
-      worldService: { attachLegacy: () => {} },
+      worldService: { attachRuntimeAdapter: () => {} },
       worldRuntime: {
         textureService: { snapshot: () => ({ textures: 1 }), setStudTextures: () => {} },
         geometryService: { snapshot: () => ({ geometries: 1 }) },
@@ -99,8 +99,8 @@ describe("EngineRuntimeBridgeService", () => {
         partService: { snapshot: () => ({}) },
         objects: [],
         colliders: [],
-        addStud: () => {},
-        removeStud: () => {},
+        addPart: () => {},
+        removePart: () => {},
         useStudTextures: () => true,
         refreshStudMaterialTextures: () => {},
         textureDiagnostics: () => []
@@ -120,6 +120,7 @@ describe("EngineRuntimeBridgeService", () => {
       update: () => {},
       updateCamera: () => {},
       updateDebug: () => {},
+      updateMultiplayer: () => {},
       updateLighting: () => {}
     });
 
@@ -136,7 +137,7 @@ describe("EngineRuntimeBridgeService", () => {
     expect(apiMethods.getCharBubbleBase()).toBe(13.4);
     expect(windowRef._vortex).toBe(api);
     expect(quality.configured).toBeTruthy();
-    expect(compatibility.installed).toBeTruthy();
+    expect(runtimeExports.installed).toBeTruthy();
     expect(frameLoop.started).toBeTruthy();
   });
 });

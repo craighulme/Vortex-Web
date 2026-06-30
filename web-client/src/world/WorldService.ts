@@ -17,7 +17,7 @@ export type WorldPart = {
   transparency?: number;
   shape?: string;
   type?: string;
-  legacyId?: unknown;
+  runtimePartId?: unknown;
 };
 
 export type RawMapPart = {
@@ -41,7 +41,7 @@ export type RawMapPart = {
 export type LoadedWorldMap = {
   name: string;
   partIds: string[];
-  legacyBatchMeshes?: unknown[];
+  batchMeshes?: unknown[];
   spawn?: { x: number; y: number; z: number; ry: number };
   bounds: {
     minX: number;
@@ -62,10 +62,10 @@ export type LoadMapOptions = {
   rotationOrder?: string;
 };
 
-export type LegacyWorldHandles = {
-  addStud?: unknown;
-  removeStud?: unknown;
-  createMesh?: unknown;
+export type WorldSceneHandles = {
+  addPart?: unknown;
+  removePart?: unknown;
+  createRuntimeMesh?: unknown;
   createGeometry?: unknown;
   scene?: unknown;
   objects?: unknown;
@@ -85,16 +85,16 @@ export type FetchMap = (input: string, init?: Record<string, unknown>) => Promis
 
 export class WorldService {
   readonly entities = new EntityRegistry();
-  private legacyHandles: LegacyWorldHandles = {};
+  private sceneHandles: WorldSceneHandles = {};
   private readonly renderChunks = new WorldRenderChunkService();
   private readonly maps = new Map<string, LoadedWorldMap>();
 
-  attachLegacy(handles: LegacyWorldHandles): void {
-    this.legacyHandles = { ...this.legacyHandles, ...handles };
+  attachRuntimeAdapter(handles: WorldSceneHandles): void {
+    this.sceneHandles = { ...this.sceneHandles, ...handles };
   }
 
-  getLegacyHandles(): LegacyWorldHandles {
-    return { ...this.legacyHandles };
+  getsceneHandles(): WorldSceneHandles {
+    return { ...this.sceneHandles };
   }
 
   registerPart(part: WorldPart): EntityRecord<WorldPart> {
@@ -126,11 +126,11 @@ export class WorldService {
       const parsed = normalizeRawPart(mapData[i], i, ox, oy, oz, rotationScale, options.rotationOrder);
       const entity = this.registerPart(parsed);
       partIds.push(entity.id);
-      const sourceMesh = this.addLegacyPart(entity.data);
+      const sourceMesh = this.addRuntimePart(entity.data);
       if (sourceMesh) sourceMeshes.push(sourceMesh);
     }
-    const legacyBatchMeshes = this.createLegacyMapBatches(name, sourceMeshes);
-    const loaded: LoadedWorldMap = { name, partIds, bounds, legacyBatchMeshes };
+    const batchMeshes = this.createMapBatches(name, sourceMeshes);
+    const loaded: LoadedWorldMap = { name, partIds, bounds, batchMeshes };
     this.maps.set(name, loaded);
     return loaded;
   }
@@ -155,7 +155,7 @@ export class WorldService {
       ry: 0
     };
     loaded.spawn = spawn;
-    this.setLegacySpawn(spawn);
+    this.setRuntimeSpawn(spawn);
     this.maps.set(name, loaded);
     return loaded;
   }
@@ -164,7 +164,7 @@ export class WorldService {
     const loaded = this.maps.get(name);
     if (!loaded) return false;
     for (const id of loaded.partIds) this.remove(id);
-    for (const mesh of loaded.legacyBatchMeshes ?? []) this.removeLegacyBatchMesh(mesh);
+    for (const mesh of loaded.batchMeshes ?? []) this.removeBatchMesh(mesh);
     this.maps.delete(name);
     return true;
   }
@@ -203,14 +203,14 @@ export class WorldService {
 
   remove(id: string): boolean {
     const entity = this.entities.get<WorldPart>(id);
-    if (entity?.data.legacyId !== undefined) this.removeLegacyPart(entity.data.legacyId);
+    if (entity?.data.runtimePartId !== undefined) this.removeRuntimePart(entity.data.runtimePartId);
     return this.entities.remove(id);
   }
 
-  private addLegacyPart(part: WorldPart): unknown | null {
-    const addStud = this.legacyHandles.addStud;
-    if (typeof addStud === "function") {
-      const result = addStud(
+  private addRuntimePart(part: WorldPart): unknown | null {
+    const addPart = this.sceneHandles.addPart;
+    if (typeof addPart === "function") {
+      const result = addPart(
         part.size[0],
         part.size[1],
         part.size[2],
@@ -229,7 +229,7 @@ export class WorldService {
         part.type
       );
       if (Array.isArray(result)) {
-        part.legacyId = result[1];
+        part.runtimePartId = result[1];
         return result[0] ?? null;
       }
       return null;
@@ -237,28 +237,28 @@ export class WorldService {
     return null;
   }
 
-  private removeLegacyPart(legacyId: unknown): void {
-    const removeStud = this.legacyHandles.removeStud;
-    if (typeof removeStud === "function") {
-      removeStud(legacyId);
+  private removeRuntimePart(runtimePartId: unknown): void {
+    const removePart = this.sceneHandles.removePart;
+    if (typeof removePart === "function") {
+      removePart(runtimePartId);
       return;
     }
   }
 
-  private createLegacyMapBatches(name: string, sourceMeshes: unknown[]): unknown[] {
-    const mergeGeometries = readFunction(this.legacyHandles.bufferGeometryUtils, "mergeGeometries") as ((geometries: LegacyGeometryLike[]) => LegacyGeometryLike | null) | null;
-    const createMesh = this.legacyHandles.createMesh;
-    const createGeometry = this.legacyHandles.createGeometry;
-    const sceneAdd = readFunction(this.legacyHandles.scene, "add");
-    const objects = Array.isArray(this.legacyHandles.objects) ? this.legacyHandles.objects : null;
-    if (!sourceMeshes.length || typeof mergeGeometries !== "function" || typeof createMesh !== "function" || typeof sceneAdd !== "function") {
+  private createMapBatches(name: string, sourceMeshes: unknown[]): unknown[] {
+    const mergeGeometries = readFunction(this.sceneHandles.bufferGeometryUtils, "mergeGeometries") as ((geometries: RuntimeGeometryLike[]) => RuntimeGeometryLike | null) | null;
+    const createRuntimeMesh = this.sceneHandles.createRuntimeMesh;
+    const createGeometry = this.sceneHandles.createGeometry;
+    const sceneAdd = readFunction(this.sceneHandles.scene, "add");
+    const objects = Array.isArray(this.sceneHandles.objects) ? this.sceneHandles.objects : null;
+    if (!sourceMeshes.length || typeof mergeGeometries !== "function" || typeof createRuntimeMesh !== "function" || typeof sceneAdd !== "function") {
       return [];
     }
 
-    const geometries = new Map<string, LegacyGeometryLike[]>();
+    const geometries = new Map<string, RuntimeGeometryLike[]>();
     const materials = new Map<string, { material: unknown; disableCastShadow: boolean; chunkKey: string }>();
     for (const source of sourceMeshes) {
-      const mesh = source as LegacyMeshLike;
+      const mesh = source as RuntimeMeshLike;
       const disableCastShadow = mesh.userData?.vwebDisableCastShadow === true;
       const chunkKey = typeof mesh.userData?.vwebRenderChunk === "string" ? mesh.userData.vwebRenderChunk : "0,0";
       const materialKey = Array.isArray(mesh.material)
@@ -282,7 +282,7 @@ export class WorldService {
       const materialInfo = materials.get(key);
       if (materialInfo && Array.isArray(materialInfo.material) && typeof createGeometry === "function") {
         const geometryFactory = createGeometry as (...args: unknown[]) => unknown;
-        const meshFactory = createMesh as (...args: unknown[]) => unknown;
+        const meshFactory = createRuntimeMesh as (...args: unknown[]) => unknown;
         batches.push(...this.createSplitMaterialBatches(
           name,
           key,
@@ -306,7 +306,7 @@ export class WorldService {
       for (const geometry of value) disposeGeometry(geometry);
       merged.computeBoundingBox?.();
       merged.computeBoundingSphere?.();
-      const mergedMesh = createMesh(merged, materialInfo.material) as LegacyMeshLike;
+      const mergedMesh = createRuntimeMesh(merged, materialInfo.material) as RuntimeMeshLike;
       mergedMesh.userData = {
         ...(mergedMesh.userData || {}),
         vwebRuntimeKind: "world-map-batch",
@@ -315,7 +315,7 @@ export class WorldService {
         vwebRenderChunk: materialInfo.chunkKey,
         vwebRenderBatchParts: value.length
       };
-      const shadows = this.legacyShadowsActive();
+      const shadows = this.runtimeShadowsActive();
       if (materialInfo.disableCastShadow) mergedMesh.userData.vwebDisableCastShadow = true;
       mergedMesh.castShadow = shadows && !materialInfo.disableCastShadow;
       mergedMesh.receiveShadow = shadows;
@@ -323,7 +323,7 @@ export class WorldService {
       mergedMesh.frustumCulled = true;
       mergedMesh.updateMatrix?.();
       this.renderChunks.register(mergedMesh, name, materialInfo.chunkKey, geometryBounds(merged));
-      sceneAdd.call(this.legacyHandles.scene, mergedMesh);
+      sceneAdd.call(this.sceneHandles.scene, mergedMesh);
       objects?.push(mergedMesh);
       batches.push(mergedMesh);
     }
@@ -334,16 +334,16 @@ export class WorldService {
     name: string,
     key: string,
     chunkKey: string,
-    sourceGeometries: LegacyGeometryLike[],
+    sourceGeometries: RuntimeGeometryLike[],
     materialInfo: { material: Array<unknown>; disableCastShadow: boolean },
-    mergeGeometries: (geometries: LegacyGeometryLike[]) => LegacyGeometryLike | null,
-    createMesh: (...args: unknown[]) => unknown,
+    mergeGeometries: (geometries: RuntimeGeometryLike[]) => RuntimeGeometryLike | null,
+    createRuntimeMesh: (...args: unknown[]) => unknown,
     createGeometry: (...args: unknown[]) => unknown,
     sceneAdd: (...args: unknown[]) => unknown,
     objects: unknown[] | null
   ): unknown[] {
-    const topGeometries: LegacyGeometryLike[] = [];
-    const sideGeometries: LegacyGeometryLike[] = [];
+    const topGeometries: RuntimeGeometryLike[] = [];
+    const sideGeometries: RuntimeGeometryLike[] = [];
     for (const geometry of sourceGeometries) {
       const count = geometry.attributes?.position?.count || 0;
       if (count === 36) {
@@ -358,15 +358,15 @@ export class WorldService {
     }
 
     const batches: unknown[] = [];
-    const shadows = this.legacyShadowsActive();
-    const addBatch = (faceKind: string, batchGeometries: LegacyGeometryLike[], material: unknown) => {
+    const shadows = this.runtimeShadowsActive();
+    const addBatch = (faceKind: string, batchGeometries: RuntimeGeometryLike[], material: unknown) => {
       if (!batchGeometries.length) return;
       const merged = mergeGeometries(batchGeometries);
       for (const geometry of batchGeometries) disposeGeometry(geometry);
       if (!merged) return;
       merged.computeBoundingBox?.();
       merged.computeBoundingSphere?.();
-      const mesh = createMesh(merged, material) as LegacyMeshLike;
+      const mesh = createRuntimeMesh(merged, material) as RuntimeMeshLike;
       mesh.userData = {
         ...(mesh.userData || {}),
         vwebRuntimeKind: "world-map-batch",
@@ -383,7 +383,7 @@ export class WorldService {
       mesh.frustumCulled = true;
       mesh.updateMatrix?.();
       this.renderChunks.register(mesh, name, chunkKey, geometryBounds(merged));
-      sceneAdd.call(this.legacyHandles.scene, mesh);
+      sceneAdd.call(this.sceneHandles.scene, mesh);
       objects?.push(mesh);
       batches.push(mesh);
     };
@@ -393,25 +393,25 @@ export class WorldService {
     return batches;
   }
 
-  private removeLegacyBatchMesh(mesh: unknown): void {
-    const sceneRemove = readFunction(this.legacyHandles.scene, "remove");
-    if (sceneRemove) sceneRemove.call(this.legacyHandles.scene, mesh);
-    this.renderChunks.unregister(mesh as LegacyMeshLike);
-    const objects = Array.isArray(this.legacyHandles.objects) ? this.legacyHandles.objects : null;
+  private removeBatchMesh(mesh: unknown): void {
+    const sceneRemove = readFunction(this.sceneHandles.scene, "remove");
+    if (sceneRemove) sceneRemove.call(this.sceneHandles.scene, mesh);
+    this.renderChunks.unregister(mesh as RuntimeMeshLike);
+    const objects = Array.isArray(this.sceneHandles.objects) ? this.sceneHandles.objects : null;
     if (objects) {
       const index = objects.indexOf(mesh);
       if (index !== -1) objects.splice(index, 1);
     }
-    disposeGeometry((mesh as LegacyMeshLike)?.geometry);
+    disposeGeometry((mesh as RuntimeMeshLike)?.geometry);
   }
 
-  private setLegacySpawn(spawn: { x: number; y: number; z: number; ry: number }): void {
-    const setSpawn = this.legacyHandles.setSpawn;
+  private setRuntimeSpawn(spawn: { x: number; y: number; z: number; ry: number }): void {
+    const setSpawn = this.sceneHandles.setSpawn;
     if (typeof setSpawn === "function") setSpawn(spawn.x, spawn.y, spawn.z, spawn.ry);
   }
 
-  private legacyShadowsActive(): boolean {
-    const shadowsActive = this.legacyHandles.shadowsActive;
+  private runtimeShadowsActive(): boolean {
+    const shadowsActive = this.sceneHandles.shadowsActive;
     if (typeof shadowsActive !== "function") return false;
     try {
       return !!shadowsActive();
@@ -421,10 +421,10 @@ export class WorldService {
   }
 }
 
-type LegacyMeshLike = {
+type RuntimeMeshLike = {
   userData?: Record<string, unknown>;
   material?: { uuid?: string } | Array<{ uuid?: string }>;
-  geometry?: LegacyGeometryLike;
+  geometry?: RuntimeGeometryLike;
   matrix?: unknown;
   visible?: boolean;
   castShadow?: boolean;
@@ -434,10 +434,10 @@ type LegacyMeshLike = {
   updateMatrix?: () => void;
 };
 
-type LegacyGeometryLike = {
-  clone?: () => LegacyGeometryLike;
+type RuntimeGeometryLike = {
+  clone?: () => RuntimeGeometryLike;
   applyMatrix4?: (matrix: unknown) => void;
-  attributes?: Record<string, LegacyAttributeLike | undefined>;
+  attributes?: Record<string, RuntimeAttributeLike | undefined>;
   boundingBox?: {
     min?: { x?: number; y?: number; z?: number };
     max?: { x?: number; y?: number; z?: number };
@@ -449,7 +449,7 @@ type LegacyGeometryLike = {
   addGroup?: (start: number, count: number, materialIndex: number) => void;
 };
 
-type LegacyAttributeLike = {
+type RuntimeAttributeLike = {
   array?: ArrayLike<number>;
   itemSize?: number;
   count?: number;
@@ -492,7 +492,7 @@ function readFunction(target: unknown, key: string): ((...args: unknown[]) => un
   return typeof value === "function" ? value as (...args: unknown[]) => unknown : null;
 }
 
-function applyBoxFaceGroups(merged: LegacyGeometryLike, sourceGeometries: LegacyGeometryLike[]): void {
+function applyBoxFaceGroups(merged: RuntimeGeometryLike, sourceGeometries: RuntimeGeometryLike[]): void {
   merged?.clearGroups?.();
   let offset = 0;
   for (const geometry of sourceGeometries) {
@@ -507,10 +507,10 @@ function applyBoxFaceGroups(merged: LegacyGeometryLike, sourceGeometries: Legacy
 }
 
 function extractFaces(
-  geometry: LegacyGeometryLike,
+  geometry: RuntimeGeometryLike,
   faces: number[],
   createGeometry: (...args: unknown[]) => unknown
-): LegacyGeometryLike | null {
+): RuntimeGeometryLike | null {
   const attributes = geometry.attributes || {};
   const position = attributes.position;
   if (!position?.array || !position.itemSize) return null;
@@ -526,14 +526,14 @@ function extractFaces(
     }
     output[name] = { array: new Float32Array(values), itemSize: attribute.itemSize };
   }
-  return createGeometry(output) as LegacyGeometryLike;
+  return createGeometry(output) as RuntimeGeometryLike;
 }
 
 function disposeGeometry(geometry: unknown): void {
   (geometry as { dispose?: () => void } | null)?.dispose?.();
 }
 
-function geometryBounds(geometry: LegacyGeometryLike): WorldRenderChunkBounds | null {
+function geometryBounds(geometry: RuntimeGeometryLike): WorldRenderChunkBounds | null {
   const min = geometry.boundingBox?.min;
   const max = geometry.boundingBox?.max;
   const minX = Number(min?.x);

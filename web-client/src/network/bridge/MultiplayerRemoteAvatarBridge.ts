@@ -27,7 +27,7 @@ export function createMultiplayerRemoteAvatarBridge(context) {
   }
 
   function animate(id, remote, dt) {
-    window.VortexRuntime?.animation?.animateLegacyRemote?.(remote, dt);
+    window.VortexRuntime?.animation?.animateRuntimeRemote?.(remote, dt);
   }
 
   return {

@@ -22,6 +22,14 @@ type ScriptInfo = {
     type: string;
 };
 
+type VortexWebDisplaySettings = {
+    chatNameGradients: boolean;
+    leaderboardCosmetics: boolean;
+    miniProfileCosmetics: boolean;
+    siteProfileCosmetics: boolean;
+    runtimeThemeCss: string;
+};
+
 declare global {
     interface Window {
         VortexWebCosmetics?: {
@@ -32,6 +40,8 @@ declare global {
 }
 
 const runtimeApi = requireRuntimeApi();
+const extensionApi = (globalThis as typeof globalThis & { chrome?: any; browser?: any }).chrome
+    || (globalThis as typeof globalThis & { chrome?: any; browser?: any }).browser;
 
 function requireRuntimeApi(): RuntimeApi {
     const extensionApi = (globalThis as typeof globalThis & { chrome?: MinimalExtensionApi; browser?: MinimalExtensionApi }).chrome
@@ -79,8 +89,11 @@ const runtimeScriptMap = new Map([
     ["vortex-engine.js", "runtime/boot.iife.js"]
 ]);
 
+const LEGACY_DEFAULT_RUNTIME_THEME_MARKER = "/* Vortex Web default in-game theme */";
+
 let vwebLaunchConfig: LaunchConfig | null = null;
 const vwebBrokerSockets = new Map<string, WebSocket>();
+let runtimeThemeBridgeInstalled = false;
 
 function isLocalRelayUrl(value: unknown): boolean {
     try {
@@ -244,6 +257,54 @@ async function readLaunchConfig(launchId: string | null): Promise<LaunchConfig |
     return null;
 }
 
+async function readVortexWebSettings(): Promise<VortexWebDisplaySettings> {
+    const defaults = {
+        chatNameGradients: true,
+        leaderboardCosmetics: true,
+        miniProfileCosmetics: true,
+        siteProfileCosmetics: true,
+        runtimeThemeCss: "",
+        vwebThemeRuntimeCss: ""
+    };
+    try {
+        const result = extensionApi?.storage?.local?.get?.(defaults);
+        const stored = result && typeof result.then === "function"
+            ? await result
+            : await new Promise<Record<string, unknown>>((resolve) => extensionApi.storage.local.get(defaults, resolve));
+        return {
+            chatNameGradients: stored.chatNameGradients !== false,
+            leaderboardCosmetics: stored.leaderboardCosmetics !== false,
+            miniProfileCosmetics: stored.miniProfileCosmetics !== false,
+            siteProfileCosmetics: stored.siteProfileCosmetics !== false,
+            runtimeThemeCss: normalizeRuntimeThemeCss(stored.vwebThemeRuntimeCss)
+        };
+    } catch {
+        return defaults;
+    }
+}
+
+function normalizeRuntimeThemeCss(value: unknown): string {
+    const css = String(value || "").trim();
+    if (!css) return "";
+    if (!css.replace(/\/\*[\s\S]*?\*\//g, "").trim()) return "";
+    if (css.includes(LEGACY_DEFAULT_RUNTIME_THEME_MARKER)) return "";
+    return css;
+}
+
+function installRuntimeThemeBridge(): void {
+    if (runtimeThemeBridgeInstalled) return;
+    runtimeThemeBridgeInstalled = true;
+    try {
+        extensionApi?.storage?.onChanged?.addListener?.((changes: Record<string, { newValue?: unknown }>, area: string) => {
+            if (area !== "local" || !changes.vwebThemeRuntimeCss) return;
+            window.postMessage({
+                vwebRuntimeTheme: true,
+                css: normalizeRuntimeThemeCss(changes.vwebThemeRuntimeCss.newValue)
+            }, location.origin);
+        });
+    } catch {}
+}
+
 function stripLaunchParams(): void {
     const clean = new URL(location.href);
     clean.searchParams.delete("VWEBLaunch");
@@ -255,6 +316,7 @@ function stripLaunchParams(): void {
 async function rewritePlayDocument(html: string, url: URL, documentRef: Document): Promise<void> {
     const parsed = new DOMParser().parseFromString(html, "text/html");
     const launchConfig = await readLaunchConfig(url.searchParams.get("VWEBLaunch"));
+    const vortexWebSettings = await readVortexWebSettings();
     const cosmetics = window.VortexWebCosmetics;
     const cosmeticsState = cosmetics?.load
         ? await cosmetics.load().catch(() => null)
@@ -298,6 +360,7 @@ async function rewritePlayDocument(html: string, url: URL, documentRef: Document
         identity: pageSafeIdentity(readRecord(identity))
     });
     appendMeta(documentRef, "_vortexWebCosmetics", cosmeticsState || { ownUserId: null, records: {} });
+    appendMeta(documentRef, "_vortexWebSettings", vortexWebSettings);
     appendMeta(documentRef, "_vortexCommunityApi", cosmetics?.API_BASE || "https://v22.irongiant.vip");
 
     for (const scriptInfo of scripts) {
@@ -309,6 +372,7 @@ export function installPlayDocumentLoader(documentRef: Document = document, fetc
     const url = new URL(documentRef.URL);
     const play = url.searchParams.get("Play");
     if (play) {
+        installRuntimeThemeBridge();
         takeoverPlayDocument(documentRef);
         void initPlayDocument(url, documentRef, fetcher);
     } else {

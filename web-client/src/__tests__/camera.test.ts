@@ -11,7 +11,7 @@ describe("CameraService", () => {
     expect(camera.state.pitch).toBe(camera.state.maxPitch);
   });
 
-  it("keeps the legacy wheel zoom clamp", () => {
+  it("keeps the wheel zoom clamp", () => {
     const camera = new CameraService();
 
     camera.zoomWheel(-100000);

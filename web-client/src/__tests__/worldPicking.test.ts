@@ -35,7 +35,7 @@ describe("WorldPickingService", () => {
     expect(raycasterState.camera).toBe(camera);
   });
 
-  it("keeps the legacy false tuple when nothing is hit", () => {
+  it("keeps the false tuple when nothing is hit", () => {
     const service = new WorldPickingService().configure({ Raycaster: FakeRaycaster, Vector3: FakeVector3 });
     raycasterState.intersections = [];
 

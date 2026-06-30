@@ -1,35 +1,35 @@
-import type { LegacyAvatarState } from "./AvatarService";
+import type { NativeAvatarState } from "./AvatarService";
 
 export type RemotePlayerMeshes = {
-  grp: LegacyObject3D;
-  proxy?: LegacyObject3D | null;
-  bones: Record<string, LegacyBone>;
-  rest: Record<string, LegacyBoneRest>;
+  grp: RuntimeObject3D;
+  proxy?: RuntimeObject3D | null;
+  bones: Record<string, RigBone>;
+  rest: Record<string, RigBoneRest>;
   shirtMesh?: unknown;
   pantsMesh?: unknown;
   faceMesh?: unknown;
-  nameSprite?: LegacySprite;
+  nameSprite?: RuntimeSprite;
 };
 
 type RemotePlayerServiceConfig = {
   THREE: ThreeLike;
   document: Document;
-  vortex: LegacyVortexApi;
+  vortex: RuntimeVortexApi;
 };
 
-type LegacyVortexApi = {
+type RuntimeVortexApi = {
   scene: { add(object: unknown): void; remove(object: unknown): void };
-  getCharacter(): LegacyObject3D | null;
-  getAnimRest(): Record<string, LegacyBoneRest>;
+  getCharacter(): RuntimeObject3D | null;
+  getAnimRest(): Record<string, RigBoneRest>;
   getCharFootOffset(): number;
   getCharHeight(): number;
-  buildShirtOverlay(group: LegacyObject3D): unknown;
-  buildPantsOverlay?: (group: LegacyObject3D) => unknown;
-  buildFaceOverlay?: (group: LegacyObject3D) => unknown;
+  buildShirtOverlay(group: RuntimeObject3D): unknown;
+  buildPantsOverlay?: (group: RuntimeObject3D) => unknown;
+  buildFaceOverlay?: (group: RuntimeObject3D) => unknown;
   applyAvatarToMeshes?: (meshes: RemotePlayerMeshes, avatar: RemoteAvatarContext) => void;
 };
 
-type LegacyObject3D = {
+type RuntimeObject3D = {
   name?: string;
   type?: string;
   isBone?: boolean;
@@ -39,81 +39,81 @@ type LegacyObject3D = {
   visible?: boolean;
   parent?: { remove?(object: unknown): void };
   userData: Record<string, unknown>;
-  material?: LegacyMaterial | LegacyMaterial[];
+  material?: RuntimeMaterial | RuntimeMaterial[];
   geometry?: unknown;
   castShadow?: boolean;
   receiveShadow?: boolean;
-  skeleton?: { bones: LegacyBone[]; boneInverses: Array<{ clone(): unknown }> };
+  skeleton?: { bones: RigBone[]; boneInverses: Array<{ clone(): unknown }> };
   bindMatrix?: { clone(): unknown };
   rotation: { y?: number; set?(x: number, y: number, z: number): void };
-  position: LegacyVector3;
-  clone(recursive?: boolean): LegacyObject3D;
-  traverse(visitor: (object: LegacyObject3D) => void): void;
+  position: RuntimeVector3;
+  clone(recursive?: boolean): RuntimeObject3D;
+  traverse(visitor: (object: RuntimeObject3D) => void): void;
   bind?(skeleton: unknown, bindMatrix: unknown): void;
   add?(object: unknown): void;
   scale?: { set?(x: number, y: number, z: number): void };
 };
 
-type LegacyBone = LegacyObject3D & {
+type RigBone = RuntimeObject3D & {
   rotation: { set?(x: number, y: number, z: number): void } & Record<string, number>;
-  position: LegacyVector3;
+  position: RuntimeVector3;
 };
 
-type LegacyVector3 = {
+type RuntimeVector3 = {
   x?: number;
   y: number;
   z?: number;
-  clone?(): LegacyVector3;
-  copy?(value: LegacyVector3): void;
-  lerp?(value: LegacyVector3, alpha: number): void;
+  clone?(): RuntimeVector3;
+  copy?(value: RuntimeVector3): void;
+  lerp?(value: RuntimeVector3, alpha: number): void;
   set?(x: number, y: number, z: number): void;
 };
 
-type LegacyBoneRest = {
+type RigBoneRest = {
   x?: number;
   y?: number;
   z?: number;
   py?: number;
 };
 
-type LegacyMaterial = {
-  clone?(): LegacyMaterial;
+type RuntimeMaterial = {
+  clone?(): RuntimeMaterial;
   dispose?(): void;
   map?: { dispose?(): void };
 };
 
-type LegacySprite = LegacyObject3D & {
-  material?: LegacyMaterial;
+type RuntimeSprite = RuntimeObject3D & {
+  material?: RuntimeMaterial;
   scale: { set(x: number, y: number, z: number): void };
 };
 
 type ThreeLike = {
-  Group?: new () => LegacyObject3D;
-  Mesh?: new (geometry: unknown, material: unknown) => LegacyObject3D;
+  Group?: new () => RuntimeObject3D;
+  Mesh?: new (geometry: unknown, material: unknown) => RuntimeObject3D;
   BoxGeometry?: new (x: number, y: number, z: number) => unknown;
-  MeshStandardMaterial?: new (options: Record<string, unknown>) => LegacyMaterial;
-  Skeleton: new (bones: LegacyBone[], boneInverses: unknown[]) => unknown;
+  MeshStandardMaterial?: new (options: Record<string, unknown>) => RuntimeMaterial;
+  Skeleton: new (bones: RigBone[], boneInverses: unknown[]) => unknown;
   CanvasTexture: new (canvas: HTMLCanvasElement) => unknown;
-  SpriteMaterial: new (options: Record<string, unknown>) => LegacyMaterial;
-  Sprite: new (material: LegacyMaterial) => LegacySprite;
-  Box3?: new () => LegacyBox3;
+  SpriteMaterial: new (options: Record<string, unknown>) => RuntimeMaterial;
+  Sprite: new (material: RuntimeMaterial) => RuntimeSprite;
+  Box3?: new () => RuntimeBox3;
 };
 
-type LegacyBox3 = {
-  setFromObject(object: unknown): LegacyBox3;
+type RuntimeBox3 = {
+  setFromObject(object: unknown): RuntimeBox3;
   min: { x: number; y: number; z: number };
   max: { x: number; y: number; z: number };
 };
 
 export type RemotePlayerRecord = {
   id?: unknown;
-  avatar?: LegacyAvatarState;
+  avatar?: NativeAvatarState;
   username?: string;
   is_staff?: unknown;
   is_booster?: unknown;
   meshes?: RemotePlayerMeshes | null | undefined;
   hasPosition?: boolean;
-  tPos?: LegacyVector3 | undefined;
+  tPos?: RuntimeVector3 | undefined;
   tRy?: number;
   seen?: number;
   anim?: string;
@@ -123,7 +123,7 @@ export type RemotePlayerRecord = {
   lastAnimationName?: string;
 };
 
-export type RemoteAvatarContext = LegacyAvatarState & {
+export type RemoteAvatarContext = NativeAvatarState & {
   id?: unknown;
   playerId?: unknown;
   username?: string;
@@ -172,7 +172,7 @@ type RemotePlayerFrameOptions = {
   dt: number;
   now?: number;
   shouldAnimate?: boolean;
-  normalizeAvatar: (input: Record<string, unknown>) => LegacyAvatarState;
+  normalizeAvatar: (input: Record<string, unknown>) => NativeAvatarState;
   displayName: (id: unknown, username: unknown) => string;
   noteState: (remote: RemotePlayerRecord, status: string, reason: string) => void;
   animate: (id: unknown, remote: RemotePlayerRecord, dt: number) => void;
@@ -208,7 +208,7 @@ export class RemotePlayerService {
     return this;
   }
 
-  makeRemote(username: string, _id: number, avatar: LegacyAvatarState): RemotePlayerMeshes | null {
+  makeRemote(username: string, _id: number, avatar: NativeAvatarState): RemotePlayerMeshes | null {
     const config = this.assertConfigured();
     const group = this.cloneLocalPlayer();
     if (!group) return null;
@@ -218,10 +218,10 @@ export class RemotePlayerService {
     nameSprite.position.y = this.nameLabelY();
     group.add?.(nameSprite);
 
-    const bones: Record<string, LegacyBone> = {};
+    const bones: Record<string, RigBone> = {};
     group.traverse((node) => {
       if (!isBone(node)) return;
-      const bone = node as LegacyBone;
+      const bone = node as RigBone;
       bones[bone.name || ""] = bone;
       bones[boneAlias(bone.name)] = bone;
     });
@@ -257,13 +257,13 @@ export class RemotePlayerService {
     vortex.scene.remove(meshes.grp);
     if (meshes.proxy) vortex.scene.remove(meshes.proxy);
     this.safeTraverse(meshes.grp, (object) => {
-      if (object.isSprite) this.disposeSprite(object as LegacySprite);
+      if (object.isSprite) this.disposeSprite(object as RuntimeSprite);
     });
     if (meshes.nameSprite) this.disposeSprite(meshes.nameSprite);
     this.disposed += 1;
   }
 
-  cloneLocalPlayer(): LegacyObject3D | null {
+  cloneLocalPlayer(): RuntimeObject3D | null {
     return this.clonePlayer();
   }
 
@@ -334,7 +334,7 @@ export class RemotePlayerService {
 
   rebuildAll(options: {
     remotes: Map<unknown, RemotePlayerRecord>;
-    normalizeAvatar: (input: Record<string, unknown>) => LegacyAvatarState;
+    normalizeAvatar: (input: Record<string, unknown>) => NativeAvatarState;
     onError?: (error: unknown) => void;
   }): RemotePlayerRebuildSnapshot {
     let rebuilt = 0;
@@ -408,7 +408,7 @@ export class RemotePlayerService {
     return { totals, rows, budget: { ...this.lastBudget } };
   }
 
-  private clonePlayer(): LegacyObject3D | null {
+  private clonePlayer(): RuntimeObject3D | null {
     const { THREE, vortex } = this.assertConfigured();
     const source = vortex.getCharacter();
     if (!source) return null;
@@ -416,7 +416,7 @@ export class RemotePlayerService {
     clone.userData = clone.userData || {};
     delete clone.userData.vwebModernAvatarMaterials;
 
-    const toRemove: LegacyObject3D[] = [];
+    const toRemove: RuntimeObject3D[] = [];
     clone.traverse((object) => {
       if (/Overlay$/.test(object.name || "")) toRemove.push(object);
       if (object.userData) delete object.userData.vwebModernAvatarMaterials;
@@ -436,23 +436,23 @@ export class RemotePlayerService {
       }
     });
 
-    const sourceBones: Record<string, LegacyBone> = {};
-    const cloneBones: Record<string, LegacyBone> = {};
+    const sourceBones: Record<string, RigBone> = {};
+    const cloneBones: Record<string, RigBone> = {};
     source.traverse((node) => {
       if (!isBone(node)) return;
-      const bone = node as LegacyBone;
+      const bone = node as RigBone;
       sourceBones[bone.name || ""] = bone;
       sourceBones[boneAlias(bone.name)] = bone;
     });
     clone.traverse((node) => {
       if (!isBone(node)) return;
-      const bone = node as LegacyBone;
+      const bone = node as RigBone;
       cloneBones[bone.name || ""] = bone;
       cloneBones[boneAlias(bone.name)] = bone;
     });
 
-    const sourceMeshes: LegacyObject3D[] = [];
-    const cloneMeshes: LegacyObject3D[] = [];
+    const sourceMeshes: RuntimeObject3D[] = [];
+    const cloneMeshes: RuntimeObject3D[] = [];
     source.traverse((mesh) => {
       if (mesh.isSkinnedMesh) sourceMeshes.push(mesh);
     });
@@ -471,7 +471,7 @@ export class RemotePlayerService {
     const rest = vortex.getAnimRest();
     clone.traverse((node) => {
       if (!isBone(node)) return;
-      const bone = node as LegacyBone;
+      const bone = node as RigBone;
       const pose = rest[bone.name || ""] || rest[boneAlias(bone.name)];
       if (!pose) return;
       bone.rotation.set?.(Number(pose.x || 0), Number(pose.y || 0), Number(pose.z || 0));
@@ -480,14 +480,14 @@ export class RemotePlayerService {
 
     clone.rotation.set?.(0, Math.PI, 0);
     clone.traverse((object) => {
-      if (object.isMesh) (object as LegacyObject3D & { castShadow?: boolean }).castShadow = true;
+      if (object.isMesh) (object as RuntimeObject3D & { castShadow?: boolean }).castShadow = true;
     });
     clone.visible = false;
     vortex.scene.add(clone);
     return clone;
   }
 
-  private createNameLabel(username: string): LegacySprite {
+  private createNameLabel(username: string): RuntimeSprite {
     const { THREE, document } = this.assertConfigured();
     const canvas = document.createElement("canvas");
     canvas.width = 512;
@@ -515,13 +515,13 @@ export class RemotePlayerService {
     return sprite;
   }
 
-  private disposeSprite(sprite: LegacySprite): void {
+  private disposeSprite(sprite: RuntimeSprite): void {
     sprite.parent?.remove?.(sprite);
     sprite.material?.map?.dispose?.();
     sprite.material?.dispose?.();
   }
 
-  private safeTraverse(root: LegacyObject3D, visitor: (object: LegacyObject3D) => void): void {
+  private safeTraverse(root: RuntimeObject3D, visitor: (object: RuntimeObject3D) => void): void {
     try {
       if (typeof root.traverse === "function") {
         root.traverse(visitor);
@@ -555,7 +555,7 @@ export class RemotePlayerService {
     }
   }
 
-  private rotateTowards(group: LegacyObject3D, targetYaw: number, dt: number): void {
+  private rotateTowards(group: RuntimeObject3D, targetYaw: number, dt: number): void {
     const currentYaw = Number(group.rotation.y || 0);
     let deltaYaw = targetYaw - currentYaw;
     deltaYaw = ((deltaYaw % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -757,7 +757,7 @@ export class RemotePlayerService {
     proxy.rotation.y = Number(group.rotation.y || 0);
   }
 
-  private createRemoteProxy(avatar: LegacyAvatarState): LegacyObject3D | null {
+  private createRemoteProxy(avatar: NativeAvatarState): RuntimeObject3D | null {
     const { THREE, vortex } = this.assertConfigured();
     if (!THREE.Group || !THREE.Mesh || !THREE.BoxGeometry || !THREE.MeshStandardMaterial) return null;
     const resources = this.getProxyResources(THREE, avatar);
@@ -786,7 +786,7 @@ export class RemotePlayerService {
     return group;
   }
 
-  private getProxyResources(THREE: ThreeLike, avatar: LegacyAvatarState): RemoteProxyResources {
+  private getProxyResources(THREE: ThreeLike, avatar: NativeAvatarState): RemoteProxyResources {
     const key = "default";
     if (this.proxyResources) return this.proxyResources;
     const BoxGeometry = THREE.BoxGeometry;
@@ -808,7 +808,7 @@ export class RemotePlayerService {
     return this.proxyResources;
   }
 
-  private readVisualBounds(group: LegacyObject3D | null | undefined): { minY: number; maxY: number } | null {
+  private readVisualBounds(group: RuntimeObject3D | null | undefined): { minY: number; maxY: number } | null {
     const Box3 = this.config?.THREE.Box3;
     if (!group || !Box3) return null;
     try {
@@ -838,12 +838,12 @@ export type RemoteRenderBudgetSnapshot = {
   shadowDistance: number;
 };
 
-function materialList(material: LegacyMaterial | LegacyMaterial[] | undefined): LegacyMaterial[] {
+function materialList(material: RuntimeMaterial | RuntimeMaterial[] | undefined): RuntimeMaterial[] {
   if (!material) return [];
   return Array.isArray(material) ? material.filter(Boolean) : [material];
 }
 
-function collectMaterialTextures(material: LegacyMaterial, textures: Set<unknown>): void {
+function collectMaterialTextures(material: RuntimeMaterial, textures: Set<unknown>): void {
   for (const [key, value] of Object.entries(material as Record<string, unknown>)) {
     if (!/map$/i.test(key)) continue;
     if (value && typeof value === "object") textures.add(value);
@@ -895,10 +895,10 @@ const REMOTE_ACTIVE_FULL_DISTANCE = 110;
 type RemoteProxyResources = {
   key: string;
   unitBox: unknown;
-  materials: Record<string, LegacyMaterial>;
+  materials: Record<string, RuntimeMaterial>;
 };
 
-function isBone(node: LegacyObject3D | null | undefined): boolean {
+function isBone(node: RuntimeObject3D | null | undefined): boolean {
   return Boolean(node?.isBone || node?.type === "Bone");
 }
 
@@ -911,7 +911,7 @@ function remoteAnimationIntervalMs(anim: string): number {
   return 1000 / 12;
 }
 
-function withRemoteAvatarContext(avatar: LegacyAvatarState, id: unknown, username: unknown): RemoteAvatarContext {
+function withRemoteAvatarContext(avatar: NativeAvatarState, id: unknown, username: unknown): RemoteAvatarContext {
   return {
     ...avatar,
     id,

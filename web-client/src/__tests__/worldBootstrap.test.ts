@@ -50,19 +50,19 @@ describe("WorldBootstrapService", () => {
     expect(windowRef.chooseSpawnPoint?.(windowRef.map)).toEqual({ x: 0, y: 10, z: 0 });
   });
 
-  it("checks for the legacy handles needed by current map loading", () => {
+  it("checks for the runtime handles needed by current map loading", () => {
     const service = new WorldBootstrapService(makeDocument(), makeWindow(), makeLocation());
     const handles = {
-      addStud() {},
-      removeStud() {},
-      createMesh() {},
+      addPart() {},
+      removePart() {},
+      createRuntimeMesh() {},
       setSpawn() {},
       scene: {},
       bufferGeometryUtils: {}
     };
 
-    expect(service.ready({ world: { getLegacyHandles: () => handles, loadOfficialMap() {} } as never })).toBe(true);
-    expect(service.ready({ world: { getLegacyHandles: () => ({ ...handles, addStud: null }), loadOfficialMap() {} } as never })).toBe(false);
+    expect(service.ready({ world: { getsceneHandles: () => handles, loadOfficialMap() {} } as never })).toBe(true);
+    expect(service.ready({ world: { getsceneHandles: () => ({ ...handles, addPart: null }), loadOfficialMap() {} } as never })).toBe(false);
   });
 
   it("falls back to a baseplate when official map loading fails", async () => {
@@ -78,7 +78,7 @@ describe("WorldBootstrapService", () => {
         partIds: ["fallback"],
         bounds: { centerX: 0, centerY: 0, centerZ: 0, minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 }
       }),
-      getLegacyHandles: () => ({
+      getsceneHandles: () => ({
         setSpawn: (...args: number[]) => spawns.push(args)
       })
     };

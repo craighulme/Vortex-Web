@@ -1,0 +1,90 @@
+import type { AvatarAssetService } from "../avatar/AvatarAssetService";
+import type { AvatarMaterialService } from "../avatar/AvatarMaterialService";
+import type { CharacterSpawnService } from "../avatar/CharacterSpawnService";
+import type { LocalAvatarService } from "../avatar/LocalAvatarService";
+import type { RemoteAvatarAppearanceService } from "../avatar/RemoteAvatarAppearanceService";
+import type { CameraService } from "../camera/CameraService";
+import type { LocalMovementRuntimeService } from "../movement/LocalMovementRuntimeService";
+import type { QualityService } from "../renderer/QualityService";
+import type { RendererService } from "../renderer/RendererService";
+import type { SceneSettingsService } from "../renderer/SceneSettingsService";
+import type { EngineRuntimeExportsService } from "./EngineRuntimeExportsService";
+import type { FrameLoopService } from "./FrameLoopService";
+
+export type ThreeLike = {
+  Mesh: new (geometry: unknown, material: unknown) => unknown;
+  BufferGeometry: new () => {
+    setAttribute(name: string, attribute: unknown): void;
+  };
+  Float32BufferAttribute: new (array: ArrayLike<number>, itemSize: number) => unknown;
+};
+
+export type WorldRuntimeLike = {
+  textureService: { snapshot(): { textures: number }; setStudTextures(value: boolean): void };
+  geometryService: { snapshot(): { geometries: number } };
+  materialService: { snapshot(): { materials: number } };
+  partService: { snapshot(): unknown };
+  objects: unknown[];
+  colliders: unknown[];
+  addPart: unknown;
+  removePart: unknown;
+  useStudTextures(): boolean;
+  refreshStudMaterialTextures(): void;
+  textureDiagnostics(): unknown;
+};
+
+export type EngineRuntimeBridgeConfig = {
+  windowRef: Window & Record<string, unknown>;
+  localStorage: Storage;
+  three: ThreeLike & Record<string, unknown>;
+  gltfLoaderClass: unknown;
+  gltfLoader: unknown;
+  scene: unknown;
+  ambient: unknown;
+  renderer: { render(scene: unknown, camera: unknown): void; getPixelRatio(): number; userData?: Record<string, unknown> };
+  cameraObject: unknown;
+  cameraState: unknown;
+  avatarMaterials: AvatarMaterialService;
+  avatarAssets: AvatarAssetService;
+  localAvatar: LocalAvatarService;
+  remoteAvatarAppearance: RemoteAvatarAppearanceService;
+  characterSpawn: CharacterSpawnService;
+  localMovement: LocalMovementRuntimeService;
+  camera: CameraService;
+  animation: { getFootIkState(): unknown };
+  shadows: { snapshot(): unknown; markNeedsUpdate(): void };
+  shadowQuality(): string;
+  shadowMapSize(): number;
+  shadowsActive(): boolean;
+  setShadowsEnabled(value: unknown): unknown;
+  setShadowQuality(value: unknown): unknown;
+  sceneSettings: SceneSettingsService;
+  rendererService: RendererService;
+  quality: QualityService;
+  runtimeExports: EngineRuntimeExportsService;
+  frameLoop: FrameLoopService;
+  profiler: { begin(now: number): unknown; mark(frame: unknown, label: string): void; end(frame: unknown): void };
+  worldService: {
+    attachRuntimeAdapter(handles: Record<string, unknown>): void;
+    renderChunkSnapshot?(): unknown;
+    setRenderDistance?(distance: number, profile?: "performance" | "balanced" | "visual"): unknown;
+  };
+  worldRuntime: WorldRuntimeLike;
+  bufferGeometryUtils: unknown;
+  keys: Record<string, boolean>;
+  anim: { rest: unknown };
+  getCharacter(): { position: { y: number } } | null;
+  getCharHeight(): number;
+  getCharFootOffset(): number;
+  getCharStandY(): number;
+  readStorageFlag(key: string, fallback?: boolean): boolean;
+  requestPointerLock(): void;
+  resetCharacterToSpawn(): boolean;
+  pick(): unknown;
+  cursorOver(element: Element | null | undefined): boolean;
+  update(dt: number): void;
+  updateCamera(dt: number): void;
+  updateDebug(): void;
+  updateMultiplayer(dt: number): void;
+  updateLighting(dt: number): void;
+};

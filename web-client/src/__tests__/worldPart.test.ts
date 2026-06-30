@@ -61,7 +61,7 @@ describe("WorldPartService", () => {
   it("adds dynamic studs to the scene, object list, and collider service", () => {
     const { service, scene, colliderService } = makeService();
 
-    const [mesh, id] = service.addStud(4, 2, 4, 0x336699, 10, 1, 12, 0, 0, 0, "Block", 0, false, true, "YXZ", "Truss");
+    const [mesh, id] = service.addPart(4, 2, 4, 0x336699, 10, 1, 12, 0, 0, 0, "Block", 0, false, true, "YXZ", "Truss");
 
     expect(id).toBe(0);
     expect(mesh.stud_id).toBe(0);
@@ -75,7 +75,7 @@ describe("WorldPartService", () => {
   it("keeps static source parts out of the scene but tracks their collider", () => {
     const { service, scene, colliderService } = makeService();
 
-    const [mesh, id] = service.addStud(4, 1, 4, 0xffffff, 0, 0, 0, 0, 0, 0, "Block", 0, true, true);
+    const [mesh, id] = service.addPart(4, 1, 4, 0xffffff, 0, 0, 0, 0, 0, 0, "Block", 0, true, true);
 
     expect(mesh.userData.vwebRuntimeKind).toBe("world-source-part");
     expect(id).toBe(0);
@@ -86,13 +86,13 @@ describe("WorldPartService", () => {
 
   it("removes and rebuilds dynamic colliders", () => {
     const { service, scene, colliderService } = makeService();
-    const [mesh, id] = service.addStud(4, 1, 4, 0xffffff, 0, 0, 0);
+    const [mesh, id] = service.addPart(4, 1, 4, 0xffffff, 0, 0, 0);
 
     expect(service.rebuildStudCollider(id, true)).toBe(true);
     expect(colliderService.colliders).toHaveLength(1);
     expect(service.objects).toEqual([mesh]);
 
-    service.removeStud(id);
+    service.removePart(id);
 
     expect(scene.removed).toEqual([mesh]);
     expect(service.objects).toEqual([]);

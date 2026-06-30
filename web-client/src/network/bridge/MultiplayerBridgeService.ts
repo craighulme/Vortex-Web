@@ -15,6 +15,7 @@ import { handleMultiplayerBridgeMessage } from "./MultiplayerRouterBridgeContext
 
 export class MultiplayerBridgeService {
   private mounted = false;
+  private frameBridge = null;
 
   constructor(
     private readonly windowRef: Window,
@@ -79,7 +80,7 @@ export class MultiplayerBridgeService {
     }
     
     function _normalizeAvatarFields(data = {}) {
-        return window.VortexRuntime?.avatar?.normalizeLegacy?.(data) || {
+        return window.VortexRuntime?.avatar?.normalizeNative?.(data) || {
             shirt_id: 0,
             pant_id: 0,
             body_type: "male",
@@ -408,7 +409,7 @@ export class MultiplayerBridgeService {
         const next = _runtimeMultiplayer().setFriendStatus(id, status);
         _leaderboard().setFriendStatus(id, next);
     };
-    installMultiplayerFrameBridge({
+    this.frameBridge = installMultiplayerFrameBridge({
         window,
         vortex: _vortex,
         runtimeRemoteSession: _runtimeRemoteSession,
@@ -419,20 +420,18 @@ export class MultiplayerBridgeService {
         animateRemote: remoteAvatarBridge.animate,
         hasBubbles: bubbleBridge.hasBubbles,
         updateBubblePositions: () => bubbleBridge.updatePositions(myId),
-        bridgeSend,
         shouldSkipAvatarRebuild: () => _skipNextRemoteAvatarRebuild,
         clearSkipAvatarRebuild: () => {
             _skipNextRemoteAvatarRebuild = false;
         }
     });
     
-    installMultiplayerConsoleBridge({
+    const consoleBridge = installMultiplayerConsoleBridge({
         window,
         fetch,
         Chat,
         vortex: _vortex,
         runtimeRemoteSession: _runtimeRemoteSession,
-        remotePlayerService: remoteAvatarBridge.service,
         normalizeAvatarFields: _normalizeAvatarFields,
         requireLicenseFeature: accessBridge.requireLicenseFeature,
         assertLicenseFeature: accessBridge.assertLicenseFeature,
@@ -448,8 +447,16 @@ export class MultiplayerBridgeService {
             }
         }
     });
+    window.VortexRuntime.chat?.configureOutbound?.({
+        handleCommand: consoleBridge.handleChatCommand,
+        sendMessage: (msg) => bridgeSend({ type: "chat", msg })
+    });
     
     connect();
     return true;
+  }
+
+  updateFrame(dt) {
+    this.frameBridge?.updateFrame?.(dt);
   }
 }

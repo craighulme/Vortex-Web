@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AnimationService, type LegacyBoneLike } from "../animation/AnimationService";
+import { AnimationService, type RigBoneLike } from "../animation/AnimationService";
 
-function bone(): LegacyBoneLike {
+function bone(): RigBoneLike {
   return {
     rotation: { x: 0, y: 0, z: 0 },
     position: { x: 0, y: 0, z: 0 },
@@ -14,7 +14,7 @@ describe("AnimationService", () => {
     vi.unstubAllGlobals();
   });
 
-  it("owns legacy remote walk/jump/climb pose animation", () => {
+  it("owns remote walk/jump/climb pose animation", () => {
     const service = new AnimationService();
     const remote = {
       anim: "jump",
@@ -37,7 +37,7 @@ describe("AnimationService", () => {
       }
     };
 
-    service.animateLegacyRemote(remote, 1 / 60);
+    service.animateRuntimeRemote(remote, 1 / 60);
 
     expect(remote.animTime).toBeGreaterThan(0);
     expect(remote.meshes.bones.Left_Arm.rotation.x).toBeLessThan(0);

@@ -1,4 +1,7 @@
 // @ts-nocheck
+import { readRuntimeDisplaySettings } from "./RuntimeDisplaySettings";
+import { matchesKeybind } from "../input/KeybindSettings";
+
 export class LeaderboardDomService {
   mount(runtime) {
   if (window.Leaderboard) {
@@ -35,6 +38,7 @@ export class LeaderboardDomService {
   const COSMETICS_TTL_MS = 10 * 60 * 1000;
   const COSMETICS_RETRY_MS = 30 * 1000;
   const cosmetics = readCosmetics();
+  const displaySettings = readRuntimeDisplaySettings(document);
   const communityApiBase = readCommunityApiBase();
   let cosmeticsRequestKey = "";
   let cosmeticsRequestAt = 0;
@@ -145,6 +149,10 @@ export class LeaderboardDomService {
 
   function renderPlayerPanelCosmetics(playerId) {
     if (!playerPanel) return;
+    if (!displaySettings.miniProfileCosmetics) {
+      clearPlayerPanelCosmetics();
+      return;
+    }
     const record = cosmeticsFor(playerId);
     const url = playerPanelBackgroundUrl(record);
     const video = isVideoUrl(url);
@@ -320,6 +328,7 @@ export class LeaderboardDomService {
   }
 
   function renderVwBadge(record) {
+    if (!displaySettings.leaderboardCosmetics) return "";
     const badge = selectedVwBadge(record);
     if (!badge) return "";
     const classes = [
@@ -335,11 +344,13 @@ export class LeaderboardDomService {
   }
 
   function rowCosmeticStyle(record) {
+    if (!displaySettings.leaderboardCosmetics) return "";
     if (!record?.nameplateUrl) return "";
     return `--lb-row-nameplate-image:url('${cssUrl(record.nameplateUrl)}')`;
   }
 
   function renderNameplate(record, safeName) {
+    if (!displaySettings.leaderboardCosmetics) return `<span class="lb-nameplate"><span class="lb-name-text">${safeName}</span></span>`;
     const styles = [];
     if (record?.nameGradient?.length === 2) {
       styles.push(`--lb-name-color-a:${record.nameGradient[0]}`);
@@ -378,7 +389,7 @@ export class LeaderboardDomService {
       row.className = [
         "lb-row",
         isSelf ? "lb-self" : "lb-clickable",
-        webRecord?.nameplateUrl ? "lb-row-nameplate" : ""
+        displaySettings.leaderboardCosmetics && webRecord?.nameplateUrl ? "lb-row-nameplate" : ""
       ].filter(Boolean).join(" ");
       const rowStyle = rowCosmeticStyle(webRecord);
       if (rowStyle) row.setAttribute("style", rowStyle);
@@ -466,6 +477,7 @@ export class LeaderboardDomService {
   }
 
   function loadCosmeticsForPlayers(list) {
+    if (!displaySettings.leaderboardCosmetics && !displaySettings.miniProfileCosmetics) return;
     if (!communityApiBase || !Array.isArray(list) || !list.length) return;
     const ids = [...new Set(list.map((player) => Number(player.id)).filter((id) => Number.isFinite(id) && id > 0))].sort((a, b) => a - b);
     const now = Date.now();
@@ -757,13 +769,11 @@ export class LeaderboardDomService {
   }
 
   document.addEventListener("keydown", (e) => {
-    if (e.code === "Tab") {
+    if (matchesKeybind(e, "playerList")) {
       e.preventDefault();
 
       leaderboardVisible = !leaderboardVisible;
-      leaderboardRoot.style.display = leaderboardVisible
-        ? ""
-        : "none";
+      leaderboardRoot.classList.toggle("lb-hidden", !leaderboardVisible);
 
       if (!leaderboardVisible) {
         selectedPlayerId = null;
@@ -872,12 +882,12 @@ export class LeaderboardDomService {
 
     show() {
       leaderboardVisible = true;
-      leaderboardRoot.style.display = "";
+      leaderboardRoot.classList.remove("lb-hidden");
     },
 
     hide() {
       leaderboardVisible = false;
-      leaderboardRoot.style.display = "none";
+      leaderboardRoot.classList.add("lb-hidden");
     },
   };
 

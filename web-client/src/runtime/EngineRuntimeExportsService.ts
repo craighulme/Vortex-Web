@@ -1,6 +1,6 @@
-export type EngineCompatibilityVortexApi = Record<string, unknown>;
+export type EngineRuntimeExportsApi = Record<string, unknown>;
 
-export type EngineCompatibilityOptions = {
+export type EngineRuntimeExportsOptions = {
   windowRef: Window & Record<string, unknown>;
   detailTarget?: EventTarget;
   three: unknown;
@@ -12,17 +12,17 @@ export type EngineCompatibilityOptions = {
   objects: unknown[];
   camera: unknown;
   cam: unknown;
-  vortexApi: EngineCompatibilityVortexApi;
+  vortexApi: EngineRuntimeExportsApi;
   rendererService: {
-    attachLegacy(handles: { scene?: unknown; camera?: unknown; renderer?: unknown }): void;
+    attachRuntimeAdapter(handles: { scene?: unknown; camera?: unknown; renderer?: unknown }): void;
   };
   worldService: {
-    attachLegacy(handles: Record<string, unknown>): void;
+    attachRuntimeAdapter(handles: Record<string, unknown>): void;
   };
   worldHandles: {
-    addStud: unknown;
-    removeStud: unknown;
-    createMesh(geometry: unknown, material: unknown): unknown;
+    addPart: unknown;
+    removePart: unknown;
+    createRuntimeMesh(geometry: unknown, material: unknown): unknown;
     createGeometry(attributes: Record<string, { array: ArrayLike<number>; itemSize: number }>): unknown;
     scene: unknown;
     objects: unknown[];
@@ -32,8 +32,8 @@ export type EngineCompatibilityOptions = {
   cursorOver(element: Element | null | undefined): boolean;
 };
 
-export class EngineCompatibilityService {
-  install(options: EngineCompatibilityOptions): EngineCompatibilityVortexApi {
+export class EngineRuntimeExportsService {
+  install(options: EngineRuntimeExportsOptions): EngineRuntimeExportsApi {
     const windowRef = options.windowRef;
     windowRef._vortex = options.vortexApi;
     windowRef.THREE = options.three;
@@ -47,12 +47,12 @@ export class EngineCompatibilityService {
     windowRef.cam = options.cam;
     windowRef._cursorOver = options.cursorOver;
 
-    options.rendererService.attachLegacy({
+    options.rendererService.attachRuntimeAdapter({
       scene: options.scene,
       camera: options.camera,
       renderer: options.renderer
     });
-    options.worldService.attachLegacy({
+    options.worldService.attachRuntimeAdapter({
       ...options.worldHandles,
       setSpawn: options.vortexApi.setSpawn,
       pick: options.vortexApi.pick,

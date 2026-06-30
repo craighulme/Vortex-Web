@@ -45,7 +45,7 @@ export type ShadowQualityConfig = {
   fade: boolean;
 };
 
-type LegacyRenderer = {
+type ThreeRenderer = {
   isWebGPURenderer?: boolean;
   backend?: {
     isWebGPUBackend?: boolean;
@@ -68,7 +68,7 @@ type LegacyRenderer = {
   shadowMap?: { enabled?: boolean };
 };
 
-type WebGpuRendererConstructor = new (options: Record<string, unknown>) => LegacyRenderer & {
+type WebGpuRendererConstructor = new (options: Record<string, unknown>) => ThreeRenderer & {
   init?(): Promise<void>;
   userData?: {
     vwebBackend?: string;
@@ -184,7 +184,7 @@ export class RendererService {
   private handles: RendererHandles = {};
   private optimizedRenderer: unknown = null;
 
-  attachLegacy(handles: RendererHandles): void {
+  attachRuntimeAdapter(handles: RendererHandles): void {
     this.handles = { ...this.handles, ...handles };
     this.applySafeDefaults();
   }
@@ -202,7 +202,7 @@ export class RendererService {
     renderer.setPixelRatio?.(Math.min(devicePixelRatio, readPixelRatioCap()));
   }
 
-  async createWebGpuRenderer(THREE: WebGpuThree, options: Record<string, unknown> = {}): Promise<LegacyRenderer> {
+  async createWebGpuRenderer(THREE: WebGpuThree, options: Record<string, unknown> = {}): Promise<ThreeRenderer> {
     if (!THREE.WebGPURenderer) {
       throw new Error("WebGPU renderer is unavailable in this build.");
     }
@@ -224,7 +224,7 @@ export class RendererService {
     return renderer;
   }
 
-  detectRendererBackend(renderer: LegacyRenderer): string {
+  detectRendererBackend(renderer: ThreeRenderer): string {
     return readRendererBackend(renderer);
   }
 
@@ -358,7 +358,7 @@ export class RendererService {
 
   diagnoseScene(options: {
     scene?: FogScene;
-    renderer?: LegacyRenderer;
+    renderer?: ThreeRenderer;
     shadows?: { snapshot?(): unknown };
     toneMappingMode?: ToneMappingMode;
   } = {}): SceneDiagnostics {
@@ -476,9 +476,9 @@ export class RendererService {
     return new ShadowService(options);
   }
 
-  private readRenderer(): LegacyRenderer | null {
+  private readRenderer(): ThreeRenderer | null {
     if (!this.handles.renderer || typeof this.handles.renderer !== "object") return null;
-    return this.handles.renderer as LegacyRenderer;
+    return this.handles.renderer as ThreeRenderer;
   }
 }
 
@@ -664,7 +664,7 @@ function shadowQualityConfig(quality: ShadowQuality): ShadowQualityConfig {
   }
 }
 
-function readRendererBackend(renderer: LegacyRenderer): string {
+function readRendererBackend(renderer: ThreeRenderer): string {
   if (renderer.userData?.vwebBackend) return renderer.userData.vwebBackend;
   if (renderer.isWebGPURenderer) {
     if (renderer.backend?.isWebGPUBackend === true) return "webgpu";

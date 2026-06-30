@@ -1,3 +1,5 @@
+import { readKeybinds, type KeybindAction } from "./KeybindSettings";
+
 export type InputSnapshot = {
   locked: boolean;
   gameFocused: boolean;
@@ -71,8 +73,21 @@ const GAMEPLAY_KEYS = new Set([
   "Comma",
   "Period",
   "Backquote",
-  "Slash"
+  "Slash",
+  "KeyH"
 ]);
+
+const KEYBIND_ALIASES: Array<[KeybindAction, string]> = [
+  ["moveForward", "KeyW"],
+  ["moveBackward", "KeyS"],
+  ["moveLeft", "KeyA"],
+  ["moveRight", "KeyD"],
+  ["jump", "Space"],
+  ["cameraLeft", "ArrowLeft"],
+  ["cameraRight", "ArrowRight"],
+  ["cameraSnapLeft", "Comma"],
+  ["cameraSnapRight", "Period"]
+];
 
 export class InputService {
   readonly keys: Record<string, boolean> = {};
@@ -291,6 +306,7 @@ export class InputService {
     this.lastKeyRejected = "";
     this.lastKeyDown = event.code || event.key || "";
     this.keys[event.code] = true;
+    this.applyKeybindAliases(event.code || event.key || "", true);
     this.document.dispatchEvent(new CustomEvent<InputEventDetail>("vortex-input-keydown", { detail: toInputDetail(event) }));
   };
 
@@ -299,6 +315,7 @@ export class InputService {
     this.handledKeyEvents.add(event);
     this.lastKeyUp = event.code || event.key || "";
     this.keys[event.code] = false;
+    this.applyKeybindAliases(event.code || event.key || "", false);
     this.document.dispatchEvent(new CustomEvent<InputEventDetail>("vortex-input-keyup", { detail: toInputDetail(event) }));
   };
 
@@ -340,6 +357,14 @@ export class InputService {
 
   private emitFocusState(): void {
     this.document.dispatchEvent(new CustomEvent("vortex-input-focus", { detail: this.snapshot() }));
+  }
+
+  private applyKeybindAliases(code: string, pressed: boolean): void {
+    if (!code) return;
+    const bindings = readKeybinds();
+    for (const [action, canonical] of KEYBIND_ALIASES) {
+      if ((bindings[action] || []).includes(code)) this.keys[canonical] = pressed;
+    }
   }
 }
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { EngineCompatibilityService } from "../runtime/EngineCompatibilityService";
+import { EngineRuntimeExportsService } from "../runtime/EngineRuntimeExportsService";
 
-describe("EngineCompatibilityService", () => {
-  it("installs engine globals and legacy handles in one place", () => {
-    const service = new EngineCompatibilityService();
+describe("EngineRuntimeExportsService", () => {
+  it("installs engine globals and runtime handles in one place", () => {
+    const service = new EngineRuntimeExportsService();
     const windowRef = new EventTarget() as Window & Record<string, unknown>;
     const rendererHandles: unknown[] = [];
     const worldHandles: Record<string, unknown>[] = [];
@@ -30,12 +30,12 @@ describe("EngineCompatibilityService", () => {
       camera: "camera",
       cam: "cam",
       vortexApi,
-      rendererService: { attachLegacy: (handles) => rendererHandles.push(handles) },
-      worldService: { attachLegacy: (handles) => worldHandles.push(handles) },
+      rendererService: { attachRuntimeAdapter: (handles) => rendererHandles.push(handles) },
+      worldService: { attachRuntimeAdapter: (handles) => worldHandles.push(handles) },
       worldHandles: {
-        addStud: "addStud",
-        removeStud: "removeStud",
-        createMesh: () => ({}),
+        addPart: "addPart",
+        removePart: "removePart",
+        createRuntimeMesh: () => ({}),
         createGeometry: () => ({}),
         scene: "scene",
         objects: [],
@@ -48,7 +48,7 @@ describe("EngineCompatibilityService", () => {
     expect(windowRef._vortex).toBe(vortexApi);
     expect(windowRef.THREE).toBe("three");
     expect(rendererHandles[0]).toMatchObject({ scene: "scene", camera: "camera", renderer: "renderer" });
-    expect(worldHandles[0]).toMatchObject({ addStud: "addStud", setSpawn: vortexApi.setSpawn });
+    expect(worldHandles[0]).toMatchObject({ addPart: "addPart", setSpawn: vortexApi.setSpawn });
     expect(readyDetail).toBe(vortexApi);
   });
 });

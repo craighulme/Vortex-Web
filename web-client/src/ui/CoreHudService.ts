@@ -43,7 +43,7 @@ type RuntimePanelSource = {
     };
   };
   world: {
-    getLegacyHandles(): {
+    getsceneHandles(): {
       getObjects?: unknown;
       getColliders?: unknown;
     };
@@ -171,7 +171,7 @@ export class CoreHudService {
     this.lastPanelRenderAt = now;
 
     const rendererHandles = source.renderer.getHandles();
-    const worldHandles = source.world.getLegacyHandles();
+    const worldHandles = source.world.getsceneHandles();
     const objects = callArrayGetter(worldHandles.getObjects);
     const colliders = callArrayGetter(worldHandles.getColliders);
     const avatar = source.avatar.getPreviewState?.();

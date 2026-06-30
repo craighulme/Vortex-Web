@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { createMultiplayerChatCommandBridge } from "./MultiplayerChatCommandBridge";
 
 export function installMultiplayerConsoleBridge(context) {
   const {
@@ -7,7 +8,6 @@ export function installMultiplayerConsoleBridge(context) {
     Chat,
     vortex,
     runtimeRemoteSession,
-    remotePlayerService,
     normalizeAvatarFields,
     requireLicenseFeature,
     assertLicenseFeature,
@@ -16,74 +16,19 @@ export function installMultiplayerConsoleBridge(context) {
     getLocalPlayerId
   } = context;
 
-  function commandPlayerList() {
-    return runtimeRemoteSession().commandPlayerList({
-      localId: getLocalPlayerId(),
-      localUsername: getLaunchInfo()?.username || "You",
-      localPosition: vortex.getCharacter?.()?.position?.clone?.() || null
-    });
-  }
-
-  function movementMods() {
-    return vortex.getMovementMods?.() || {
-      fly: false,
-      noclip: false,
-      airwalk: false,
-      gravityScale: 1,
-      flySpeed: 28
-    };
-  }
-
-  function setMovementMods(patch = {}) {
-    if (!vortex.setMovementMods) throw new Error("movement modifiers are not available in this build");
-    return vortex.setMovementMods(patch);
-  }
-
-  function teleportLocalToScene(x, y, z) {
-    const char = vortex.getCharacter?.();
-    if (!char) return false;
-    char.position.set(Number(x), Number(y), Number(z));
-    vortex.setVelY?.(0);
-    vortex.setGrounded?.(false);
-    return true;
-  }
-
-  window._mpHandleChatCommand = function (text) {
-    return window.VortexRuntime.chatCommands.handle(text, {
-      chat: Chat,
-      players: commandPlayerList,
-      localPosition: () => vortex.getCharacter?.()?.position || null,
-      movementMods,
-      setMovementMods,
-      requireFeature: requireLicenseFeature,
-      teleportLocal: teleportLocalToScene,
-      bringPlayer: (player) => {
-        const char = vortex.getCharacter?.();
-        const remote = runtimeRemoteSession().get(player.id);
-        if (!char || !remote) return false;
-        const pos = char.position.clone();
-        pos.x += Math.sin(char.rotation.y || 0) * 3;
-        pos.z += Math.cos(char.rotation.y || 0) * 3;
-        remote.tPos.copy(pos);
-        remote.meshes?.grp?.position?.copy(pos);
-        remote.meshes && (remote.meshes.grp.visible = true);
-        remote.seen = performance.now();
-        return true;
-      },
-    });
-  };
-
-  window._mpRebuildAvatars = function () {
-    runtimeRemoteSession().rebuildAll({
-      service: remotePlayerService(),
-      normalizeAvatar: normalizeAvatarFields,
-      onError: (error) => console.error("[mp] avatar rebuild failed:", error),
-    });
-  };
+  const commandBridge = createMultiplayerChatCommandBridge({
+    window,
+    Chat,
+    vortex,
+    runtimeRemoteSession,
+    requireLicenseFeature,
+    getLaunchInfo,
+    getLocalPlayerId
+  });
 
   window.VortexMovement = window.VortexRuntime.chatCommands.createMovementApi({
-    movementMods,
-    setMovementMods,
+    movementMods: commandBridge.movementMods,
+    setMovementMods: commandBridge.setMovementMods,
     assertFeature: assertLicenseFeature,
   });
 
@@ -196,4 +141,6 @@ export function installMultiplayerConsoleBridge(context) {
     }
     return "no-apply-diagnostic";
   }
+
+  return { handleChatCommand: commandBridge.handleChatCommand };
 }

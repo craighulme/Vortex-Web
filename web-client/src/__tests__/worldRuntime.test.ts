@@ -50,10 +50,10 @@ describe("WorldRuntimeService", () => {
         this.config = config;
         return this;
       },
-      addStud(...args: unknown[]) {
+      addPart(...args: unknown[]) {
         return ["mesh", args.length];
       },
-      removeStud(id: number) {
+      removePart(id: number) {
         this.removed = id;
       },
       removed: -1
@@ -82,8 +82,8 @@ describe("WorldRuntimeService", () => {
     expect(partService.config.shadowsActive()).toBe(true);
     expect(handles.objects).toEqual(partService.objects);
     expect(handles.colliders).toEqual(colliderService.colliders);
-    expect(handles.addStud(1, 2, 3, 4, 5, 6, 7)).toEqual(["mesh", 7]);
-    handles.removeStud(42);
+    expect(handles.addPart(1, 2, 3, 4, 5, 6, 7)).toEqual(["mesh", 7]);
+    handles.removePart(42);
     expect(partService.removed).toBe(42);
 
     textureService.config.onTextureChanged();

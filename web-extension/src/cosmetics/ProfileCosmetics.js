@@ -1,7 +1,13 @@
-(function bootProfileCosmetics(attempt = 0) {
+(async function bootProfileCosmetics(attempt = 0) {
   const api = globalThis.VortexWebCosmetics;
   if (!api) {
     if (attempt < 80) window.setTimeout(() => bootProfileCosmetics(attempt + 1), 100);
+    return;
+  }
+  if (!(await readSiteProfileCosmeticsEnabled())) {
+    globalThis.__VortexProfileCosmeticsStarted = true;
+    document.documentElement.dataset.vwProfileScript = "disabled";
+    document.documentElement.classList.remove("vw-profile-cosmetics-pending");
     return;
   }
   if (globalThis.__VortexProfileCosmeticsStarted) return;
@@ -32,6 +38,23 @@
     "vw-badge-effect-toxic",
     "vw-badge-effect-pulse"
   ];
+
+  function readSiteProfileCosmeticsEnabled() {
+    const extensionApi = globalThis.chrome || globalThis.browser;
+    const defaults = { siteProfileCosmetics: true };
+    if (!extensionApi?.storage?.local?.get) return Promise.resolve(true);
+    try {
+      const result = extensionApi.storage.local.get(defaults);
+      if (result && typeof result.then === "function") {
+        return result.then((stored) => stored?.siteProfileCosmetics !== false).catch(() => true);
+      }
+      return new Promise((resolve) => {
+        extensionApi.storage.local.get(defaults, (stored) => resolve(stored?.siteProfileCosmetics !== false));
+      });
+    } catch {
+      return Promise.resolve(true);
+    }
+  }
 
   let renderTimer = 0;
   let lastRenderKey = "";

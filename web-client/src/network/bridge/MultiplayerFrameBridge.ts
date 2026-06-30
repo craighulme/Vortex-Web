@@ -12,12 +12,11 @@ export function installMultiplayerFrameBridge(context) {
     animateRemote,
     hasBubbles,
     updateBubblePositions,
-    bridgeSend,
     shouldSkipAvatarRebuild,
     clearSkipAvatarRebuild
   } = context;
 
-  window._mpUpdate = function (dt) {
+  function updateFrame(dt) {
     const remoteSession = runtimeRemoteSession();
     if (remoteSession.pendingAvatars.size === 0 && remoteSession.remotes.size === 0 && !hasBubbles()) return;
 
@@ -36,17 +35,23 @@ export function installMultiplayerFrameBridge(context) {
     });
 
     updateBubblePositions();
-  };
+  }
 
-  window._mpSendChat = function (msg) {
-    bridgeSend({ type: "chat", msg });
-  };
+  function rebuildAvatars() {
+    runtimeRemoteSession().rebuildAll({
+      service: remotePlayerService(),
+      normalizeAvatar: normalizeAvatarFields,
+      onError: (error) => console.error("[mp] avatar rebuild failed:", error),
+    });
+  }
 
   window.addEventListener("vweb-character-renderer-changed", () => {
     if (shouldSkipAvatarRebuild()) {
       clearSkipAvatarRebuild();
       return;
     }
-    window._mpRebuildAvatars?.();
+    rebuildAvatars();
   });
+
+  return { updateFrame, rebuildAvatars };
 }

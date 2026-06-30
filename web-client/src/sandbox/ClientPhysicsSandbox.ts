@@ -1,6 +1,6 @@
 type RuntimeLike = {
   renderer: { getHandles(): { scene?: unknown } };
-  world: { getLegacyHandles(): { getColliders?: unknown } };
+  world: { getsceneHandles(): { getColliders?: unknown } };
   vortex: { get(): unknown };
   slim?: {
     registerTarget?(target: {
@@ -266,7 +266,7 @@ export class ClientPhysicsSandbox {
   }
 
   private readColliders(runtime: RuntimeLike): Collider[] {
-    const getter = runtime.world.getLegacyHandles().getColliders;
+    const getter = runtime.world.getsceneHandles().getColliders;
     if (typeof getter !== "function") return [];
     try {
       const colliders = getter();

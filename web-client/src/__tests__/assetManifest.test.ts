@@ -4,7 +4,7 @@ import { normalizeAssetManifest } from "../assets/manifest";
 import { DiagnosticsService } from "../diagnostics/DiagnosticsService";
 
 describe("asset manifest", () => {
-  it("normalizes legacy imported asset metadata", () => {
+  it("normalizes imported asset metadata", () => {
     const manifest = normalizeAssetManifest({
       stud: "stud.png",
       malePlayerGlb: "male.glb",

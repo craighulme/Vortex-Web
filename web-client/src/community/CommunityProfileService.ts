@@ -58,6 +58,10 @@ export class CommunityProfileService {
     this.ownUserId = Number.isFinite(userId) ? userId : null;
   }
 
+  getOwnUserId(): number | null {
+    return this.ownUserId;
+  }
+
   isOwnProfile(profileUserId: number): boolean {
     return this.ownUserId === profileUserId;
   }

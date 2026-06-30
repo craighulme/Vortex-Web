@@ -75,7 +75,7 @@ export function handleMultiplayerBridgeMessage(d, ctx) {
       systemRed: (message) => ctx.Chat.systemRed(message),
       systemPlayer: (username, message) => ctx.Chat.systemPlayer(username, message),
       clearPlayerMsg: (username) => ctx.Chat.clearPlayerMsg(username),
-      message: (username, message, self, isStaff, isOwner, isBooster) => ctx.Chat.message(username, message, self, isStaff, isOwner, isBooster),
+      message: (username, message, self, isStaff, isOwner, isBooster, playerId) => ctx.Chat.message(username, message, self, isStaff, isOwner, isBooster, playerId),
       warn: (message) => ctx.Chat.warn(message)
     },
     bubble: ctx.showBubble,

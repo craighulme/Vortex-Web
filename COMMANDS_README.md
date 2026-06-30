@@ -102,7 +102,6 @@ These browser devtools helpers are for local profiling and performance reports.
 | `VortexQuality.performance()` | Switches to the lightweight local renderer profile: shadows off and antialias disabled on next reload. Modern avatar rendering remains the default. |
 | `VortexQuality.visual()` | Enables higher visual settings such as shadows. Some settings require a reload to recreate the WebGPU renderer. |
 | `VortexQuality.setShadows(value)` | Turns dynamic shadows on or off for the current session. |
-| `VortexQuality.setAvatarRenderer("legacy" \| "modern")` | Switches the local avatar renderer. Modern is the default; legacy remains available for compatibility testing. |
 | `VortexPerf.setEnabled(true)` | Starts lightweight frame-section timing. |
 | `VortexPerf.report()` | Returns average CPU frame-section timings, rAF/present cadence, renderer draw counts, and quality state collected so far. |
 | `VortexPerf.setLog(true)` | Prints timing tables to the console for the current page session only. Leave this off for real FPS testing. |
@@ -117,20 +116,6 @@ await VortexPerf.sample(5)
 ```
 
 `VortexQuality.get()` also includes renderer and cache stats such as backend, pixel ratio, draw calls, triangles, GPU texture count, cached geometries, cached materials, and cached shared textures.
-
-To compare the new runtime shell against the legacy-only boot path:
-
-```js
-localStorage.setItem("vwebRuntimeDisabled", "1")
-location.reload()
-```
-
-Run the same `await VortexPerf.sample(5)` test after reload. Restore the new runtime with:
-
-```js
-localStorage.removeItem("vwebRuntimeDisabled")
-location.reload()
-```
 
 The runtime shell is passive by default. The runtime panel and sandbox scheduler only run after `VortexRuntimeDevTools.enable()` or when `localStorage.vwebRuntimeDevTools` is set to `"1"`.
 

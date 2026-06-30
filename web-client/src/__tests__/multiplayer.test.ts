@@ -472,7 +472,7 @@ describe("MultiplayerService", () => {
 
     expect(session.connectFinished).toBe(true);
     expect(session.launchInfo?.id).toBe(18154);
-    expect(chat[0]).toBe("Vortex Web connecting relay: relay.example");
+    expect(chat[0]).toBe("Vortex Web connecting to relay");
 
     socket.onopen?.();
     expect(socket.sentJson()).toMatchObject({

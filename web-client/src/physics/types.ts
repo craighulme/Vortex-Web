@@ -1,4 +1,4 @@
-export type PhysicsBackend = "legacy" | "rapier";
+export type PhysicsBackend = "static" | "rapier";
 
 export type PhysicsWorldOptions = {
   backend: PhysicsBackend;
@@ -26,7 +26,7 @@ export type PhysicsWorld = {
   step(dt: number): void;
   addStaticBox(collider: StaticBoxCollider): ColliderHandle;
   removeCollider(handle: ColliderHandle): void;
-  syncStaticCollidersFromLegacy?(colliders: unknown[]): void;
+  syncStaticColliders?(colliders: unknown[]): void;
   castRay(origin: [number, number, number], direction: [number, number, number], maxDistance: number): RayHit | null;
   debugRender?(): PhysicsDebugRender | null;
   snapshot(): PhysicsWorldSnapshot;
@@ -40,7 +40,7 @@ export type PhysicsDebugRender = {
 
 export type PhysicsWorldSnapshot = {
   backend: PhysicsBackend;
-  status: "legacy" | "loading" | "ready" | "error" | "disposed";
+  status: "static" | "loading" | "ready" | "error" | "disposed";
   colliders: number;
   pendingColliders: number;
   lastSyncSource: string;

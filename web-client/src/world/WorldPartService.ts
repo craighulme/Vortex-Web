@@ -64,7 +64,7 @@ export class WorldPartService {
     return this;
   }
 
-  addStud(
+  addPart(
     sw: number,
     sh: number,
     sd: number,
@@ -134,7 +134,7 @@ export class WorldPartService {
     return [mesh, studId];
   }
 
-  removeStud(studId: number): void {
+  removePart(studId: number): void {
     const config = this.assertConfigured();
     const data = this.studData[studId];
     if (!data) return;

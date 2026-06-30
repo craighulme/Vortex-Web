@@ -27,7 +27,7 @@ describe("EngineWorldRuntimeService", () => {
         resolve: (path: string) => path === "meshes.malePlayerGlb" ? "/male.glb" : null
       },
       assetResolver: new RuntimeAssetResolverService(),
-      fallbackAssetRaw: JSON.stringify({ legacy: "/legacy.png" }),
+      fallbackAssetRaw: JSON.stringify({ fallback: "/fallback.png" }),
       worldRuntime: { configure: vi.fn(() => worldRuntimeHandles) },
       textures: {},
       geometry: {},
@@ -43,8 +43,8 @@ describe("EngineWorldRuntimeService", () => {
       studsPerTile: 4
     });
 
-    expect(service.runtimeAsset("meshes.malePlayerGlb", "legacy")).toBe("/male.glb");
-    expect(service.runtimeAsset("missing", "legacy")).toBe("/legacy.png");
+    expect(service.runtimeAsset("meshes.malePlayerGlb", "fallback")).toBe("/male.glb");
+    expect(service.runtimeAsset("missing", "fallback")).toBe("/fallback.png");
     expect([...service.getNearbyColliders(0, 0, 0)]).toEqual(["collider"]);
     expect(service.getClicked3DPoint()).toBe("hit");
     expect(pick).toHaveBeenCalledWith("camera", ["part"], 10, 20, 100, 80);

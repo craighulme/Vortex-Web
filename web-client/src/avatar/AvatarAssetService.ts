@@ -1,4 +1,4 @@
-export type LegacyAvatarLike = {
+export type NativeAvatarLike = {
   shirt_id?: unknown;
   shirtId?: unknown;
   pant_id?: unknown;
@@ -80,7 +80,7 @@ export class AvatarAssetService {
     return cached.hit ? cached.url : null;
   }
 
-  prefetchAvatarImages(avatars: LegacyAvatarLike | LegacyAvatarLike[]): void {
+  prefetchAvatarImages(avatars: NativeAvatarLike | NativeAvatarLike[]): void {
     const unique = new Set<number>();
     for (const avatar of Array.isArray(avatars) ? avatars : [avatars]) {
       for (const id of this.avatarImageIds(avatar)) unique.add(id);
@@ -88,7 +88,7 @@ export class AvatarAssetService {
     for (const id of unique) void this.prefetchClothingImage(id).catch(() => null);
   }
 
-  avatarImageIds(avatar: LegacyAvatarLike = {}): number[] {
+  avatarImageIds(avatar: NativeAvatarLike = {}): number[] {
     return [
       Number(avatar.shirt_id ?? avatar.shirtId ?? 0),
       Number(avatar.pant_id ?? avatar.pantId ?? 0),

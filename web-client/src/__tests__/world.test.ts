@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { WorldService } from "../world/WorldService";
 
 describe("WorldService", () => {
-  it("uses the legacy stud backend when it is available", () => {
+  it("uses the runtime stud backend when it is available", () => {
     const world = new WorldService();
     const added: unknown[][] = [];
     const removed: unknown[] = [];
-    world.attachLegacy({
-      addStud: (...args: unknown[]) => {
+    world.attachRuntimeAdapter({
+      addPart: (...args: unknown[]) => {
         added.push(args);
         return [null, `stud-${added.length}`];
       },
-      removeStud: (id: unknown) => removed.push(id)
+      removePart: (id: unknown) => removed.push(id)
     });
 
     world.loadMapParts("studs", [
@@ -33,8 +33,8 @@ describe("WorldService", () => {
     const requests: unknown[][] = [];
     const spawns: unknown[][] = [];
     const added: unknown[][] = [];
-    world.attachLegacy({
-      addStud: (...args: unknown[]) => {
+    world.attachRuntimeAdapter({
+      addPart: (...args: unknown[]) => {
         added.push(args);
         return [null, `stud-${added.length}`];
       },
@@ -81,18 +81,18 @@ describe("WorldService", () => {
       computeBoundingSphere: () => {},
       dispose: () => {}
     });
-    world.attachLegacy({
+    world.attachRuntimeAdapter({
       scene,
       bufferGeometryUtils: {
         mergeGeometries: (geometries: unknown[]) => ({ ...makeGeometry(), mergedCount: geometries.length })
       },
-      createMesh: (geometry: unknown, batchMaterial: unknown) => ({
+      createRuntimeMesh: (geometry: unknown, batchMaterial: unknown) => ({
         geometry,
         material: batchMaterial,
         userData: {},
         updateMatrix: () => {}
       }),
-      addStud: (...args: unknown[]) => {
+      addPart: (...args: unknown[]) => {
         const x = Number(args[4] || 0);
         const z = Number(args[6] || 0);
         return [{

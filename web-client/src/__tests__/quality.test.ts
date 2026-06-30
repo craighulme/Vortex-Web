@@ -17,6 +17,7 @@ describe("QualityService", () => {
       setRenderDistance: (value, profile) => calls.push(`renderDistance:${String(value)}:${String(profile)}`),
       diagnoseScene: () => "scene",
       performance: () => "performance",
+      balanced: () => "balanced",
       visual: () => "visual"
     });
 
@@ -32,6 +33,7 @@ describe("QualityService", () => {
     expect(service.diagnoseTextures()).toBe("textures");
     expect(service.diagnoseScene()).toBe("scene");
     expect(service.performance()).toBe("performance");
+    expect(service.balanced()).toBe("balanced");
     expect(service.visual()).toBe("visual");
     expect(calls).toEqual([
       "shadows:true",
@@ -86,5 +88,44 @@ describe("QualityService", () => {
     expect(service.get()).toMatchObject({ rendererBackend: "webgpu", studTextures: true });
     service.performance();
     expect(calls).toEqual(["shadows:false", "quality:low", "tone:none", "fog:false", "renderDistance:700:performance", "studs:false", "refresh"]);
+  });
+
+  it("keeps the selected render-distance algorithm when the distance changes", () => {
+    const calls: string[] = [];
+    const storage = new Map<string, string>([["vwebRenderDistanceProfile", "visual"]]);
+    const service = new QualityService().configureRuntime({
+      windowRef: {} as any,
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => { storage.set(key, value); }
+      } as any,
+      renderer: { getPixelRatio: () => 1, userData: { vwebBackend: "webgpu" } },
+      scene: { fog: null },
+      shadows: { snapshot: () => ({}), markNeedsUpdate: () => {} },
+      rendererService: { detectRendererBackend: () => "webgpu", diagnoseScene: () => ({}) },
+      toneMappingMode: () => "none",
+      fogSettings: () => ({}),
+      shadowQuality: () => "medium",
+      shadowMapSize: () => 2048,
+      shadowsActive: () => true,
+      readStorageFlag: () => false,
+      useStudTextures: () => true,
+      textureDiagnostics: () => [],
+      caches: () => ({ renderChunks: { cullDistance: 1200, renderDistanceProfile: "visual" } }),
+      setShadows: () => {},
+      setShadowQuality: () => {},
+      setToneMapping: () => {},
+      setRenderFog: () => {},
+      setFogDistance: () => {},
+      setRenderDistance: (value, profile) => calls.push(`${value}:${profile}`),
+      setStudTexturesEnabled: () => {},
+      refreshMaterials: () => {},
+      diagnoseSceneInput: () => ({})
+    });
+
+    service.setRenderDistance(1500, "visual");
+
+    expect(calls).toEqual(["1500:visual"]);
+    expect(storage.get("vwebRenderDistanceProfile")).toBe("visual");
   });
 });

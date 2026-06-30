@@ -1,6 +1,5 @@
 //Made by Inuk
 const extensionApi = globalThis.chrome || globalThis.browser;
-let lightModeToggle = document.getElementById('lightMode')
 let hubInput = document.getElementById('hubUrl')
 let licenseKeyInput = document.getElementById('licenseKey')
 let hubStatus = document.getElementById('hubStatus')
@@ -16,6 +15,7 @@ let updateBody = document.getElementById('updateBody')
 let updateList = document.getElementById('updateList')
 let openUpdateBtn = document.getElementById('openUpdateBtn')
 let dismissUpdateBtn = document.getElementById('dismissUpdateBtn')
+let openSettingsBtn = document.getElementById('openSettingsBtn')
 
 const LOCAL_NATIVE_RELAY = "ws://127.0.0.1:27822/ws";
 const HOSTED_NATIVE_RELAY = "wss://v22-relay.116.203.155.30.sslip.io/ws";
@@ -28,11 +28,6 @@ const REPO_URL = "https://github.com/craighulme/Vortex-Web";
 const CURRENT_VERSION = extensionApi.runtime?.getManifest?.().version || "0.0.0";
 
 extensionVersionLabel.textContent = `Version ${CURRENT_VERSION}`;
-
-function applyPopupTheme(enabled) {
-    document.documentElement.toggleAttribute("theme", Boolean(enabled));
-    if (enabled) document.documentElement.setAttribute("theme", "light");
-}
 
 function storageGet(defaults, cb) {
     const handleLocal = (localStored) => {
@@ -149,6 +144,10 @@ function openUrl(url) {
     window.open(safeUrl, "_blank", "noopener");
 }
 
+openSettingsBtn.addEventListener('click', () => {
+    openUrl(extensionApi.runtime.getURL("options/settings.html"));
+});
+
 function decodeUpdatePayload(raw) {
     if (raw?.content && raw.encoding === "base64") {
         return JSON.parse(atob(String(raw.content).replace(/\s/g, "")));
@@ -242,63 +241,3 @@ storageGet({ hubUrl: "", licenseKey: "" }, (stored) => {
 });
 
 checkForUpdates();
-
-function normalizeTheme(value) {
-    return value === "light" || value === "true" ? "light" : "dark";
-}
-
-async function activeTab() {
-    const tabs = await extensionApi.tabs.query({ active: true, currentWindow: true });
-    return tabs[0] || null;
-}
-
-async function readActiveTabTheme() {
-    const tab = await activeTab();
-    if (!tab?.id || !extensionApi.scripting?.executeScript) return null;
-    try {
-        const results = await extensionApi.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: () => localStorage.getItem("theme") || "dark"
-        });
-        return normalizeTheme(results?.[0]?.result);
-    } catch {
-        return null;
-    }
-}
-
-async function writeActiveTabTheme(theme) {
-    const tab = await activeTab();
-    if (!tab?.id || !extensionApi.scripting?.executeScript) return;
-    try {
-        await extensionApi.scripting.executeScript({
-            target: { tabId: tab.id },
-            args: [theme],
-            func: (nextTheme) => {
-                localStorage.setItem("theme", nextTheme);
-                if (nextTheme === "light") {
-                    document.documentElement.setAttribute("theme", "light");
-                } else {
-                    document.documentElement.removeAttribute("theme");
-                }
-            }
-        });
-    } catch {}
-}
-
-function setLightModeChecked(enabled) {
-    lightModeToggle.checked = Boolean(enabled);
-    applyPopupTheme(Boolean(enabled));
-}
-
-(async function initLightModeToggle() {
-    const theme = await readActiveTabTheme() || normalizeTheme(localStorage.getItem("theme"));
-    localStorage.setItem("theme", theme);
-    setLightModeChecked(theme === "light");
-})();
-
-lightModeToggle.addEventListener("change", async () => {
-    const theme = lightModeToggle.checked ? "light" : "dark";
-    localStorage.setItem("theme", theme);
-    applyPopupTheme(theme === "light");
-    await writeActiveTabTheme(theme);
-});

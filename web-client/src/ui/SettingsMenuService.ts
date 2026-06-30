@@ -1,3 +1,10 @@
+import {
+  keybindLabel,
+  readKeybinds,
+  writeKeybind,
+  type KeybindAction
+} from "../input/KeybindSettings";
+
 export type SettingsMenuSnapshot = {
   attached: boolean;
   open: boolean;
@@ -19,7 +26,7 @@ type SettingsMenuElements = {
   targets?: Partial<Record<SettingsMenuTarget, HTMLElement | null | undefined>>;
 };
 
-export type SettingsMenuTarget = "audio" | "graphics" | "advanced" | "dev" | "game";
+export type SettingsMenuTarget = "audio" | "controls" | "graphics" | "advanced" | "dev" | "game";
 
 export type SettingsMenuOption = {
   value: string;
@@ -75,6 +82,7 @@ export class SettingsMenuService {
     this.syncReloadNotice();
     this.syncBodyClass();
     this.syncTitle();
+    this.mountKeybindEditor();
   }
 
   setOpen(open: boolean): void {
@@ -320,6 +328,53 @@ export class SettingsMenuService {
     if (!this.panel || !this.reloadNotice) return;
     this.reloadNotice.hidden = !this.reloadNoticeVisible;
     this.panel.classList.toggle("has-reload-notice", this.reloadNoticeVisible);
+  }
+
+  private mountKeybindEditor(): void {
+    if (!this.panel) return;
+    const render = () => {
+      if (!this.panel) return;
+      const bindings = readKeybinds(this.storage);
+      for (const button of this.panel.querySelectorAll<HTMLButtonElement>("[data-keybind-action][data-bind-index]")) {
+        const action = button.dataset.keybindAction as KeybindAction;
+        const index = Number(button.dataset.bindIndex || 0) === 1 ? 1 : 0;
+        const code = bindings[action]?.[index] || "";
+        button.textContent = keybindLabel(code);
+        button.classList.toggle("empty", !code);
+      }
+    };
+
+    for (const button of this.panel.querySelectorAll<HTMLButtonElement>("[data-keybind-action][data-bind-index]")) {
+      if (button.dataset.keybindMounted === "true") continue;
+      button.dataset.keybindMounted = "true";
+      button.addEventListener("click", (clickEvent) => {
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        button.textContent = "Press key";
+        button.classList.add("listening");
+
+        const captureKey = (event: KeyboardEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation?.();
+          const action = button.dataset.keybindAction as KeybindAction;
+          const index = Number(button.dataset.bindIndex || 0) === 1 ? 1 : 0;
+          writeKeybind(this.storage, action, index, event.code || event.key || "");
+          cleanup();
+          render();
+        };
+        const cleanup = () => {
+          button.classList.remove("listening");
+          this.document.removeEventListener("keydown", captureKey, true);
+          this.document.defaultView?.removeEventListener("keydown", captureKey, true);
+        };
+
+        this.document.addEventListener("keydown", captureKey, true);
+        this.document.defaultView?.addEventListener("keydown", captureKey, true);
+      });
+    }
+
+    render();
   }
 }
 

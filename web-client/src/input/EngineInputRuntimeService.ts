@@ -1,4 +1,5 @@
 import type { CameraService } from "../camera/CameraService";
+import { matchesKeybindCode } from "./KeybindSettings";
 import type { CursorService } from "./CursorService";
 import type { InputService } from "./InputService";
 
@@ -106,9 +107,9 @@ export class EngineInputRuntimeService {
         config.setShiftLock(next);
         if (!config.isFirstPerson()) setMouseLock(next);
       }
-      if (code === "Comma") camera.snapYaw(1);
-      if (code === "Period") camera.snapYaw(-1);
-      if (code === "Space") config.onJumpRequest();
+      if (code && matchesKeybindCode(code, "cameraSnapLeft")) camera.snapYaw(1);
+      if (code && matchesKeybindCode(code, "cameraSnapRight")) camera.snapYaw(-1);
+      if (code && matchesKeybindCode(code, "jump")) config.onJumpRequest();
       if (code === "Backquote") config.onToggleDebug();
     });
 

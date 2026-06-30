@@ -271,8 +271,8 @@ function readPacketAvatar(view: DataView, foff: number): Omit<NativePlayerRecord
     valid: true,
     recordBytes: 0
   };
-  const legacyBodyType = foff + 63 <= view.byteLength ? view.getUint8(foff + 27) : 0;
-  if (foff + 59 <= view.byteLength && view.getUint8(foff + 22) === 1 && legacyBodyType !== 1 && legacyBodyType !== 2) {
+  const shirtOnlyBodyType = foff + 63 <= view.byteLength ? view.getUint8(foff + 27) : 0;
+  if (foff + 59 <= view.byteLength && view.getUint8(foff + 22) === 1 && shirtOnlyBodyType !== 1 && shirtOnlyBodyType !== 2) {
     avatar.shirtId = view.getUint32(foff + 23, true);
     const colors: string[] = [];
     let off = foff + 29;

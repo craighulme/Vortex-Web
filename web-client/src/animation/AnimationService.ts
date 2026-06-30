@@ -6,24 +6,24 @@ export type FootIkConfig = {
   smoothing: number;
 };
 
-export type LegacyRemoteAnimation = "idle" | "walk" | "jump" | "climb" | string;
+export type RuntimeRemoteAnimation = "idle" | "walk" | "jump" | "climb" | string;
 
-export type LegacyRemoteAnimationTarget = {
-  anim?: LegacyRemoteAnimation;
+export type RuntimeRemoteAnimationTarget = {
+  anim?: RuntimeRemoteAnimation;
   animTime?: number;
   meshes?: {
-    bones?: Record<string, LegacyBoneLike | undefined>;
-    rest?: Record<string, LegacyBoneRest | undefined>;
+    bones?: Record<string, RigBoneLike | undefined>;
+    rest?: Record<string, RigBoneRest | undefined>;
   };
 };
 
-export type LegacyBoneLike = {
+export type RigBoneLike = {
   rotation: Record<string, number>;
   position: Record<string, number>;
   scale?: Record<string, number>;
 };
 
-export type LegacyBoneRest = {
+export type RigBoneRest = {
   x?: number;
   y?: number;
   z?: number;
@@ -37,8 +37,8 @@ export type LegacyBoneRest = {
 
 export type LocalAnimationState = {
   time: number;
-  bones: Record<string, LegacyBoneLike | undefined>;
-  rest: Record<string, LegacyBoneRest | undefined>;
+  bones: Record<string, RigBoneLike | undefined>;
+  rest: Record<string, RigBoneRest | undefined>;
 };
 
 export type LocalAnimationOptions = {
@@ -112,15 +112,15 @@ export class AnimationService {
         : options.moving
           ? "walk"
           : "idle";
-    animateLegacyPose(state.bones, state.rest, mode, state.time, dt, options.moving);
+    animateRuntimePose(state.bones, state.rest, mode, state.time, dt, options.moving);
   }
 
-  animateLegacyRemote(remote: LegacyRemoteAnimationTarget, dt: number): void {
+  animateRuntimeRemote(remote: RuntimeRemoteAnimationTarget, dt: number): void {
     const bones = remote.meshes?.bones;
     const rest = remote.meshes?.rest;
     if (!bones || !rest) return;
     remote.animTime = Number(remote.animTime || 0) + dt;
-    animateLegacyPose(bones, rest, remote.anim, remote.animTime, dt, true);
+    animateRuntimePose(bones, rest, remote.anim, remote.animTime, dt, true);
   }
 
   applyLocalFootIk(options: LocalFootIkOptions): FootIkState {
@@ -209,10 +209,10 @@ function createFootIkState(): FootIkState {
   };
 }
 
-function animateLegacyPose(
-  bones: Record<string, LegacyBoneLike | undefined>,
-  rest: Record<string, LegacyBoneRest | undefined>,
-  animation: LegacyRemoteAnimation | undefined,
+function animateRuntimePose(
+  bones: Record<string, RigBoneLike | undefined>,
+  rest: Record<string, RigBoneRest | undefined>,
+  animation: RuntimeRemoteAnimation | undefined,
   time: number,
   dt: number,
   climbMoving: boolean
@@ -271,8 +271,8 @@ function animateLegacyPose(
 }
 
 function setBoneRotation(
-  bones: Record<string, LegacyBoneLike | undefined>,
-  rest: Record<string, LegacyBoneRest | undefined>,
+  bones: Record<string, RigBoneLike | undefined>,
+  rest: Record<string, RigBoneRest | undefined>,
   name: string,
   axis: string,
   target: number,
@@ -281,13 +281,13 @@ function setBoneRotation(
 ): void {
   const bone = bones[name];
   if (!bone) return;
-  const restValue = Number(rest[name]?.[axis as keyof LegacyBoneRest] ?? 0);
+  const restValue = Number(rest[name]?.[axis as keyof RigBoneRest] ?? 0);
   bone.rotation[axis] = lerp(Number(bone.rotation[axis] || 0), restValue + target, Math.min(1, speed * dt));
 }
 
 function setBonePositionY(
-  bones: Record<string, LegacyBoneLike | undefined>,
-  rest: Record<string, LegacyBoneRest | undefined>,
+  bones: Record<string, RigBoneLike | undefined>,
+  rest: Record<string, RigBoneRest | undefined>,
   name: string,
   offset: number,
   speed: number,
@@ -307,7 +307,7 @@ function footIkGroundOffset(sample: { hit: boolean; groundY: number }, footY: nu
 function sampleFootGround(
   animation: LocalAnimationState,
   character: NonNullable<LocalFootIkOptions["character"]>,
-  bone: LegacyBoneLike,
+  bone: RigBoneLike,
   fallbackLocalX: number,
   footY: number,
   probe: number,
@@ -330,7 +330,7 @@ function sampleFootGround(
   };
 }
 
-function footIkVerticalAxis(animation: LocalAnimationState, leftLeg: LegacyBoneLike | undefined, rightLeg: LegacyBoneLike | undefined): "y" | "z" {
+function footIkVerticalAxis(animation: LocalAnimationState, leftLeg: RigBoneLike | undefined, rightLeg: RigBoneLike | undefined): "y" | "z" {
   const left = leftLeg ? animation.rest[readBoneName(animation, leftLeg)] : null;
   const right = rightLeg ? animation.rest[readBoneName(animation, rightLeg)] : null;
   const zMagnitude = Math.max(Math.abs(left?.pz || 0), Math.abs(right?.pz || 0));
@@ -338,7 +338,7 @@ function footIkVerticalAxis(animation: LocalAnimationState, leftLeg: LegacyBoneL
   return zMagnitude > yMagnitude + 0.25 ? "z" : "y";
 }
 
-function applyBoneVerticalOffset(animation: LocalAnimationState, bone: LegacyBoneLike, offset: number, axis: "y" | "z"): void {
+function applyBoneVerticalOffset(animation: LocalAnimationState, bone: RigBoneLike, offset: number, axis: "y" | "z"): void {
   const rest = animation.rest[readBoneName(animation, bone)] || {};
   const key = axis === "z" ? "pz" : "py";
   const restValue = Number.isFinite(rest[key]) ? Number(rest[key]) : Number(bone.position[axis] || 0);
@@ -347,7 +347,7 @@ function applyBoneVerticalOffset(animation: LocalAnimationState, bone: LegacyBon
 
 function applyLegVerticalOffset(
   animation: LocalAnimationState,
-  bone: LegacyBoneLike | undefined,
+  bone: RigBoneLike | undefined,
   offset: number,
   axis: "y" | "z",
   charHeight: number
@@ -366,7 +366,7 @@ function applyLegVerticalOffset(
   return restScale;
 }
 
-function readBoneName(animation: LocalAnimationState, bone: LegacyBoneLike): string {
+function readBoneName(animation: LocalAnimationState, bone: RigBoneLike): string {
   for (const [name, candidate] of Object.entries(animation.bones)) {
     if (candidate === bone) return name;
   }

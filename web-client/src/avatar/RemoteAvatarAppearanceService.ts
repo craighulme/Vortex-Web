@@ -1,6 +1,6 @@
 import type { AvatarAssetService } from "./AvatarAssetService";
 import type { AvatarMaterialService } from "./AvatarMaterialService";
-import type { AvatarService, LegacyAvatarState } from "./AvatarService";
+import type { AvatarService, NativeAvatarState } from "./AvatarService";
 import type { RemotePlayerMeshes } from "./RemotePlayerService";
 
 export type RemoteAvatarAppearanceOptions = {
@@ -58,10 +58,10 @@ export class RemoteAvatarAppearanceService {
     return this.requireOptions().avatarMaterials.applyShirtToMesh(mesh, url);
   }
 
-  async applyAvatarToMeshes(meshes: RemotePlayerMeshes | null | undefined, avatar: LegacyAvatarState | Record<string, unknown>): Promise<void> {
+  async applyAvatarToMeshes(meshes: RemotePlayerMeshes | null | undefined, avatar: NativeAvatarState | Record<string, unknown>): Promise<void> {
     if (!meshes) return;
     const options = this.requireOptions();
-    const normalized = options.avatarService.normalizeLegacy(avatar);
+    const normalized = options.avatarService.normalizeNative(avatar);
     const rawAvatar = avatar as Record<string, unknown>;
     const playerId = Number(rawAvatar.id ?? rawAvatar.user_id ?? rawAvatar.userId ?? rawAvatar.player_id ?? rawAvatar.playerId ?? 0) || null;
     const username = String(rawAvatar.username ?? rawAvatar.name ?? "").trim() || null;

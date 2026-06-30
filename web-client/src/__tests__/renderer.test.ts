@@ -54,7 +54,7 @@ describe("RendererService", () => {
     };
 
     const service = new RendererService();
-    service.attachLegacy({ renderer });
+    service.attachRuntimeAdapter({ renderer });
 
     expect(renderer.pixelRatio).toBe(1);
     expect(service.snapshot()).toMatchObject({
@@ -98,7 +98,7 @@ describe("RendererService", () => {
     };
 
     const service = new RendererService();
-    service.attachLegacy({ renderer });
+    service.attachRuntimeAdapter({ renderer });
 
     expect(renderer.pixelRatio).toBe(0.5);
 

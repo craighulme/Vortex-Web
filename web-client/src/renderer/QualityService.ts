@@ -11,6 +11,7 @@ export type QualityServiceConfig = {
   setRenderDistance(value: unknown, profile?: "performance" | "balanced" | "visual"): unknown;
   diagnoseScene(): unknown;
   performance(): unknown;
+  balanced(): unknown;
   visual(): unknown;
 };
 
@@ -97,10 +98,19 @@ export class QualityService {
         options.setShadowQuality("low");
         options.setToneMapping("none");
         options.setRenderFog(false);
-        options.setRenderDistance(700, "performance");
-        options.localStorage.setItem("vwebRenderDistance", "700");
-        options.localStorage.setItem("vwebRenderDistanceProfile", "performance");
+        this.applyRenderDistancePreset(options, "performance", 700);
         options.setStudTexturesEnabled(false);
+        options.refreshMaterials();
+        return this.get();
+      },
+      balanced: () => {
+        options.setShadows(true);
+        options.localStorage.setItem("vwebAntialias", "0");
+        options.setShadowQuality("medium");
+        options.setToneMapping("none");
+        options.setRenderFog(false);
+        this.applyRenderDistancePreset(options, "balanced", 1200);
+        options.setStudTexturesEnabled(true);
         options.refreshMaterials();
         return this.get();
       },
@@ -110,9 +120,7 @@ export class QualityService {
         options.setShadowQuality("medium");
         options.setToneMapping("agx");
         options.setRenderFog(false);
-        options.setRenderDistance(1800, "visual");
-        options.localStorage.setItem("vwebRenderDistance", "1800");
-        options.localStorage.setItem("vwebRenderDistanceProfile", "visual");
+        this.applyRenderDistancePreset(options, "visual", 1800);
         options.setStudTexturesEnabled(true);
         options.refreshMaterials();
         return this.get();
@@ -168,6 +176,10 @@ export class QualityService {
     return this.requireConfig().performance();
   }
 
+  balanced(): unknown {
+    return this.requireConfig().balanced();
+  }
+
   visual(): unknown {
     return this.requireConfig().visual();
   }
@@ -194,6 +206,7 @@ export class QualityService {
         sceneFog: options.scene.fog ? { near: options.scene.fog.near, far: options.scene.fog.far } : null
       },
       renderDistance: normalizeRenderDistance(options.localStorage.getItem("vwebRenderDistance") || renderChunks?.cullDistance || 1200),
+      renderDistanceProfile: normalizeRenderDistanceProfile(options.localStorage.getItem("vwebRenderDistanceProfile") || renderChunks?.renderDistanceProfile || "balanced"),
       shadowQuality: options.rendererService.getShadowQuality?.() || options.shadowQuality(),
       shadowMapSize: options.shadowMapSize(),
       shadowService: options.shadows.snapshot(),
@@ -207,6 +220,17 @@ export class QualityService {
       caches
     };
   }
+
+  private applyRenderDistancePreset(
+    options: RuntimeQualityOptions,
+    profile: "performance" | "balanced" | "visual",
+    fallbackDistance: number
+  ): void {
+    const distance = normalizeRenderDistance(fallbackDistance);
+    options.localStorage.setItem("vwebRenderDistance", String(distance));
+    options.localStorage.setItem("vwebRenderDistanceProfile", profile);
+    options.setRenderDistance(distance, profile);
+  }
 }
 
 function normalizeRenderDistance(value: unknown): number {
@@ -217,4 +241,8 @@ function normalizeRenderDistance(value: unknown): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function normalizeRenderDistanceProfile(value: unknown): "performance" | "balanced" | "visual" {
+  return value === "performance" || value === "visual" ? value : "balanced";
 }

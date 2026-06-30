@@ -6,7 +6,7 @@ type VortexWindow = Window & {
   _vortex?: unknown;
 };
 
-export function installCompatibilityShim(target: Window, runtime: VortexRuntime): void {
+export function installWindowRuntimeBridge(target: Window, runtime: VortexRuntime): void {
   const win = target as VortexWindow;
   win.VortexRuntime = runtime;
   win.__vwebRuntime = runtime;

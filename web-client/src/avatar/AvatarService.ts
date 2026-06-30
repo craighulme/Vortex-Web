@@ -24,7 +24,7 @@ export type AvatarState = {
   attachments: Partial<Record<AttachmentSlot, string>>;
 };
 
-export type LegacyAvatarState = {
+export type NativeAvatarState = {
   shirt_id: number;
   pant_id: number;
   body_type: "male" | "female";
@@ -43,27 +43,27 @@ export const DEFAULT_BODY_COLORS = [
 
 export type VortexAvatarConsoleApi = {
   readonly renderer: string;
-  getOutfit(): LegacyAvatarState | unknown;
-  setOutfit(outfit: Record<string, unknown>, persist?: boolean): Promise<LegacyAvatarState>;
+  getOutfit(): NativeAvatarState | unknown;
+  setOutfit(outfit: Record<string, unknown>, persist?: boolean): Promise<NativeAvatarState>;
 };
 
 export type VortexAvatarConsoleOptions = {
-  persistOutfit(avatar: LegacyAvatarState): Promise<void>;
-  syncLaunchInfo(avatar: LegacyAvatarState): void;
+  persistOutfit(avatar: NativeAvatarState): Promise<void>;
+  syncLaunchInfo(avatar: NativeAvatarState): void;
 };
 
-type LegacyAvatarApi = {
+type AvatarRuntimeAdapter = {
   applyAvatar?: unknown;
   getAvatar?: unknown;
 };
 
 export class AvatarService {
-  private legacy: LegacyAvatarApi = {};
+  private runtimeAdapter: AvatarRuntimeAdapter = {};
   private previewState: AvatarState = this.normalize();
 
-  attachLegacy(api: LegacyAvatarApi): void {
-    this.legacy = { ...this.legacy, ...api };
-    const current = this.readLegacyAvatar();
+  attachRuntimeAdapter(api: AvatarRuntimeAdapter): void {
+    this.runtimeAdapter = { ...this.runtimeAdapter, ...api };
+    const current = this.readRuntimeAvatar();
     if (current) this.previewState = current;
   }
 
@@ -78,7 +78,7 @@ export class AvatarService {
     };
   }
 
-  normalizeLegacy(input: Record<string, unknown> = {}, fallback: Partial<LegacyAvatarState> = {}): LegacyAvatarState {
+  normalizeNative(input: Record<string, unknown> = {}, fallback: Partial<NativeAvatarState> = {}): NativeAvatarState {
     const bodyColors = Array.isArray(input.body_colors)
       ? input.body_colors
       : Array.isArray(input.bodyColors)
@@ -93,14 +93,14 @@ export class AvatarService {
       pantId: Number(input.pant_id ?? input.pantId ?? fallback.pant_id ?? 0),
       faceId: Number(input.face_id ?? input.faceId ?? fallback.face_id ?? 0)
     });
-    return toLegacyAvatar(avatar) as LegacyAvatarState;
+    return toNativeAvatar(avatar) as NativeAvatarState;
   }
 
   async applyLocal(input: Partial<AvatarState>): Promise<AvatarState> {
     const avatar = this.normalize({ ...this.previewState, ...input });
     this.previewState = avatar;
-    if (typeof this.legacy.applyAvatar === "function") {
-      await this.legacy.applyAvatar(toLegacyAvatar(avatar));
+    if (typeof this.runtimeAdapter.applyAvatar === "function") {
+      await this.runtimeAdapter.applyAvatar(toNativeAvatar(avatar));
     }
     return avatar;
   }
@@ -110,7 +110,7 @@ export class AvatarService {
   }
 
   getPreviewState(): AvatarState {
-    const current = this.readLegacyAvatar();
+    const current = this.readRuntimeAvatar();
     if (current) this.previewState = current;
     return { ...this.previewState, bodyColors: [...this.previewState.bodyColors], attachments: { ...this.previewState.attachments } };
   }
@@ -122,14 +122,14 @@ export class AvatarService {
         return thisService.getRenderer();
       },
       getOutfit() {
-        return thisService.readLegacyRawAvatar() || toLegacyAvatar(thisService.getPreviewState());
+        return thisService.readRuntimeRawAvatar() || toNativeAvatar(thisService.getPreviewState());
       },
       async setOutfit(outfit: Record<string, unknown>, persist = true) {
-        const normalized = thisService.normalizeLegacy(outfit);
+        const normalized = thisService.normalizeNative(outfit);
         if (persist) await options.persistOutfit(normalized);
         options.syncLaunchInfo(normalized);
-        if (typeof thisService.legacy.applyAvatar === "function") {
-          await thisService.legacy.applyAvatar(normalized);
+        if (typeof thisService.runtimeAdapter.applyAvatar === "function") {
+          await thisService.runtimeAdapter.applyAvatar(normalized);
         }
         thisService.previewState = thisService.normalize({
           bodyType: normalized.body_type,
@@ -143,10 +143,10 @@ export class AvatarService {
     };
   }
 
-  private readLegacyAvatar(): AvatarState | null {
-    if (typeof this.legacy.getAvatar !== "function") return null;
+  private readRuntimeAvatar(): AvatarState | null {
+    if (typeof this.runtimeAdapter.getAvatar !== "function") return null;
     try {
-      const raw = this.legacy.getAvatar() as Record<string, unknown>;
+      const raw = this.runtimeAdapter.getAvatar() as Record<string, unknown>;
       return this.normalize({
         bodyType: raw.body_type === "female" || raw.bodyType === "female" ? "female" : "male",
         bodyColors: Array.isArray(raw.body_colors) ? raw.body_colors as string[] : (Array.isArray(raw.bodyColors) ? raw.bodyColors as string[] : []),
@@ -159,17 +159,17 @@ export class AvatarService {
     }
   }
 
-  private readLegacyRawAvatar(): unknown {
-    if (typeof this.legacy.getAvatar !== "function") return null;
+  private readRuntimeRawAvatar(): unknown {
+    if (typeof this.runtimeAdapter.getAvatar !== "function") return null;
     try {
-      return this.legacy.getAvatar();
+      return this.runtimeAdapter.getAvatar();
     } catch {
       return null;
     }
   }
 }
 
-function toLegacyAvatar(avatar: AvatarState): LegacyAvatarState {
+function toNativeAvatar(avatar: AvatarState): NativeAvatarState {
   return {
     shirt_id: avatar.shirtId,
     pant_id: avatar.pantId,

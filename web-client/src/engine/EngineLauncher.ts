@@ -64,7 +64,7 @@ const {
 } = sceneRuntime;
 const sceneSettings = VortexRuntime.sceneSettings;
 
-const runtimeAssets = window.VortexRuntime?.assets;
+const runtimeAssets = VortexRuntime.assets;
 const cursorService = VortexRuntime.cursor;
 const worldRuntime = VortexRuntime.engineWorld.configure({
     THREE,
@@ -162,7 +162,7 @@ const localPlayerRuntime = VortexRuntime.engineLocalPlayer.configure({
 const localMovement = localPlayerRuntime.localMovement;
 const cam = localPlayerRuntime.cameraState;
 
-const runtimeInput = window.VortexRuntime && window.VortexRuntime.input;
+const runtimeInput = VortexRuntime.input;
 if (!runtimeInput || typeof runtimeInput.attachTarget !== 'function') {
     throw new Error('[input] VortexRuntime input service is required before the engine starts.');
 }
@@ -234,7 +234,7 @@ VortexRuntime.engineRuntimeBridge.install({
     sceneSettings,
     rendererService: runtimeRendererService,
     quality: VortexRuntime.quality,
-    compatibility: VortexRuntime.engineCompatibility,
+    runtimeExports: VortexRuntime.engineExports,
     frameLoop: VortexRuntime.frameLoop,
     profiler: VortexPerf,
     worldService: VortexRuntime.world,
@@ -270,6 +270,7 @@ VortexRuntime.engineRuntimeBridge.install({
         chunkDebug.update();
         worldRuntime.updateDebug(getCharacter(), characterMetrics());
     },
+    updateMultiplayer: (dt) => VortexRuntime.multiplayerBridge.updateFrame(dt),
     updateLighting: updateLightingForFrame,
 });
 }

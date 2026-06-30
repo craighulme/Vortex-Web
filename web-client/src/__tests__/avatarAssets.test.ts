@@ -19,7 +19,7 @@ describe("AvatarAssetService", () => {
     expect(service.clothingImageUrl(0)).toBeNull();
   });
 
-  it("extracts avatar image ids from legacy and camelCase fields", () => {
+  it("extracts avatar image ids from snake_case and camelCase fields", () => {
     const service = new AvatarAssetService(createWindow(vi.fn() as unknown as Window["fetch"]));
 
     expect(service.avatarImageIds({ shirt_id: 1, pantId: 2, face_id: 0 })).toEqual([1, 2]);

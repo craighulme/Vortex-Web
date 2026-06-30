@@ -7,7 +7,7 @@ type CreatePhysicsWorldOptions = {
   diagnostics: DiagnosticsService;
 };
 
-type LegacyCollider = {
+type RuntimeColliderInput = {
   minX: number;
   maxX: number;
   minY: number;
@@ -38,11 +38,11 @@ type RapierCollider = ReturnType<RapierWorld["createCollider"]>;
 
 export function createPhysicsWorld(options: CreatePhysicsWorldOptions): PhysicsWorld {
   if (options.backend === "rapier") return new RapierPhysicsWorld(options.diagnostics);
-  return new LegacyPhysicsWorld();
+  return new StaticPhysicsWorld();
 }
 
-class LegacyPhysicsWorld implements PhysicsWorld {
-  readonly backend = "legacy";
+class StaticPhysicsWorld implements PhysicsWorld {
+  readonly backend = "static";
   private readonly colliders = new Map<string, StaticBoxCollider>();
   private lastSyncSource = "manual";
 
@@ -58,8 +58,8 @@ class LegacyPhysicsWorld implements PhysicsWorld {
     this.colliders.delete(handle);
   }
 
-  syncStaticCollidersFromLegacy(colliders: unknown[]): void {
-    const parsed = normalizeLegacyColliders(colliders);
+  syncStaticColliders(colliders: unknown[]): void {
+    const parsed = normalizeRuntimeColliders(colliders);
     this.colliders.clear();
     for (const collider of parsed) {
       this.colliders.set(collider.id ?? crypto.randomUUID(), collider);
@@ -77,8 +77,8 @@ class LegacyPhysicsWorld implements PhysicsWorld {
 
   snapshot(): PhysicsWorldSnapshot {
     return {
-      backend: "legacy",
-      status: "legacy",
+      backend: "static",
+      status: "static",
       colliders: this.colliders.size,
       pendingColliders: 0,
       lastSyncSource: this.lastSyncSource
@@ -133,8 +133,8 @@ class RapierPhysicsWorld implements PhysicsWorld {
     if (index >= 0) this.pendingColliders.splice(index, 1);
   }
 
-  syncStaticCollidersFromLegacy(colliders: unknown[]): void {
-    const parsed = normalizeLegacyColliders(colliders);
+  syncStaticColliders(colliders: unknown[]): void {
+    const parsed = normalizeRuntimeColliders(colliders);
     const nextSignature = signatureFor(parsed);
     if (nextSignature === this.lastSyncSource) return;
     this.lastSyncSource = nextSignature;
@@ -244,20 +244,20 @@ class RapierPhysicsWorld implements PhysicsWorld {
   }
 }
 
-function normalizeLegacyColliders(colliders: unknown[]): StaticBoxCollider[] {
+function normalizeRuntimeColliders(colliders: unknown[]): StaticBoxCollider[] {
   const parsed: StaticBoxCollider[] = [];
   for (let i = 0; i < colliders.length; i += 1) {
-    const collider = normalizeLegacyCollider(colliders[i], i);
+    const collider = normalizeRuntimeCollider(colliders[i], i);
     if (collider) parsed.push(collider);
   }
   return parsed;
 }
 
-function normalizeLegacyCollider(value: unknown, index: number): StaticBoxCollider | null {
-  if (!isLegacyCollider(value)) return null;
+function normalizeRuntimeCollider(value: unknown, index: number): StaticBoxCollider | null {
+  if (!isRuntimeCollider(value)) return null;
   if (value.isOBB && hasObbBasis(value)) {
     return {
-      id: `legacy-${index}`,
+      id: `static-${index}`,
       center: [value.cx, value.cy, value.cz],
       size: [value.hx * 2, value.hy * 2, value.hz * 2],
       rotationQuaternion: quaternionFromBasis(value)
@@ -269,7 +269,7 @@ function normalizeLegacyCollider(value: unknown, index: number): StaticBoxCollid
     Math.max(0.001, value.maxZ - value.minZ)
   ];
   return {
-    id: `legacy-${index}`,
+    id: `static-${index}`,
     center: [
       (value.minX + value.maxX) * 0.5,
       (value.minY + value.maxY) * 0.5,
@@ -279,16 +279,16 @@ function normalizeLegacyCollider(value: unknown, index: number): StaticBoxCollid
   };
 }
 
-function isLegacyCollider(value: unknown): value is LegacyCollider {
+function isRuntimeCollider(value: unknown): value is RuntimeColliderInput {
   if (!value || typeof value !== "object") return false;
   const c = value as Record<string, unknown>;
   return ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"].every((key) => Number.isFinite(Number(c[key])));
 }
 
-function hasObbBasis(collider: LegacyCollider): collider is Required<Pick<LegacyCollider,
-  "cx" | "cy" | "cz" | "hx" | "hy" | "hz" | "ux" | "uy" | "uz" | "vx" | "vy" | "vz" | "wx" | "wy" | "wz">> & LegacyCollider {
+function hasObbBasis(collider: RuntimeColliderInput): collider is Required<Pick<RuntimeColliderInput,
+  "cx" | "cy" | "cz" | "hx" | "hy" | "hz" | "ux" | "uy" | "uz" | "vx" | "vy" | "vz" | "wx" | "wy" | "wz">> & RuntimeColliderInput {
   return ["cx", "cy", "cz", "hx", "hy", "hz", "ux", "uy", "uz", "vx", "vy", "vz", "wx", "wy", "wz"]
-    .every((key) => Number.isFinite(Number(collider[key as keyof LegacyCollider])));
+    .every((key) => Number.isFinite(Number(collider[key as keyof RuntimeColliderInput])));
 }
 
 function signatureFor(colliders: StaticBoxCollider[]): string {
@@ -327,7 +327,7 @@ function eulerToQuaternion(rotation: [number, number, number] | undefined): [num
   ];
 }
 
-function quaternionFromBasis(collider: Required<Pick<LegacyCollider,
+function quaternionFromBasis(collider: Required<Pick<RuntimeColliderInput,
   "ux" | "uy" | "uz" | "vx" | "vy" | "vz" | "wx" | "wy" | "wz">>): [number, number, number, number] {
   const m00 = collider.ux;
   const m01 = collider.vx;
