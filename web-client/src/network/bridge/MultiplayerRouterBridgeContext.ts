@@ -1,7 +1,7 @@
 // @ts-nocheck
 
 export function handleMultiplayerBridgeMessage(d, ctx) {
-  if (ctx.queueUntilRuntimeExports(d)) return;
+  if (ctx.queueUntilRuntimeApi(d)) return;
   ctx.remoteBridge.recordMultiplayerMessage(d);
   ctx.runtimeRouter().handle(d, {
     selfId: ctx.getSelfId,
@@ -37,13 +37,13 @@ export function handleMultiplayerBridgeMessage(d, ctx) {
     addRemote: ctx.remoteBridge.addRemote,
     removeRemote: ctx.remoteBridge.removeRemote,
     decodeRemoteState: ctx.remoteBridge.decodeNetworkData,
-    prefetchAvatarImages: (value) => ctx.vortex.prefetchAvatarImages?.(value),
-    applyLocalAvatar: (value) => ctx.vortex.applyAvatar?.(value),
+    prefetchAvatarImages: (value) => ctx.runtimeApi.prefetchAvatarImages?.(value),
+    applyLocalAvatar: (value) => ctx.runtimeApi.applyAvatar?.(value),
     applyAvatarToRemote: (remote, data) => {
       const avatar = ctx.normalizeAvatarFields({ ...(remote.avatar || {}), ...data });
       remote.avatar = avatar;
       if (remote.meshes) {
-        ctx.vortex.applyAvatarToMeshes?.(remote.meshes, {
+        ctx.runtimeApi.applyAvatarToMeshes?.(remote.meshes, {
           ...avatar,
           id: remote.id,
           playerId: remote.id,

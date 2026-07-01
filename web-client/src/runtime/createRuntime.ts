@@ -5,9 +5,10 @@ import { AnimationService } from "../animation/AnimationService";
 import { AudioService } from "../audio/AudioService";
 import { CameraService } from "../camera/CameraService";
 import { AvatarMaterialService } from "../avatar/AvatarMaterialService";
+import { AvatarEquipmentService } from "../avatar/AvatarEquipmentService";
 import { AvatarAssetService } from "../avatar/AvatarAssetService";
 import { CharacterSpawnService } from "../avatar/CharacterSpawnService";
-import { AvatarRuntimeBridgeService } from "../avatar/AvatarRuntimeBridgeService";
+import { AvatarRuntimeSetupService } from "../avatar/AvatarRuntimeSetupService";
 import { LocalAvatarService } from "../avatar/LocalAvatarService";
 import { AvatarService } from "../avatar/AvatarService";
 import { RemoteAvatarAppearanceService } from "../avatar/RemoteAvatarAppearanceService";
@@ -19,13 +20,14 @@ import { DiagnosticsService } from "../diagnostics/DiagnosticsService";
 import { PerformanceService } from "../diagnostics/PerformanceService";
 import { GameSession } from "../game/GameSession";
 import { CursorService } from "../input/CursorService";
-import { InputRuntimeBridgeService } from "../input/InputRuntimeBridgeService";
+import { InputRuntimeSetupService } from "../input/InputRuntimeSetupService";
 import { InputService } from "../input/InputService";
 import { CharacterCollisionService } from "../movement/CharacterCollisionService";
 import { ClimbService } from "../movement/ClimbService";
-import { LocalPlayerRuntimeBridgeService } from "../movement/LocalPlayerRuntimeBridgeService";
+import { LocalPlayerRuntimeSetupService } from "../movement/LocalPlayerRuntimeSetupService";
 import { LocalMovementRuntimeService } from "../movement/LocalMovementRuntimeService";
 import { MovementService } from "../movement/MovementService";
+import { PlayerService } from "../players/PlayerService";
 import { MultiplayerService } from "../network/MultiplayerService";
 import { MultiplayerBridgeService } from "../network/bridge/MultiplayerBridgeService";
 import { MultiplayerConnectionService } from "../network/relay/MultiplayerConnectionService";
@@ -48,7 +50,7 @@ import { ChatCommandService } from "../ui/ChatCommandService";
 import { ChatService } from "../ui/ChatService";
 import { ChatBubbleService } from "../ui/ChatBubbleService";
 import { CoreHudService } from "../ui/CoreHudService";
-import { HudRuntimeBridgeService } from "../ui/HudRuntimeBridgeService";
+import { HudRuntimeSetupService } from "../ui/HudRuntimeSetupService";
 import { HudInteractionService } from "../ui/HudInteractionService";
 import { LeaderboardService } from "../ui/LeaderboardService";
 import { LeaderboardDomService } from "../ui/LeaderboardDomService";
@@ -56,19 +58,20 @@ import { NotificationService } from "../ui/NotificationService";
 import { RuntimeSettingsPresenterService } from "../ui/RuntimeSettingsPresenter";
 import { SettingsMenuService } from "../ui/SettingsMenuService";
 import { ThemeService } from "../ui/ThemeService";
-import { WorldRuntimeBridgeService } from "../world/WorldRuntimeBridgeService";
+import { WorldRuntimeSetupService } from "../world/WorldRuntimeSetupService";
 import { WorldBootstrapService } from "../world/WorldBootstrapService";
 import { WorldService } from "../world/WorldService";
 import { WorldColliderService } from "../world/WorldColliderService";
+import { WorldDynamicObjectService } from "../world/WorldDynamicObjectService";
 import { WorldGeometryService } from "../world/WorldGeometryService";
 import { WorldMaterialService } from "../world/WorldMaterialService";
 import { WorldPartService } from "../world/WorldPartService";
 import { WorldPickingService } from "../world/WorldPickingService";
 import { WorldRuntimeService } from "../world/WorldRuntimeService";
 import { EventBus } from "./EventBus";
-import { RuntimeExportsService } from "./RuntimeExportsService";
-import { RuntimeBridgeService } from "./RuntimeBridgeService";
-import { SceneRuntimeBridgeService } from "./SceneRuntimeBridgeService";
+import { RuntimeApiExportService } from "./RuntimeApiExportService";
+import { RuntimeStartupService } from "./RuntimeStartupService";
+import { SceneRuntimeSetupService } from "./SceneRuntimeSetupService";
 import { FrameLoopService } from "./FrameLoopService";
 import { LoadingScreenService } from "./LoadingScreenService";
 import { RuntimeSettingsStore } from "./RuntimeSettingsStore";
@@ -85,11 +88,13 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
   const input = new InputService(options.document, options.window);
   const settingsMenu = new SettingsMenuService(options.document);
   const theme = new ThemeService(options.document, options.window.localStorage).installGlobal(options.window as Window & Record<string, unknown>);
-  let vortexApi: unknown = null;
   let physicsSyncTimer: number | null = null;
   const animation = new AnimationService();
   const multiplayer = new MultiplayerService();
   const multiplayerSession = new MultiplayerSessionService();
+  const remoteSession = new RemoteSessionService();
+  const players = new PlayerService();
+  players.attachRemoteSession(remoteSession);
   animation.setFootIk({ enabled: false });
 
   const runtime: VortexRuntime = {
@@ -97,9 +102,9 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     access: new AccessService(),
     platform,
     events,
-    runtimeExports: new RuntimeExportsService(),
-    runtimeBridge: new RuntimeBridgeService(),
-    sceneBridge: new SceneRuntimeBridgeService(),
+    runtimeApiExports: new RuntimeApiExportService(),
+    runtimeStartup: new RuntimeStartupService(),
+    sceneSetup: new SceneRuntimeSetupService(),
     frameLoop: new FrameLoopService(),
     loading: new LoadingScreenService(options.document),
     settingsStore: new RuntimeSettingsStore(options.window.localStorage),
@@ -111,7 +116,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     renderer: new RendererService(),
     sceneSettings: new SceneSettingsService(),
     shadowRuntime: new ShadowRuntimeService(),
-    worldBridge: new WorldRuntimeBridgeService(),
+    worldBridge: new WorldRuntimeSetupService(),
     world: new WorldService(),
     worldBootstrap: new WorldBootstrapService(options.document, options.window, options.location),
     worldColliders: new WorldColliderService(),
@@ -120,25 +125,28 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     worldParts: new WorldPartService(),
     worldPicking: new WorldPickingService(),
     worldRuntime: new WorldRuntimeService(),
+    worldDynamicObjects: new WorldDynamicObjectService(),
     cursor: new CursorService(options.window),
-    inputBridge: new InputRuntimeBridgeService(),
+    inputSetup: new InputRuntimeSetupService(),
     input,
     characterCollision: new CharacterCollisionService(),
     climb: new ClimbService(),
-    localPlayerBridge: new LocalPlayerRuntimeBridgeService(),
+    localPlayerSetup: new LocalPlayerRuntimeSetupService(),
     localMovement: new LocalMovementRuntimeService(),
     movement: new MovementService(),
+    players,
     gameSession,
     physics: createPhysicsWorld({ backend: readPhysicsBackend(options.window), diagnostics }),
     avatarMaterials: new AvatarMaterialService(),
     avatarAssets: new AvatarAssetService(options.window),
+    avatarEquipment: new AvatarEquipmentService(),
     avatar: new AvatarService(),
-    avatarBridge: new AvatarRuntimeBridgeService(),
+    avatarSetup: new AvatarRuntimeSetupService(),
     characterSpawn: new CharacterSpawnService(),
     localAvatar: new LocalAvatarService(),
     remoteAvatarAppearance: new RemoteAvatarAppearanceService(),
     remotePlayers: new RemotePlayerService(),
-    remoteSession: new RemoteSessionService(),
+    remoteSession,
     animation,
     scripting: new ScriptRuntime(events, diagnostics),
     sandbox: new ClientPhysicsSandbox(),
@@ -151,7 +159,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     packetDebug: new PacketDebugService(options.window.localStorage),
     protocol: createProtocolService(),
     ui: new CoreHudService(options.document),
-    hudBridge: new HudRuntimeBridgeService(),
+    hudSetup: new HudRuntimeSetupService(),
     hudInteractions: new HudInteractionService(options.document),
     chatCommands: new ChatCommandService(),
     chat: new ChatService(options.document, options.window),
@@ -174,19 +182,12 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     perf: new PerformanceService(options.window),
     community: new CommunityProfileService(options.window),
     streaming: new AssetStreamService(diagnostics),
-    quality: new QualityService(),
-    vortex: {
-      get: () => vortexApi,
-      set(value: unknown) {
-        vortexApi = value;
-        attachVortexRuntimeHandles(runtime, value);
-        startPhysicsSync(runtime, options.window, () => vortexApi, physicsSyncTimer, (timer) => {
-          physicsSyncTimer = timer;
-        });
-        events.emit("vortex:ready", { vortex: value });
-      }
-    }
+    quality: new QualityService()
   };
+
+  startPhysicsSync(runtime, options.window, physicsSyncTimer, (timer) => {
+    physicsSyncTimer = timer;
+  });
 
   options.window.addEventListener("beforeunload", () => {
     if (physicsSyncTimer !== null) options.window.clearInterval(physicsSyncTimer);
@@ -197,6 +198,22 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
   return runtime;
 }
 
+export function attachRuntimeApi(runtime: VortexRuntime, api: unknown): void {
+  if (!api || typeof api !== "object") return;
+  const runtimeApi = api as Record<string, unknown>;
+  const renderer = runtime.renderer.getHandles().renderer;
+  const domElement = readRendererDomElement(renderer);
+  if (domElement) runtime.input.attachTarget(domElement);
+
+  runtime.avatar.attachRuntimeAdapter({
+    applyAvatar: runtimeApi.applyAvatar,
+    getAvatar: runtimeApi.getAvatar
+  });
+
+  runtime.multiplayerBridge.setRuntimeApi(runtimeApi);
+  runtime.events.emit("runtime-api:ready", { api: runtimeApi });
+}
+
 function readPhysicsBackend(windowRef: Window): PhysicsBackend {
   if (windowRef.localStorage.getItem("vwebRapierEnabled") === "1") return "rapier";
   return "static";
@@ -205,18 +222,14 @@ function readPhysicsBackend(windowRef: Window): PhysicsBackend {
 function startPhysicsSync(
   runtime: VortexRuntime,
   windowRef: Window,
-  readVortex: () => unknown,
   currentTimer: number | null,
   setTimer: (timer: number | null) => void
 ): void {
   if (runtime.physics.backend !== "rapier") return;
   if (!runtime.physics.syncStaticColliders) return;
   const sync = () => {
-    const vortex = readVortex();
-    const getColliders = vortex && typeof vortex === "object" ? (vortex as { getColliders?: unknown }).getColliders : null;
-    if (typeof getColliders !== "function") return;
     try {
-      const colliders = getColliders();
+      const colliders = runtime.worldColliders.colliders;
       if (Array.isArray(colliders)) runtime.physics.syncStaticColliders?.(colliders);
     } catch (error) {
       runtime.diagnostics.warn("physics.sync.failed", { error: error instanceof Error ? error.message : String(error) });
@@ -229,31 +242,6 @@ function startPhysicsSync(
   if (currentTimer === null) {
     setTimer(windowRef.setInterval(sync, 2000));
   }
-}
-
-function attachVortexRuntimeHandles(runtime: VortexRuntime, vortex: unknown): void {
-  if (!vortex || typeof vortex !== "object") return;
-  const api = vortex as Record<string, unknown>;
-
-  const rendererHandles: Parameters<VortexRuntime["renderer"]["attachRuntimeAdapter"]>[0] = {};
-  if (api.scene) rendererHandles.scene = api.scene;
-  if (typeof api.getCamera === "function") rendererHandles.camera = api.getCamera();
-  const globalRenderer = (globalThis as typeof globalThis & { renderer?: unknown }).renderer;
-  if (globalRenderer) rendererHandles.renderer = globalRenderer;
-  runtime.renderer.attachRuntimeAdapter(rendererHandles);
-  const domElement = readRendererDomElement(globalRenderer);
-  if (domElement) runtime.input.attachTarget(domElement);
-
-  runtime.world.attachRuntimeAdapter({
-    pick: api.pick,
-    getObjects: api.getObjects,
-    getColliders: api.getColliders
-  });
-
-  runtime.avatar.attachRuntimeAdapter({
-    applyAvatar: api.applyAvatar,
-    getAvatar: api.getAvatar
-  });
 }
 
 function readRendererDomElement(renderer: unknown): HTMLElement | null {

@@ -37,6 +37,10 @@ export class AssetManager {
     }));
   }
 
+  load<T = unknown>(key: string, loader: () => Promise<T>, dispose?: (value: T) => void): Promise<T> {
+    return this.retain(key, loader, dispose);
+  }
+
   retainImage(key: string, url: string): Promise<HTMLImageElement> {
     return this.retain<HTMLImageElement>(key, () => new Promise((resolve, reject) => {
       const image = new Image();

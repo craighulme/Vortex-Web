@@ -5,7 +5,7 @@ export function createMultiplayerChatCommandBridge(context) {
     window,
     Chat,
     chatCommands,
-    vortex,
+    runtimeApi,
     runtimeRemoteSession,
     requireLicenseFeature,
     getLaunchInfo,
@@ -16,12 +16,12 @@ export function createMultiplayerChatCommandBridge(context) {
     return runtimeRemoteSession().commandPlayerList({
       localId: getLocalPlayerId(),
       localUsername: getLaunchInfo()?.username || "You",
-      localPosition: vortex.getCharacter?.()?.position?.clone?.() || null
+      localPosition: runtimeApi.getCharacter?.()?.position?.clone?.() || null
     });
   }
 
   function movementMods() {
-    return vortex.getMovementMods?.() || {
+    return runtimeApi.getMovementMods?.() || {
       fly: false,
       noclip: false,
       airwalk: false,
@@ -31,16 +31,16 @@ export function createMultiplayerChatCommandBridge(context) {
   }
 
   function setMovementMods(patch = {}) {
-    if (!vortex.setMovementMods) throw new Error("movement modifiers are not available in this build");
-    return vortex.setMovementMods(patch);
+    if (!runtimeApi.setMovementMods) throw new Error("movement modifiers are not available in this build");
+    return runtimeApi.setMovementMods(patch);
   }
 
   function teleportLocalToScene(x, y, z) {
-    const char = vortex.getCharacter?.();
+    const char = runtimeApi.getCharacter?.();
     if (!char) return false;
     char.position.set(Number(x), Number(y), Number(z));
-    vortex.setVelY?.(0);
-    vortex.setGrounded?.(false);
+    runtimeApi.setVelY?.(0);
+    runtimeApi.setGrounded?.(false);
     return true;
   }
 
@@ -48,13 +48,13 @@ export function createMultiplayerChatCommandBridge(context) {
     return chatCommands.handle(text, {
       chat: Chat,
       players: commandPlayerList,
-      localPosition: () => vortex.getCharacter?.()?.position || null,
+      localPosition: () => runtimeApi.getCharacter?.()?.position || null,
       movementMods,
       setMovementMods,
       requireFeature: requireLicenseFeature,
       teleportLocal: teleportLocalToScene,
       bringPlayer: (player) => {
-        const char = vortex.getCharacter?.();
+        const char = runtimeApi.getCharacter?.();
         const remote = runtimeRemoteSession().get(player.id);
         if (!char || !remote) return false;
         const pos = char.position.clone();

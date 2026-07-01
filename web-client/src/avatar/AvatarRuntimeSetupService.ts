@@ -14,7 +14,7 @@ type CharacterMetrics = {
   standY: number;
 };
 
-export type AvatarRuntimeBridgeOptions = {
+export type AvatarRuntimeSetupOptions = {
   THREE: ThreeLike;
   scene: unknown;
   document: Document;
@@ -23,6 +23,7 @@ export type AvatarRuntimeBridgeOptions = {
   avatarService: any;
   avatarAssets: any;
   avatarMaterials: any;
+  equipment: any;
   localAvatar: any;
   remoteAvatarAppearance: any;
   characterSpawn: any;
@@ -35,7 +36,7 @@ export type AvatarRuntimeBridgeOptions = {
   markShadowsDirty(): void;
 };
 
-export type AvatarRuntimeBridgeHandles = {
+export type AvatarRuntimeSetupHandles = {
   avatarMaterials: any;
   avatarAssets: any;
   avatarService: any;
@@ -49,12 +50,13 @@ export type AvatarRuntimeBridgeHandles = {
   getCharStandY(): number;
 };
 
-export class AvatarRuntimeBridgeService {
-  configure(options: AvatarRuntimeBridgeOptions): AvatarRuntimeBridgeHandles {
+export class AvatarRuntimeSetupService {
+  configure(options: AvatarRuntimeSetupOptions): AvatarRuntimeSetupHandles {
     const avatarMaterials = options.avatarMaterials.configure?.({
       THREE: options.THREE,
       window: options.windowRef,
-      document: options.document
+      document: options.document,
+      isWebGpuRuntime: options.isWebGpuRuntime
     });
     if (!avatarMaterials) {
       throw new Error("[avatar] VortexRuntime avatar material service is required before the runtime starts.");
@@ -64,6 +66,9 @@ export class AvatarRuntimeBridgeService {
     }
     if (!options.avatarService) {
       throw new Error("[avatar] VortexRuntime avatar service is required before the runtime starts.");
+    }
+    if (!options.equipment) {
+      throw new Error("[avatar] VortexRuntime avatar equipment service is required before the runtime starts.");
     }
     if (!options.characterSpawn) {
       throw new Error("[avatar] VortexRuntime character spawn service is required before the runtime starts.");
@@ -120,6 +125,7 @@ export class AvatarRuntimeBridgeService {
     }
 
     localAvatar.reload();
+    options.avatarService.attachRuntimeAdapter?.({ equipment: options.equipment });
 
     return {
       avatarMaterials,

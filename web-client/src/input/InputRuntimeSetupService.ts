@@ -23,7 +23,7 @@ type SettingsPresenterLike = {
   panel(): HTMLElement | null;
 };
 
-export type InputRuntimeBridgeConfig = {
+export type InputRuntimeSetupConfig = {
   document: Document;
   rendererElement: RendererElement;
   overlay: HTMLElement | null;
@@ -42,7 +42,7 @@ export type InputRuntimeBridgeConfig = {
   getCharacter(): CharacterLike | null;
 };
 
-export type InputRuntimeBridgeHandles = {
+export type InputRuntimeSetupHandles = {
   keys: InputService["keys"];
   cursor: CursorService;
   requestPointerLock(): void;
@@ -56,10 +56,10 @@ export type InputRuntimeBridgeHandles = {
   panel(): HTMLElement | null;
 };
 
-export class InputRuntimeBridgeService {
+export class InputRuntimeSetupService {
   private cleanups: Array<() => void> = [];
 
-  configure(config: InputRuntimeBridgeConfig): InputRuntimeBridgeHandles {
+  configure(config: InputRuntimeSetupConfig): InputRuntimeSetupHandles {
     this.dispose();
     const {
       document,

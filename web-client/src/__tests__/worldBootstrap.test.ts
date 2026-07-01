@@ -61,8 +61,8 @@ describe("WorldBootstrapService", () => {
       bufferGeometryUtils: {}
     };
 
-    expect(service.ready({ world: { getsceneHandles: () => handles, loadOfficialMap() {} } as never })).toBe(true);
-    expect(service.ready({ world: { getsceneHandles: () => ({ ...handles, addPart: null }), loadOfficialMap() {} } as never })).toBe(false);
+    expect(service.ready({ world: { getSceneHandles: () => handles, loadOfficialMap() {} } as never })).toBe(true);
+    expect(service.ready({ world: { getSceneHandles: () => ({ ...handles, addPart: null }), loadOfficialMap() {} } as never })).toBe(false);
   });
 
   it("falls back to a baseplate when official map loading fails", async () => {
@@ -78,7 +78,7 @@ describe("WorldBootstrapService", () => {
         partIds: ["fallback"],
         bounds: { centerX: 0, centerY: 0, centerZ: 0, minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 }
       }),
-      getsceneHandles: () => ({
+      getSceneHandles: () => ({
         setSpawn: (...args: number[]) => spawns.push(args)
       })
     };

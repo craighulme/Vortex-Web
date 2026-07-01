@@ -13,20 +13,26 @@ import { createMultiplayerRemoteAvatarBridge } from "./MultiplayerRemoteAvatarBr
 import { createMultiplayerRemoteBridge } from "./MultiplayerRemoteBridge";
 import { createMultiplayerRuntimeServices } from "./MultiplayerRuntimeServices";
 import { handleMultiplayerBridgeMessage } from "./MultiplayerRouterBridgeContext";
+import { createMultiplayerLaunchState } from "./MultiplayerLaunchState";
 
 export class MultiplayerBridgeService {
   private mounted = false;
   private frameBridge = null;
+  private runtimeApi = null;
 
   constructor(
     private readonly windowRef: Window,
     private readonly documentRef: Document
   ) {}
 
+  setRuntimeApi(api) {
+    this.runtimeApi = api;
+  }
+
   mount(runtime: unknown): boolean {
     if (this.mounted) return false;
 
-    const resolved = resolveMultiplayerBridgeDependencies(this.windowRef, this.documentRef);
+    const resolved = resolveMultiplayerBridgeDependencies(this.windowRef, this.documentRef, this.runtimeApi);
     if (!resolved.ok) return false;
     const {
       window,
@@ -41,7 +47,7 @@ export class MultiplayerBridgeService {
       location,
       THREE,
       Chat,
-      _vortex,
+      runtimeApi,
       scene
     } = resolved.deps;
     const runtimeServices = runtime;
@@ -49,27 +55,26 @@ export class MultiplayerBridgeService {
     window.VortexRuntime = runtimeServices;
     this.mounted = true;
 
-    function _hasRuntimeExports() {
-        return !!window._vortex;
+    function _hasRuntimeApi() {
+        return !!runtimeApi;
     }
     
-    function _queueUntilRuntimeExports(message) {
-        return _runtimeMultiplayer().queueUntilRuntimeExportsReady(message, _hasRuntimeExports());
+    function _queueUntilRuntimeApi(message) {
+        return _runtimeMultiplayer().queueUntilRuntimeApiReady(message, _hasRuntimeApi());
     }
     
-    function _flushPendingRuntimeExportMessages() {
-        _runtimeMultiplayer().flushQueuedRuntimeExportMessages(_hasRuntimeExports, handle);
+    function _flushPendingRuntimeApiMessages() {
+        _runtimeMultiplayer().flushQueuedRuntimeApiMessages(_hasRuntimeApi, handle);
     }
     
-    window.addEventListener("vweb-runtime-exports-ready", _flushPendingRuntimeExportMessages);
-    window.addEventListener("vweb-runtime-ready", () => setTimeout(_flushPendingRuntimeExportMessages, 0));
+    window.addEventListener("vweb-runtime-exports-ready", _flushPendingRuntimeApiMessages);
+    window.addEventListener("vweb-runtime-ready", () => setTimeout(_flushPendingRuntimeApiMessages, 0));
     
     function _normalizeAvatarFields(data = {}) {
         return services.normalizeAvatarFields(data);
     }
     
-    let myId = null;
-    let launchInfo = null;
+    const launchState = createMultiplayerLaunchState();
     
     function _statusFor(id) {
         return _runtimeMultiplayer().friendStatus(id);
@@ -107,7 +112,7 @@ export class MultiplayerBridgeService {
         return services.leaderboard();
     }
     const coordinateBridge = createMultiplayerCoordinateBridge({
-        vortex: _vortex,
+        runtimeApi,
         runtimeMultiplayer: _runtimeMultiplayer
     });
 
@@ -122,7 +127,7 @@ export class MultiplayerBridgeService {
         THREE,
         document,
         window,
-        vortex: _vortex,
+        runtimeApi,
         chatBubbles: runtimeServices.chatBubbles,
         runtimeRemoteSession: _runtimeRemoteSession
     });
@@ -130,7 +135,7 @@ export class MultiplayerBridgeService {
     const remoteAvatarBridge = createMultiplayerRemoteAvatarBridge({
         THREE,
         document,
-        vortex: _vortex,
+        runtimeApi,
         remotePlayers: runtimeServices.remotePlayers,
         animation: runtimeServices.animation
     });
@@ -206,7 +211,7 @@ export class MultiplayerBridgeService {
 
     const remoteBridge = createMultiplayerRemoteBridge({
         THREE,
-        vortex: _vortex,
+        runtimeApi,
         fetch,
         localStorage,
         console,
@@ -233,7 +238,7 @@ export class MultiplayerBridgeService {
         runtimePacketDebug: _runtimePacketDebug,
         runtimeMultiplayer: _runtimeMultiplayer,
         getBridgeConfig,
-        getLaunchInfo: () => launchInfo
+        getLaunchInfo: launchState.getLaunchInfo
     });
     
     const avatarSpoof = createMultiplayerAvatarSpoofBridge({
@@ -245,20 +250,13 @@ export class MultiplayerBridgeService {
         runtimePacketDebug: _runtimePacketDebug,
         runtimeSession: _runtimeSession,
         runtimeMultiplayer: _runtimeMultiplayer,
-        vortex: _vortex,
+        runtimeApi,
         bridgeOpen,
         bridgeSend,
         sceneFootOffset: _sceneFootOffset,
         sceneYToNativeY: _sceneYToNativeY,
-        getLaunchInfo: () => launchInfo,
-        updateLaunchAvatar(normalized) {
-            if (!launchInfo) return;
-            launchInfo.shirtId = normalized.shirt_id;
-            launchInfo.pantId = normalized.pant_id;
-            launchInfo.bodyType = normalized.body_type;
-            launchInfo.bodyColors = normalized.body_colors;
-            launchInfo.faceId = normalized.face_id;
-        },
+        getLaunchInfo: launchState.getLaunchInfo,
+        updateLaunchAvatar: launchState.updateLaunchAvatar,
         setSkipNextRemoteAvatarRebuild(value) {
             _skipNextRemoteAvatarRebuild = !!value;
         }
@@ -276,11 +274,9 @@ export class MultiplayerBridgeService {
         runtimeConnection: _runtimeConnection,
         runtimeRemoteSession: _runtimeRemoteSession,
         getBridgeConfig,
-        getLaunchInfo: () => launchInfo,
-        setLaunchInfo(info) {
-            launchInfo = info;
-        },
-        getSelfId: () => myId,
+        getLaunchInfo: launchState.getLaunchInfo,
+        setLaunchInfo: launchState.setLaunchInfo,
+        getSelfId: launchState.getSelfId,
         getFallbackGameId: () => window.GAME_ID || 0,
         handleMessage: handle,
         scheduleReconnect: _scheduleReconnect,
@@ -344,7 +340,7 @@ export class MultiplayerBridgeService {
         window,
         setInterval,
         clearInterval,
-        vortex: _vortex,
+        runtimeApi,
         runtimeSession: _runtimeSession,
         runtimeMultiplayer: _runtimeMultiplayer,
         sceneYToNativeY: _sceneYToNativeY,
@@ -357,18 +353,18 @@ export class MultiplayerBridgeService {
         handleMultiplayerBridgeMessage(d, {
             window,
             Chat,
-            vortex: _vortex,
-            queueUntilRuntimeExports: _queueUntilRuntimeExports,
+            runtimeApi,
+            queueUntilRuntimeApi: _queueUntilRuntimeApi,
             runtimeRouter: _runtimeRouter,
             runtimeSession: _runtimeSession,
             runtimeRemoteSession: _runtimeRemoteSession,
             runtimeMultiplayer: _runtimeMultiplayer,
             runtimePacketDebug: _runtimePacketDebug,
             remoteBridge,
-            getSelfId: () => myId,
-            setSelfId: (id) => { myId = id; },
-            getLaunchInfo: () => launchInfo,
-            setLaunchInfo: (info) => { launchInfo = info; },
+            getSelfId: launchState.getSelfId,
+            setSelfId: launchState.setSelfId,
+            getLaunchInfo: launchState.getLaunchInfo,
+            setLaunchInfo: launchState.setLaunchInfo,
             playerDisplayName: _playerDisplayName,
             applyKnownPlayerName: _applyKnownPlayerName,
             recordReplicatedPlayers: _recordReplicatedPlayers,
@@ -387,7 +383,7 @@ export class MultiplayerBridgeService {
     };
     this.frameBridge = installMultiplayerFrameBridge({
         window,
-        vortex: _vortex,
+        runtimeApi,
         runtimeRemoteSession: _runtimeRemoteSession,
         remotePlayerService: remoteAvatarBridge.service,
         normalizeAvatarFields: _normalizeAvatarFields,
@@ -395,7 +391,7 @@ export class MultiplayerBridgeService {
         noteRemoteState: remoteBridge.noteRemoteState,
         animateRemote: remoteAvatarBridge.animate,
         hasBubbles: bubbleBridge.hasBubbles,
-        updateBubblePositions: () => bubbleBridge.updatePositions(myId),
+        updateBubblePositions: () => bubbleBridge.updatePositions(launchState.getSelfId()),
         shouldSkipAvatarRebuild: () => _skipNextRemoteAvatarRebuild,
         clearSkipAvatarRebuild: () => {
             _skipNextRemoteAvatarRebuild = false;
@@ -413,22 +409,14 @@ export class MultiplayerBridgeService {
         remotePlayers: runtimeServices.remotePlayers,
         remoteSession: runtimeServices.remoteSession,
         packetDebug: runtimeServices.packetDebug,
-        vortex: _vortex,
+        runtimeApi,
         runtimeRemoteSession: _runtimeRemoteSession,
         normalizeAvatarFields: _normalizeAvatarFields,
         requireLicenseFeature: accessBridge.requireLicenseFeature,
         assertLicenseFeature: accessBridge.assertLicenseFeature,
-        getLaunchInfo: () => launchInfo,
-        getLocalPlayerId: () => myId,
-        setLaunchInfoAvatar(normalized) {
-            if (launchInfo) {
-                launchInfo.shirtId = normalized.shirt_id;
-                launchInfo.pantId = normalized.pant_id;
-                launchInfo.bodyType = normalized.body_type;
-                launchInfo.bodyColors = normalized.body_colors;
-                launchInfo.faceId = normalized.face_id;
-            }
-        }
+        getLaunchInfo: launchState.getLaunchInfo,
+        getLocalPlayerId: launchState.getSelfId,
+        setLaunchInfoAvatar: launchState.updateLaunchAvatar
     });
     runtimeServices.chat?.configureOutbound?.({
         handleCommand: consoleBridge.handleChatCommand,

@@ -74,7 +74,7 @@ export function installMultiplayerDebugConsole(context) {
     heights() {
       assertPacketDebugAccess();
       const rows = remoteDebugRows();
-      const footOffset = Number(runtime?._vortex?.get?.()?.getCharFootOffset?.() ?? runtime?.vortex?.get?.()?.getCharFootOffset?.() ?? 2);
+      const footOffset = Number(runtime?.vortex?.get?.()?.getCharFootOffset?.() ?? 2);
       const colliders = runtime?.worldColliders;
       const renderRows = runtime?.remotePlayers?.profile?.(runtime?.remoteSession?.remotes)?.rows || [];
       const renderById = new Map(renderRows.map((row) => [Number(row.id), row]));

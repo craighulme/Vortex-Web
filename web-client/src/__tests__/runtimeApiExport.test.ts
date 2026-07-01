@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { RuntimeExportsService } from "../runtime/RuntimeExportsService";
+import { RuntimeApiExportService } from "../runtime/RuntimeApiExportService";
 
-describe("RuntimeExportsService", () => {
+describe("RuntimeApiExportService", () => {
   it("installs runtime globals and adapter handles in one place", () => {
-    const service = new RuntimeExportsService();
+    const service = new RuntimeApiExportService();
     const windowRef = new EventTarget() as Window & Record<string, unknown>;
     const rendererHandles: unknown[] = [];
     const worldHandles: Record<string, unknown>[] = [];
     let readyDetail: unknown = null;
+    let installedRuntimeApi: unknown = null;
     windowRef.addEventListener("vweb-runtime-exports-ready", (event) => {
       readyDetail = (event as CustomEvent).detail;
     });
-    const vortexApi = {
+    const runtimeApi = {
       setSpawn: () => undefined,
       pick: () => undefined,
       getObjects: () => [],
@@ -21,15 +22,13 @@ describe("RuntimeExportsService", () => {
     service.install({
       windowRef,
       three: "three",
-      gltfLoaderClass: "GLTFLoader",
-      gltfLoader: "loader",
       scene: "scene",
-      ambient: "ambient",
       renderer: "renderer",
-      objects: [],
       camera: "camera",
-      cam: "cam",
-      vortexApi,
+      runtimeApi,
+      setRuntimeApi: (value) => {
+        installedRuntimeApi = value;
+      },
       rendererService: { attachRuntimeAdapter: (handles) => rendererHandles.push(handles) },
       worldService: { attachRuntimeAdapter: (handles) => worldHandles.push(handles) },
       worldHandles: {
@@ -41,14 +40,14 @@ describe("RuntimeExportsService", () => {
         objects: [],
         bufferGeometryUtils: "buffer",
         shadowsActive: () => true
-      },
-      cursorOver: () => false
+      }
     });
 
-    expect(windowRef._vortex).toBe(vortexApi);
-    expect(windowRef.THREE).toBe("three");
-    expect(rendererHandles[0]).toMatchObject({ scene: "scene", camera: "camera", renderer: "renderer" });
-    expect(worldHandles[0]).toMatchObject({ addPart: "addPart", setSpawn: vortexApi.setSpawn });
-    expect(readyDetail).toBe(vortexApi);
+    expect(windowRef._vortex).toBeUndefined();
+    expect(installedRuntimeApi).toBe(runtimeApi);
+    expect(windowRef.THREE).toBeUndefined();
+    expect(rendererHandles[0]).toMatchObject({ three: "three", scene: "scene", camera: "camera", renderer: "renderer" });
+    expect(worldHandles[0]).toMatchObject({ addPart: "addPart", setSpawn: runtimeApi.setSpawn });
+    expect(readyDetail).toBe(runtimeApi);
   });
 });

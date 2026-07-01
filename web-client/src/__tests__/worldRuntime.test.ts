@@ -60,6 +60,25 @@ describe("WorldRuntimeService", () => {
     };
     const sceneSettings = { marks: 0, markMaterialsForShaderUpdate() { this.marks += 1; } };
     const shadows = { marks: 0, active: () => true, markNeedsUpdate() { this.marks += 1; } };
+    const dynamicObjects = {
+      configured: null as any,
+      configure(config: any) {
+        this.configured = config;
+        return {
+          addPart: partService.addPart.bind(partService),
+          removePart: partService.removePart.bind(partService),
+          createRuntimeMesh: () => ({}),
+          createGeometry: () => ({}),
+          spawnPart: () => ["mesh", 1],
+          removeObject: () => {},
+          spawnMesh: () => ({}),
+          createBatchMesh: () => ({}),
+          scene: config.scene,
+          objects: partService.objects,
+          shadowsActive: config.shadowsActive
+        };
+      }
+    };
 
     const handles = new WorldRuntimeService().configure({
       THREE: { TextureLoader: function TextureLoader() {} },
@@ -70,6 +89,7 @@ describe("WorldRuntimeService", () => {
       materials: materialService as any,
       colliders: colliderService as any,
       parts: partService as any,
+      dynamicObjects: dynamicObjects as any,
       sceneSettings: sceneSettings as any,
       shadows: shadows as any,
       studsPerTile: 4,
@@ -80,6 +100,7 @@ describe("WorldRuntimeService", () => {
     expect(textureService.config.importedAssets).toEqual({ stud: "stud.png", studNormal: "normal.png" });
     expect(materialService.config.studsPerTile).toBe(4);
     expect(partService.config.shadowsActive()).toBe(true);
+    expect(dynamicObjects.configured.parts).toBe(partService);
     expect(handles.objects).toEqual(partService.objects);
     expect(handles.colliders).toEqual(colliderService.colliders);
     expect(handles.addPart(1, 2, 3, 4, 5, 6, 7)).toEqual(["mesh", 7]);

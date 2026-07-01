@@ -1,6 +1,6 @@
 type ThreeLike = Record<string, any>;
 
-export type SceneRuntimeBridgeOptions = {
+export type SceneRuntimeSetupOptions = {
   windowRef: Window & Record<string, any>;
   document: Document;
   localStorage: Storage;
@@ -18,7 +18,7 @@ export type SceneRuntimeBridgeOptions = {
   };
 };
 
-export type SceneRuntimeBridgeHandles = {
+export type SceneRuntimeSetupHandles = {
   renderer: any;
   rendererBackend: string;
   isWebGpuRuntime: boolean;
@@ -40,8 +40,8 @@ export type SceneRuntimeBridgeHandles = {
   readShadowsEnabled(): boolean;
 };
 
-export class SceneRuntimeBridgeService {
-  async configure(options: SceneRuntimeBridgeOptions): Promise<SceneRuntimeBridgeHandles> {
+export class SceneRuntimeSetupService {
+  async configure(options: SceneRuntimeSetupOptions): Promise<SceneRuntimeSetupHandles> {
     const readStorageFlag = (key: string, fallback = false): boolean => options.settingsStore.readFlag(key, fallback);
     const readStorageNumber = (key: string, fallback: number, min = -Infinity, max = Infinity): number => {
       return options.settingsStore.readNumber(key, fallback, min, max);

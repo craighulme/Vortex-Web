@@ -1,7 +1,7 @@
-import type { RuntimeBridgeConfig } from "./RuntimeBridgeTypes";
+import type { RuntimeStartupConfig } from "./RuntimeStartupTypes";
 
 export class QualityApiService {
-  install(config: RuntimeBridgeConfig): unknown {
+  install(config: RuntimeStartupConfig): unknown {
     return config.quality.configureRuntime({
       windowRef: config.windowRef,
       localStorage: config.localStorage,

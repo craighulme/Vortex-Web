@@ -63,13 +63,13 @@ export type MultiplayerMessageSummary = {
 
 export class MultiplayerService {
   private readonly messages: MultiplayerMessageSummary[] = [];
-  private readonly pendingRuntimeExportMessages: unknown[] = [];
+  private readonly pendingRuntimeApiMessages: unknown[] = [];
   private readonly names = new PlayerNameRegistry();
   private readonly friends = new FriendStatusRegistry();
   private readonly remoteDebug = new RemoteStateDebugTracker();
   private readonly broadcast = new BroadcastStateTracker();
   private reconnectAttempts = 0;
-  private flushingRuntimeExportMessages = false;
+  private flushingRuntimeApiMessages = false;
 
   recordMessage(message: unknown, enabled = true): void {
     if (!enabled || !message || typeof message !== "object") return;
@@ -92,30 +92,30 @@ export class MultiplayerService {
     return this.messages.map((message) => ({ ...message, ids: [...message.ids] }));
   }
 
-  queueUntilRuntimeExportsReady(message: unknown, runtimeExportsReady: boolean): boolean {
-    if (runtimeExportsReady) return false;
+  queueUntilRuntimeApiReady(message: unknown, runtimeApiReady: boolean): boolean {
+    if (runtimeApiReady) return false;
     if (message && typeof message === "object" && (message as { type?: unknown }).type === "kicked") return false;
-    this.pendingRuntimeExportMessages.push(message);
-    if (this.pendingRuntimeExportMessages.length > 200) {
-      this.pendingRuntimeExportMessages.splice(0, this.pendingRuntimeExportMessages.length - 200);
+    this.pendingRuntimeApiMessages.push(message);
+    if (this.pendingRuntimeApiMessages.length > 200) {
+      this.pendingRuntimeApiMessages.splice(0, this.pendingRuntimeApiMessages.length - 200);
     }
     return true;
   }
 
-  flushQueuedRuntimeExportMessages(runtimeExportsReady: () => boolean, handleMessage: (message: unknown) => void): void {
-    if (this.flushingRuntimeExportMessages || !runtimeExportsReady()) return;
-    this.flushingRuntimeExportMessages = true;
+  flushQueuedRuntimeApiMessages(runtimeApiReady: () => boolean, handleMessage: (message: unknown) => void): void {
+    if (this.flushingRuntimeApiMessages || !runtimeApiReady()) return;
+    this.flushingRuntimeApiMessages = true;
     try {
-      while (this.pendingRuntimeExportMessages.length && runtimeExportsReady()) {
-        handleMessage(this.pendingRuntimeExportMessages.shift());
+      while (this.pendingRuntimeApiMessages.length && runtimeApiReady()) {
+        handleMessage(this.pendingRuntimeApiMessages.shift());
       }
     } finally {
-      this.flushingRuntimeExportMessages = false;
+      this.flushingRuntimeApiMessages = false;
     }
   }
 
-  pendingRuntimeExportMessageCount(): number {
-    return this.pendingRuntimeExportMessages.length;
+  pendingRuntimeApiMessageCount(): number {
+    return this.pendingRuntimeApiMessages.length;
   }
 
   isPlaceholderPlayerName(id: unknown, value: unknown): boolean {
@@ -303,7 +303,7 @@ export class MultiplayerService {
 
   reset(): void {
     this.messages.length = 0;
-    this.pendingRuntimeExportMessages.length = 0;
+    this.pendingRuntimeApiMessages.length = 0;
     this.names.clear();
     this.friends.clear();
     this.remoteDebug.clear();

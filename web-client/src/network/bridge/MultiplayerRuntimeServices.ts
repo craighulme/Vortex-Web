@@ -1,13 +1,14 @@
-// @ts-nocheck
 import { DEFAULT_BODY_COLORS } from "../../avatar/AvatarService";
 
-function required(runtime, key, label) {
+type RuntimeServiceBag = Record<string, any>;
+
+function required(runtime: RuntimeServiceBag | null | undefined, key: string, label: string) {
   const service = runtime?.[key];
   if (!service) throw new Error(`[mp] VortexRuntime ${label} service is required.`);
   return service;
 }
 
-export function createMultiplayerRuntimeServices(runtime) {
+export function createMultiplayerRuntimeServices(runtime: RuntimeServiceBag) {
   return {
     raw: runtime,
     multiplayer: () => required(runtime, "multiplayer", "multiplayer"),
@@ -28,7 +29,7 @@ export function createMultiplayerRuntimeServices(runtime) {
       if (!leaderboard) throw new Error("[mp] VortexRuntime leaderboard service is required.");
       return leaderboard;
     },
-    normalizeAvatarFields(data = {}) {
+    normalizeAvatarFields(data: Record<string, any> = {}) {
       return runtime?.avatar?.normalizeNative?.(data) || {
         shirt_id: 0,
         pant_id: 0,

@@ -1,4 +1,4 @@
-export type HudRuntimeBridgeOptions = {
+export type HudRuntimeSetupOptions = {
   document: Document;
   windowRef: Window & Record<string, any>;
   runtime: Record<string, any>;
@@ -32,7 +32,7 @@ export type HudRuntimeBridgeOptions = {
   onToggleDebug(): void;
 };
 
-export type HudRuntimeBridgeHandles = {
+export type HudRuntimeSetupHandles = {
   requestPointerLock(): void;
   setMouseLock(value: boolean): void;
   cursorOver(element: Element | null): boolean;
@@ -43,8 +43,8 @@ export type HudRuntimeBridgeHandles = {
   refreshSettingsStatus(): void;
 };
 
-export class HudRuntimeBridgeService {
-  configure(options: HudRuntimeBridgeOptions): HudRuntimeBridgeHandles {
+export class HudRuntimeSetupService {
+  configure(options: HudRuntimeSetupOptions): HudRuntimeSetupHandles {
     const overlay = options.document.getElementById("overlay");
     const crosshair = options.document.getElementById("crosshair");
     const cursorElement = options.document.getElementById("cursor");
@@ -94,7 +94,7 @@ export class HudRuntimeBridgeService {
       markSceneMaterialsForShaderUpdate: options.markSceneMaterialsForShaderUpdate
     });
 
-    inputRuntimeHandles = options.runtime.inputBridge.configure({
+    inputRuntimeHandles = options.runtime.inputSetup.configure({
       document: options.document,
       rendererElement: options.renderer.domElement,
       overlay,

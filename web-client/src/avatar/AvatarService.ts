@@ -1,19 +1,6 @@
-export const ATTACHMENT_SLOTS = [
-  "Head",
-  "Face",
-  "Hat",
-  "Mask",
-  "Torso",
-  "Shirt",
-  "Pants",
-  "LeftHand",
-  "RightHand",
-  "Back",
-  "LeftFoot",
-  "RightFoot"
-] as const;
+import type { AvatarAttachment, AvatarAttachmentSlot, AvatarEquipmentState } from "./AvatarEquipmentService";
 
-export type AttachmentSlot = typeof ATTACHMENT_SLOTS[number];
+export type AttachmentSlot = AvatarAttachmentSlot;
 
 export type AvatarState = {
   bodyType: "male" | "female";
@@ -21,7 +8,7 @@ export type AvatarState = {
   shirtId: number;
   pantId: number;
   faceId: number;
-  attachments: Partial<Record<AttachmentSlot, string>>;
+  attachments: AvatarEquipmentState;
 };
 
 export type NativeAvatarState = {
@@ -55,6 +42,11 @@ export type VortexAvatarConsoleOptions = {
 type AvatarRuntimeAdapter = {
   applyAvatar?: unknown;
   getAvatar?: unknown;
+  equipment?: {
+    equip(input: Partial<AvatarAttachment> & { id?: unknown; slot?: unknown }): AvatarAttachment | null;
+    unequip(slot: unknown): boolean;
+    snapshot(): AvatarEquipmentState;
+  };
 };
 
 export class AvatarService {
@@ -65,6 +57,22 @@ export class AvatarService {
     this.runtimeAdapter = { ...this.runtimeAdapter, ...api };
     const current = this.readRuntimeAvatar();
     if (current) this.previewState = current;
+  }
+
+  equipAttachment(input: Partial<AvatarAttachment> & { id?: unknown; slot?: unknown }): AvatarAttachment | null {
+    const attachment = this.runtimeAdapter.equipment?.equip(input) ?? null;
+    if (attachment) this.previewState.attachments = this.runtimeAdapter.equipment?.snapshot() ?? this.previewState.attachments;
+    return attachment;
+  }
+
+  unequipAttachment(slot: unknown): boolean {
+    const removed = this.runtimeAdapter.equipment?.unequip(slot) ?? false;
+    if (removed) this.previewState.attachments = this.runtimeAdapter.equipment?.snapshot() ?? this.previewState.attachments;
+    return removed;
+  }
+
+  getEquipment(): AvatarEquipmentState {
+    return this.runtimeAdapter.equipment?.snapshot() ?? { ...this.previewState.attachments };
   }
 
   normalize(input: Partial<AvatarState> = {}): AvatarState {

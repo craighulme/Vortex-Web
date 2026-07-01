@@ -59,18 +59,18 @@ describe("MultiplayerService", () => {
     const handled: unknown[] = [];
     let ready = false;
 
-    expect(multiplayer.queueUntilRuntimeExportsReady({ type: "init" }, ready)).toBe(true);
-    expect(multiplayer.queueUntilRuntimeExportsReady({ type: "kicked" }, ready)).toBe(false);
-    expect(multiplayer.pendingRuntimeExportMessageCount()).toBe(1);
+    expect(multiplayer.queueUntilRuntimeApiReady({ type: "init" }, ready)).toBe(true);
+    expect(multiplayer.queueUntilRuntimeApiReady({ type: "kicked" }, ready)).toBe(false);
+    expect(multiplayer.pendingRuntimeApiMessageCount()).toBe(1);
 
-    multiplayer.flushQueuedRuntimeExportMessages(() => ready, (message) => handled.push(message));
+    multiplayer.flushQueuedRuntimeApiMessages(() => ready, (message) => handled.push(message));
     expect(handled).toEqual([]);
 
     ready = true;
-    multiplayer.flushQueuedRuntimeExportMessages(() => ready, (message) => handled.push(message));
+    multiplayer.flushQueuedRuntimeApiMessages(() => ready, (message) => handled.push(message));
     expect(handled).toEqual([{ type: "init" }]);
-    expect(multiplayer.pendingRuntimeExportMessageCount()).toBe(0);
-    expect(multiplayer.queueUntilRuntimeExportsReady({ type: "states" }, ready)).toBe(false);
+    expect(multiplayer.pendingRuntimeApiMessageCount()).toBe(0);
+    expect(multiplayer.queueUntilRuntimeApiReady({ type: "states" }, ready)).toBe(false);
   });
 
   it("validates and converts remote scene positions", () => {

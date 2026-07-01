@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AvatarMaterialService } from "../avatar/AvatarMaterialService";
-import { ATTACHMENT_SLOTS, AvatarService, DEFAULT_BODY_COLORS } from "../avatar/AvatarService";
+import { AvatarService, DEFAULT_BODY_COLORS } from "../avatar/AvatarService";
+import { AVATAR_ATTACHMENT_SLOTS } from "../avatar/AvatarEquipmentService";
 
 describe("avatar service", () => {
   it("defines production attachment slots and normalizes avatar data", () => {
@@ -8,13 +9,13 @@ describe("avatar service", () => {
       bodyType: "female",
       bodyColors: ["#000000", "bad"],
       shirtId: 12,
-      attachments: { Hat: "asset-hat" }
+      attachments: { Hat: { id: "asset-hat", slot: "Hat", kind: "accessory" } }
     });
 
-    expect(ATTACHMENT_SLOTS).toContain("RightHand");
+    expect(AVATAR_ATTACHMENT_SLOTS).toContain("RightHand");
     expect(avatar.bodyType).toBe("female");
     expect(avatar.bodyColors[1]).toBe(DEFAULT_BODY_COLORS[1]);
-    expect(avatar.attachments.Hat).toBe("asset-hat");
+    expect(avatar.attachments.Hat?.id).toBe("asset-hat");
   });
 
   it("normalizes snake_case and camelCase avatar packets", () => {

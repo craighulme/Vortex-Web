@@ -23,7 +23,7 @@ type RuntimePanelSource = {
     };
   };
   renderer: {
-    getHandles(): { renderer?: unknown; scene?: unknown; camera?: unknown };
+    getHandles(): { three?: unknown; renderer?: unknown; scene?: unknown; camera?: unknown };
     snapshot?(): {
       attached: boolean;
       backend: string | null;
@@ -43,7 +43,7 @@ type RuntimePanelSource = {
     };
   };
   world: {
-    getsceneHandles(): {
+    getSceneHandles(): {
       getObjects?: unknown;
       getColliders?: unknown;
     };
@@ -88,7 +88,6 @@ type RuntimePanelSource = {
   community: {
     snapshot(): { ownUserId: number | null; cachedProfiles: number };
   };
-  vortex: { get(): unknown };
   diagnostics: { warn(event: string, payload?: Record<string, unknown>): void };
 };
 
@@ -171,7 +170,7 @@ export class CoreHudService {
     this.lastPanelRenderAt = now;
 
     const rendererHandles = source.renderer.getHandles();
-    const worldHandles = source.world.getsceneHandles();
+    const worldHandles = source.world.getSceneHandles();
     const objects = callArrayGetter(worldHandles.getObjects);
     const colliders = callArrayGetter(worldHandles.getColliders);
     const avatar = source.avatar.getPreviewState?.();
@@ -284,7 +283,7 @@ export class CoreHudService {
     const buffers = source.physics.debugRender?.();
     const handles = source.renderer.getHandles();
     const scene = handles.scene as { add?: (object: unknown) => void; remove?: (object: unknown) => void } | undefined;
-    const three = (globalThis as typeof globalThis & { THREE?: ThreeLike }).THREE;
+    const three = handles.three as ThreeLike | undefined;
     if (!buffers || !scene || !three) {
       this.clearPhysicsDebug(scene);
       return;

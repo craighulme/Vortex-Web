@@ -28,6 +28,7 @@ export type PhysicsWorld = {
   removeCollider(handle: ColliderHandle): void;
   syncStaticColliders?(colliders: unknown[]): void;
   castRay(origin: [number, number, number], direction: [number, number, number], maxDistance: number): RayHit | null;
+  raycast(origin: [number, number, number], direction: [number, number, number], maxDistance: number): RayHit | null;
   debugRender?(): PhysicsDebugRender | null;
   snapshot(): PhysicsWorldSnapshot;
   dispose(): void;

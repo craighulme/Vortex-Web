@@ -105,7 +105,7 @@ describe("RemotePlayerService", () => {
         },
         Sprite: FakeSprite
       },
-      vortex: {
+      runtimeApi: {
         scene: { add() {}, remove() {} },
         getCharacter: () => null,
         getAnimRest: () => ({}),
@@ -144,7 +144,7 @@ describe("RemotePlayerService", () => {
         },
         Sprite: FakeSprite
       },
-      vortex: {
+      runtimeApi: {
         scene: { add() {}, remove() {} },
         getCharacter: () => new FakeGroup() as never,
         getAnimRest: () => ({}),
@@ -176,7 +176,7 @@ describe("RemotePlayerService", () => {
         },
         Sprite: FakeSprite
       },
-      vortex: {
+      runtimeApi: {
         scene: { add() {}, remove() {} },
         getCharacter: () => new FakeGroup() as never,
         getAnimRest: () => ({}),
@@ -209,7 +209,7 @@ describe("RemotePlayerService", () => {
         },
         Sprite: FakeSprite
       },
-      vortex: {
+      runtimeApi: {
         scene: { add() {}, remove() {} },
         getCharacter: () => null,
         getAnimRest: () => ({}),
@@ -260,7 +260,7 @@ describe("RemotePlayerService", () => {
         },
         Sprite: FakeSprite
       },
-      vortex: {
+      runtimeApi: {
         scene: { add() {}, remove() {} },
         getCharacter: () => null,
         getAnimRest: () => ({}),
@@ -310,7 +310,7 @@ describe("RemotePlayerService", () => {
         },
         Sprite: FakeSprite
       },
-      vortex: {
+      runtimeApi: {
         scene: { add() {}, remove() {} },
         getCharacter: () => null,
         getAnimRest: () => ({}),
@@ -361,7 +361,7 @@ describe("RemotePlayerService", () => {
         },
         Sprite: FakeSprite
       },
-      vortex: {
+      runtimeApi: {
         scene: { add() {}, remove(object: unknown) { sceneRemoved.push(object); } },
         getCharacter: () => new FakeGroup() as never,
         getAnimRest: () => ({}),

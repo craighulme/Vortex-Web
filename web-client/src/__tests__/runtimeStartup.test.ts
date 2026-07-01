@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { RuntimeBridgeService } from "../runtime/RuntimeBridgeService";
+import { RuntimeStartupService } from "../runtime/RuntimeStartupService";
 
-describe("RuntimeBridgeService", () => {
+describe("RuntimeStartupService", () => {
   it("installs quality, runtime exports, frame loop, and vortex api", () => {
     const windowRef = { requestAnimationFrame: () => 0 } as unknown as Window & Record<string, unknown>;
     const localMovement = {
@@ -14,12 +14,12 @@ describe("RuntimeBridgeService", () => {
       setMovementMods: () => ({ fly: true }),
       getClimbState: () => "none"
     };
-    const runtimeExports = {
+    const runtimeApiExports = {
       installed: null as unknown,
       install(options: unknown) {
         this.installed = options;
-        (options as { windowRef: Record<string, unknown>; vortexApi: unknown }).windowRef._vortex = (options as { vortexApi: unknown }).vortexApi;
-        return (options as { vortexApi: unknown }).vortexApi;
+        (options as { setRuntimeApi(value: unknown): void; runtimeApi: unknown }).setRuntimeApi((options as { runtimeApi: unknown }).runtimeApi);
+        return (options as { runtimeApi: unknown }).runtimeApi;
       }
     };
     const frameLoop = {
@@ -36,8 +36,9 @@ describe("RuntimeBridgeService", () => {
       }
     };
     const character = { position: { y: 10 } };
+    let installedRuntimeApi: unknown = null;
 
-    const api = new RuntimeBridgeService().install({
+    const api = new RuntimeStartupService().install({
       windowRef,
       localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } as unknown as Storage,
       three: {
@@ -45,13 +46,9 @@ describe("RuntimeBridgeService", () => {
         BufferGeometry: class { setAttribute() {} },
         Float32BufferAttribute: class {}
       } as any,
-      gltfLoaderClass: class {},
-      gltfLoader: {},
       scene: {},
-      ambient: {},
       renderer: { render: () => {}, getPixelRatio: () => 1, userData: { vwebBackend: "webgpu" } },
       cameraObject: {},
-      cameraState: {},
       avatarMaterials: { applyShirtToMesh: () => {} } as any,
       avatarAssets: { prefetchAvatarImages: () => {} } as any,
       localAvatar: { getShirtMesh: () => ({}), applyAvatar: async () => {}, getAvatar: () => ({}) } as any,
@@ -88,7 +85,10 @@ describe("RuntimeBridgeService", () => {
       } as any,
       rendererService: { detectRendererBackend: () => "webgpu", diagnoseScene: () => ({}) } as any,
       quality: quality as any,
-      runtimeExports: runtimeExports as any,
+      runtimeApiExports: runtimeApiExports as any,
+      setRuntimeApi: (value) => {
+        installedRuntimeApi = value;
+      },
       frameLoop: frameLoop as any,
       profiler: { begin: () => ({}), mark: () => {}, end: () => {} },
       worldService: { attachRuntimeAdapter: () => {} },
@@ -101,11 +101,24 @@ describe("RuntimeBridgeService", () => {
         colliders: [],
         addPart: () => {},
         removePart: () => {},
+        dynamicObjects: {
+          addPart: () => {},
+          removePart: () => {},
+          spawnPart: () => ({}),
+          removeObject: () => {},
+          spawnMesh: () => ({}),
+          createBatchMesh: () => ({}),
+          createRuntimeMesh: () => ({}),
+          createGeometry: () => ({}),
+          scene: {},
+          objects: [],
+          bufferGeometryUtils: {},
+          shadowsActive: () => false
+        },
         useStudTextures: () => true,
         refreshStudMaterialTextures: () => {},
         textureDiagnostics: () => []
       },
-      bufferGeometryUtils: {},
       keys: {},
       anim: { rest: {} },
       getCharacter: () => character,
@@ -116,7 +129,6 @@ describe("RuntimeBridgeService", () => {
       requestPointerLock: () => {},
       resetCharacterToSpawn: () => true,
       pick: () => "hit",
-      cursorOver: () => false,
       update: () => {},
       updateCamera: () => {},
       updateDebug: () => {},
@@ -135,9 +147,10 @@ describe("RuntimeBridgeService", () => {
     expect(apiMethods.getVelY()).toBe(4);
     expect(apiMethods.pick()).toBe("hit");
     expect(apiMethods.getCharBubbleBase()).toBe(13.4);
-    expect(windowRef._vortex).toBe(api);
+    expect(windowRef._vortex).toBeUndefined();
+    expect(installedRuntimeApi).toBe(api);
     expect(quality.configured).toBeTruthy();
-    expect(runtimeExports.installed).toBeTruthy();
+    expect(runtimeApiExports.installed).toBeTruthy();
     expect(frameLoop.started).toBeTruthy();
   });
 });

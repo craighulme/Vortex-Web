@@ -8,15 +8,11 @@ import type { LocalMovementRuntimeService } from "../movement/LocalMovementRunti
 import type { QualityService } from "../renderer/QualityService";
 import type { RendererService } from "../renderer/RendererService";
 import type { SceneSettingsService } from "../renderer/SceneSettingsService";
-import type { RuntimeExportsService } from "./RuntimeExportsService";
+import type { RuntimeApiExportService } from "./RuntimeApiExportService";
 import type { FrameLoopService } from "./FrameLoopService";
 
 export type ThreeLike = {
-  Mesh: new (geometry: unknown, material: unknown) => unknown;
-  BufferGeometry: new () => {
-    setAttribute(name: string, attribute: unknown): void;
-  };
-  Float32BufferAttribute: new (array: ArrayLike<number>, itemSize: number) => unknown;
+  [key: string]: unknown;
 };
 
 export type WorldRuntimeLike = {
@@ -28,22 +24,32 @@ export type WorldRuntimeLike = {
   colliders: unknown[];
   addPart: unknown;
   removePart: unknown;
+  dynamicObjects: {
+    addPart: unknown;
+    removePart: unknown;
+    spawnPart?(options: unknown): unknown;
+    removeObject?(id: number): void;
+    spawnMesh?(geometry: unknown, material: unknown, options?: unknown): unknown;
+    createBatchMesh?(geometry: unknown, material: unknown): unknown;
+    createRuntimeMesh(geometry: unknown, material: unknown): unknown;
+    createGeometry(attributes: Record<string, { array: ArrayLike<number>; itemSize: number }>): unknown;
+    scene: unknown;
+    objects: unknown[];
+    bufferGeometryUtils?: unknown;
+    shadowsActive(): boolean;
+  };
   useStudTextures(): boolean;
   refreshStudMaterialTextures(): void;
   textureDiagnostics(): unknown;
 };
 
-export type RuntimeBridgeConfig = {
+export type RuntimeStartupConfig = {
   windowRef: Window & Record<string, unknown>;
   localStorage: Storage;
   three: ThreeLike & Record<string, unknown>;
-  gltfLoaderClass: unknown;
-  gltfLoader: unknown;
   scene: unknown;
-  ambient: unknown;
   renderer: { render(scene: unknown, camera: unknown): void; getPixelRatio(): number; userData?: Record<string, unknown> };
   cameraObject: unknown;
-  cameraState: unknown;
   avatarMaterials: AvatarMaterialService;
   avatarAssets: AvatarAssetService;
   localAvatar: LocalAvatarService;
@@ -61,7 +67,8 @@ export type RuntimeBridgeConfig = {
   sceneSettings: SceneSettingsService;
   rendererService: RendererService;
   quality: QualityService;
-  runtimeExports: RuntimeExportsService;
+  runtimeApiExports: RuntimeApiExportService;
+  setRuntimeApi(value: Record<string, unknown>): void;
   frameLoop: FrameLoopService;
   profiler: { begin(now: number): unknown; mark(frame: unknown, label: string): void; end(frame: unknown): void };
   worldService: {
@@ -70,7 +77,6 @@ export type RuntimeBridgeConfig = {
     setRenderDistance?(distance: number, profile?: "performance" | "balanced" | "visual"): unknown;
   };
   worldRuntime: WorldRuntimeLike;
-  bufferGeometryUtils: unknown;
   keys: Record<string, boolean>;
   anim: { rest: unknown };
   getCharacter(): { position: { y: number } } | null;
@@ -81,7 +87,6 @@ export type RuntimeBridgeConfig = {
   requestPointerLock(): void;
   resetCharacterToSpawn(): boolean;
   pick(): unknown;
-  cursorOver(element: Element | null | undefined): boolean;
   update(dt: number): void;
   updateCamera(dt: number): void;
   updateDebug(): void;

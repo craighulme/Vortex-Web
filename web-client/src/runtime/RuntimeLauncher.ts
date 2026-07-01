@@ -3,6 +3,7 @@ import * as THRE from "../../public/vendor/three.webgpu.js";
 import * as BufferGeometryUtils from "../../public/vendor/BufferGeometryUtils.js";
 import { GLTFLoader } from "../../public/vendor/GLTFLoader.js";
 import { CSMShadowNode } from "../../public/vendor/CSMShadowNode.js";
+import { attachRuntimeApi } from "./createRuntime";
 import type { VortexRuntime } from "./types";
 
 const VortexBufferGeometryUtils = {
@@ -34,7 +35,7 @@ if (!runtimeRendererService) {
     throw new Error('[renderer] VortexRuntime renderer service is required before the runtime starts.');
 }
 
-const sceneRuntime = await VortexRuntime.sceneBridge.configure({
+const sceneRuntime = await VortexRuntime.sceneSetup.configure({
     windowRef: window,
     document,
     localStorage,
@@ -80,6 +81,7 @@ const worldRuntime = VortexRuntime.worldBridge.configure({
     materials: VortexRuntime.worldMaterials,
     colliders: VortexRuntime.worldColliders,
     parts: VortexRuntime.worldParts,
+    dynamicObjects: VortexRuntime.worldDynamicObjects,
     sceneSettings,
     shadows,
     debugVisuals: VortexRuntime.debugVisuals,
@@ -103,7 +105,7 @@ window.locked = false;
 const anim = { time: 0, bones: {}, rest: {} };
 
 const gltfLoader = new THREE.GLTFLoader();
-const avatarRuntime = VortexRuntime.avatarBridge.configure({
+const avatarRuntime = VortexRuntime.avatarSetup.configure({
     THREE,
     scene,
     document,
@@ -112,6 +114,7 @@ const avatarRuntime = VortexRuntime.avatarBridge.configure({
     avatarService: VortexRuntime.avatar,
     avatarAssets: VortexRuntime.avatarAssets,
     avatarMaterials: VortexRuntime.avatarMaterials,
+    equipment: VortexRuntime.avatarEquipment,
     localAvatar: VortexRuntime.localAvatar,
     remoteAvatarAppearance: VortexRuntime.remoteAvatarAppearance,
     characterSpawn: VortexRuntime.characterSpawn,
@@ -145,7 +148,7 @@ function setMouseLock(sl) {
     hudRuntime?.setMouseLock(!!sl);
 }
 
-const localPlayerRuntime = VortexRuntime.localPlayerBridge.configure({
+const localPlayerRuntime = VortexRuntime.localPlayerSetup.configure({
     THREE,
     runtime: VortexRuntime,
     cameraObject: camera,
@@ -160,7 +163,6 @@ const localPlayerRuntime = VortexRuntime.localPlayerBridge.configure({
     setFirstPerson: (value) => { isFirstPerson = !!value; },
 });
 const localMovement = localPlayerRuntime.localMovement;
-const cam = localPlayerRuntime.cameraState;
 
 const runtimeInput = VortexRuntime.input;
 if (!runtimeInput || typeof runtimeInput.attachTarget !== 'function') {
@@ -168,11 +170,7 @@ if (!runtimeInput || typeof runtimeInput.attachTarget !== 'function') {
 }
 const keys = runtimeInput.keys;
 
-function _cursorOver(el) {
-    return hudRuntime?.cursorOver(el) || false;
-}
-
-hudRuntime = VortexRuntime.hudBridge.configure({
+hudRuntime = VortexRuntime.hudSetup.configure({
     document,
     windowRef: window,
     runtime: VortexRuntime,
@@ -206,17 +204,13 @@ hudRuntime = VortexRuntime.hudBridge.configure({
     onToggleDebug: toggleDebug,
 });
 
-VortexRuntime.runtimeBridge.install({
+VortexRuntime.runtimeStartup.install({
     windowRef: window,
     localStorage,
     three: THREE,
-    gltfLoaderClass: GLTFLoader,
-    gltfLoader,
     scene,
-    ambient,
     renderer,
     cameraObject: camera,
-    cameraState: cam,
     avatarMaterials,
     avatarAssets,
     localAvatar,
@@ -234,12 +228,12 @@ VortexRuntime.runtimeBridge.install({
     sceneSettings,
     rendererService: runtimeRendererService,
     quality: VortexRuntime.quality,
-    runtimeExports: VortexRuntime.runtimeExports,
+    runtimeApiExports: VortexRuntime.runtimeApiExports,
+    setRuntimeApi: (api) => attachRuntimeApi(VortexRuntime, api),
     frameLoop: VortexRuntime.frameLoop,
     profiler: VortexPerf,
     worldService: VortexRuntime.world,
     worldRuntime: worldRuntimeHandles,
-    bufferGeometryUtils: VortexBufferGeometryUtils,
     keys,
     anim,
     getCharacter,
@@ -250,7 +244,6 @@ VortexRuntime.runtimeBridge.install({
     requestPointerLock: () => hudRuntime?.requestPointerLock(),
     resetCharacterToSpawn: () => localMovement.resetCharacterToSpawn(),
     pick: () => worldRuntime.getClicked3DPoint(),
-    cursorOver: _cursorOver,
     update: (dt) => localMovement.update(dt),
     updateCamera: (dt) => localMovement.updateCamera(dt),
     updateDebug: () => {

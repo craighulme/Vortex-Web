@@ -28,6 +28,43 @@ describe("WorldService", () => {
     expect(removed).toEqual(["stud-1"]);
   });
 
+  it("exposes dynamic part spawning through the world service", () => {
+    const world = new WorldService();
+    const spawned: unknown[] = [];
+    const removed: unknown[] = [];
+    world.attachRuntimeAdapter({
+      spawnPart: (part: unknown) => {
+        spawned.push(part);
+        return ["mesh", "dynamic-1"];
+      },
+      removeObject: (id: unknown) => removed.push(id)
+    });
+
+    const entity = world.spawnPart({
+      id: "ball",
+      position: [1, 4, 3],
+      size: [2, 2, 2],
+      color: 0xffffff,
+      shape: "Sphere"
+    });
+
+    expect(entity.id).toBe("ball");
+    expect(spawned).toEqual([{
+      size: [2, 2, 2],
+      position: [1, 3, 3],
+      color: 0xffffff,
+      rotation: undefined,
+      shape: "Sphere",
+      transparency: 0,
+      staticMesh: false,
+      canCollide: true,
+      rotationOrder: "YXZ",
+      type: undefined
+    }]);
+    expect(world.removeObject("ball")).toBe(true);
+    expect(removed).toEqual(["dynamic-1"]);
+  });
+
   it("loads official maps through the runtime service and sets spawn from map bounds", async () => {
     const world = new WorldService();
     const requests: unknown[][] = [];

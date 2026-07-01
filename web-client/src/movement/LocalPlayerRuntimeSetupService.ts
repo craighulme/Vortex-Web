@@ -2,7 +2,7 @@ type ThreeLike = {
   Vector3: new () => unknown;
 };
 
-export type LocalPlayerRuntimeBridgeOptions = {
+export type LocalPlayerRuntimeSetupOptions = {
   THREE: ThreeLike;
   runtime: Record<string, any>;
   cameraObject: unknown;
@@ -17,13 +17,13 @@ export type LocalPlayerRuntimeBridgeOptions = {
   setFirstPerson(value: boolean): void;
 };
 
-export type LocalPlayerRuntimeBridgeHandles = {
+export type LocalPlayerRuntimeSetupHandles = {
   localMovement: any;
   cameraState: unknown;
 };
 
-export class LocalPlayerRuntimeBridgeService {
-  configure(options: LocalPlayerRuntimeBridgeOptions): LocalPlayerRuntimeBridgeHandles {
+export class LocalPlayerRuntimeSetupService {
+  configure(options: LocalPlayerRuntimeSetupOptions): LocalPlayerRuntimeSetupHandles {
     const localMovement = options.runtime.localMovement.configure?.({
       movement: requireRuntimeService(options.runtime.movement, "movement"),
       collision: requireRuntimeService(options.runtime.characterCollision, "character collision"),

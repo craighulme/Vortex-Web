@@ -3,7 +3,7 @@
 export function installMultiplayerFrameBridge(context) {
   const {
     window,
-    vortex,
+    runtimeApi,
     runtimeRemoteSession,
     remotePlayerService,
     normalizeAvatarFields,
@@ -20,7 +20,7 @@ export function installMultiplayerFrameBridge(context) {
     const remoteSession = runtimeRemoteSession();
     if (remoteSession.pendingAvatars.size === 0 && remoteSession.remotes.size === 0 && !hasBubbles()) return;
 
-    const cam = vortex.getCamera?.();
+    const cam = runtimeApi.getCamera?.();
     remoteSession.updateFrame({
       service: remotePlayerService(),
       dt,

@@ -10,7 +10,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     runtimePacketDebug,
     runtimeSession,
     runtimeMultiplayer,
-    vortex,
+    runtimeApi,
     bridgeOpen,
     bridgeSend,
     sceneFootOffset,
@@ -69,7 +69,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     const rebuildLocal = options.rebuild !== false && options.applyLocal !== false;
     if (rebuildLocal) {
       if (options.rebuildRemotes === false) setSkipNextRemoteAvatarRebuild(true);
-      vortex.applyAvatar?.(next);
+      runtimeApi.applyAvatar?.(next);
     }
     if (options.measure) runtimePacketDebug().addPendingSpoof(next, normalizeAvatarFields);
     if (runtimeSession().hubMode && bridgeOpen()) {
@@ -96,7 +96,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
   }
 
   function currentState(anim = "idle") {
-    const char = vortex.getCharacter?.();
+    const char = runtimeApi.getCharacter?.();
     if (!char) return null;
     return runtimeMultiplayer().buildStateAtScenePosition({
       position: char.position,
@@ -171,11 +171,11 @@ export function createMultiplayerAvatarSpoofBridge(context) {
 
   function spoofAvatarReset(patch = {}, options = {}) {
     if (!runtimeSession().hubMode || !bridgeOpen()) throw new Error("avatar reset sync requires the local relay connection");
-    const char = vortex.getCharacter?.();
+    const char = runtimeApi.getCharacter?.();
     if (!char) throw new Error("character is not ready");
 
     const original = currentState("idle");
-    const spawn = vortex.getSpawn?.() || { x: 0, y: char.position.y - sceneFootOffset(), z: 0, ry: char.rotation.y };
+    const spawn = runtimeApi.getSpawn?.() || { x: 0, y: char.position.y - sceneFootOffset(), z: 0, ry: char.rotation.y };
     const spawnScene = {
       x: Number(options.x ?? spawn.x ?? 0),
       y: Number(options.y ?? ((spawn.y ?? 0) + sceneFootOffset())),

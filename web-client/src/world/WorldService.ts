@@ -65,6 +65,10 @@ export type LoadMapOptions = {
 export type WorldSceneHandles = {
   addPart?: unknown;
   removePart?: unknown;
+  spawnPart?: unknown;
+  removeObject?: unknown;
+  spawnMesh?: unknown;
+  createBatchMesh?: unknown;
   createRuntimeMesh?: unknown;
   createGeometry?: unknown;
   scene?: unknown;
@@ -93,12 +97,37 @@ export class WorldService {
     this.sceneHandles = { ...this.sceneHandles, ...handles };
   }
 
-  getsceneHandles(): WorldSceneHandles {
+  getSceneHandles(): WorldSceneHandles {
     return { ...this.sceneHandles };
   }
 
   registerPart(part: WorldPart): EntityRecord<WorldPart> {
     return this.entities.create("part", part, part.id);
+  }
+
+  spawnPart(part: WorldPart): EntityRecord<WorldPart> {
+    const entity = this.registerPart(part);
+    const runtimePart = this.spawnRuntimePart(entity.data, false);
+    if (Array.isArray(runtimePart)) entity.data.runtimePartId = runtimePart[1];
+    return entity;
+  }
+
+  removeObject(id: string): boolean {
+    return this.remove(id);
+  }
+
+  spawnMesh(geometry: unknown, material: unknown, options?: unknown): unknown {
+    const spawnMesh = this.sceneHandles.spawnMesh;
+    if (typeof spawnMesh !== "function") throw new Error("World dynamic mesh spawning is not ready");
+    return spawnMesh(geometry, material, options);
+  }
+
+  createBatchMesh(geometry: unknown, material: unknown): unknown {
+    const createBatchMesh = this.sceneHandles.createBatchMesh;
+    if (typeof createBatchMesh === "function") return createBatchMesh(geometry, material);
+    const createRuntimeMesh = this.sceneHandles.createRuntimeMesh;
+    if (typeof createRuntimeMesh !== "function") throw new Error("World batch mesh creation is not ready");
+    return createRuntimeMesh(geometry, material);
   }
 
   loadMapParts(name: string, raw: RawMapPart[] | string, tx = 0, ty = 1.6, tz = 0, options: LoadMapOptions = {}): LoadedWorldMap {
@@ -208,9 +237,33 @@ export class WorldService {
   }
 
   private addRuntimePart(part: WorldPart): unknown | null {
+    const result = this.spawnRuntimePart(part, true);
+    if (Array.isArray(result)) {
+      part.runtimePartId = result[1];
+      return result[0] ?? null;
+    }
+    return null;
+  }
+
+  private spawnRuntimePart(part: WorldPart, staticMesh: boolean): unknown {
+    const spawnPart = this.sceneHandles.spawnPart;
+    if (typeof spawnPart === "function") {
+      return spawnPart({
+        size: part.size,
+        position: [part.position[0], part.position[1] - part.size[1] * 0.5, part.position[2]],
+        color: part.color,
+        rotation: part.rotation,
+        shape: part.shape ?? "Block",
+        transparency: part.transparency ?? 0,
+        staticMesh,
+        canCollide: part.canCollide !== false,
+        rotationOrder: part.rotationOrder || "YXZ",
+        type: part.type
+      });
+    }
     const addPart = this.sceneHandles.addPart;
     if (typeof addPart === "function") {
-      const result = addPart(
+      return addPart(
         part.size[0],
         part.size[1],
         part.size[2],
@@ -223,21 +276,21 @@ export class WorldService {
         part.rotation?.[2] ?? 0,
         part.shape ?? "Block",
         part.transparency ?? 0,
-        true,
+        staticMesh,
         part.canCollide !== false,
         part.rotationOrder || "YXZ",
         part.type
       );
-      if (Array.isArray(result)) {
-        part.runtimePartId = result[1];
-        return result[0] ?? null;
-      }
-      return null;
     }
     return null;
   }
 
   private removeRuntimePart(runtimePartId: unknown): void {
+    const removeObject = this.sceneHandles.removeObject;
+    if (typeof removeObject === "function") {
+      removeObject(runtimePartId);
+      return;
+    }
     const removePart = this.sceneHandles.removePart;
     if (typeof removePart === "function") {
       removePart(runtimePartId);

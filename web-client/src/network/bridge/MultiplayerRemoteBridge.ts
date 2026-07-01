@@ -3,7 +3,7 @@
 export function createMultiplayerRemoteBridge(context) {
   const {
     THREE,
-    vortex,
+    runtimeApi,
     localStorage,
     console,
     runtimeMultiplayer,
@@ -103,7 +103,7 @@ export function createMultiplayerRemoteBridge(context) {
       avatarPatch: (data) => runtimeMultiplayer().remoteAvatarPatch(data),
       readScenePosition: readRemoteScenePositionResult,
       noteState: noteRemoteState,
-      applyAvatar: (target, avatar) => vortex.applyAvatarToMeshes?.(target.meshes, {
+      applyAvatar: (target, avatar) => runtimeApi.applyAvatarToMeshes?.(target.meshes, {
         ...avatar,
         id: target.id,
         playerId: target.id,
@@ -124,7 +124,7 @@ export function createMultiplayerRemoteBridge(context) {
       normalizeAvatar: normalizeAvatarFields,
       readInitialState: (data) => readRemoteScenePosition(data || {}),
       createPosition: () => new THREE.Vector3(),
-      canCreateMeshes: () => !!vortex.getCharacter(),
+      canCreateMeshes: () => !!runtimeApi.getCharacter(),
       makeRemote,
       setNameLabel: setRemoteNameLabel,
       decodeRemoteState: decodeNetworkData,

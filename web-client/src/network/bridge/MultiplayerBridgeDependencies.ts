@@ -1,8 +1,6 @@
-// @ts-nocheck
-
 export type MultiplayerBridgeDependencies = {
-  window: any;
-  document: any;
+  window: Window & { VortexRuntime?: any; Chat?: any; WebSocket: typeof WebSocket };
+  document: Document;
   localStorage: Storage;
   setTimeout: Window["setTimeout"];
   setInterval: Window["setInterval"];
@@ -13,7 +11,7 @@ export type MultiplayerBridgeDependencies = {
   location: Location;
   THREE: any;
   Chat: any;
-  _vortex: any;
+  runtimeApi: any;
   scene: any;
 };
 
@@ -21,14 +19,14 @@ export type MultiplayerBridgeDependencyResult =
   | { ok: true; deps: MultiplayerBridgeDependencies }
   | { ok: false; reason: string };
 
-export function resolveMultiplayerBridgeDependencies(windowRef: Window, documentRef: Document): MultiplayerBridgeDependencyResult {
-  const window = windowRef as any;
-  const document = documentRef as any;
-  const THREE = window.THREE;
+export function resolveMultiplayerBridgeDependencies(windowRef: Window, documentRef: Document, runtimeApi: unknown): MultiplayerBridgeDependencyResult {
+  const window = windowRef as MultiplayerBridgeDependencies["window"];
+  const document = documentRef;
+  const THREE = window.VortexRuntime?.renderer?.getHandles?.()?.three;
   const Chat = window.Chat;
-  const _vortex = window._vortex;
+  const api = runtimeApi as any;
 
-  if (!_vortex) return { ok: false, reason: "Vortex runtime exports are not ready" };
+  if (!api) return { ok: false, reason: "runtime exports are not ready" };
   if (!THREE) return { ok: false, reason: "THREE is not ready" };
   if (!Chat) return { ok: false, reason: "chat service is not ready" };
 
@@ -47,8 +45,8 @@ export function resolveMultiplayerBridgeDependencies(windowRef: Window, document
       location: window.location,
       THREE,
       Chat,
-      _vortex,
-      scene: _vortex?.scene
+      runtimeApi: api,
+      scene: api?.scene
     }
   };
 }

@@ -1,7 +1,7 @@
 type RuntimeLike = {
-  renderer: { getHandles(): { scene?: unknown } };
-  world: { getsceneHandles(): { getColliders?: unknown } };
-  vortex: { get(): unknown };
+  renderer: { getHandles(): { three?: unknown; scene?: unknown } };
+  worldColliders?: { colliders?: unknown[] };
+  localAvatar?: { getCharacter?(): unknown };
   slim?: {
     registerTarget?(target: {
       id: string;
@@ -106,7 +106,7 @@ export class ClientPhysicsSandbox {
     }
 
     if (this.stressBodies.length) {
-      const THREE = readThree();
+      const THREE = readThree(runtime);
       this.stressFrame += 1;
       const shouldStepStress = this.shouldStepStress();
       if (shouldStepStress) {
@@ -137,7 +137,7 @@ export class ClientPhysicsSandbox {
   }
 
   spawnFootball(runtime: RuntimeLike): boolean {
-    const THREE = readThree();
+    const THREE = readThree(runtime);
     const scene = readScene(runtime);
     if (!THREE || !scene?.add) {
       runtime.diagnostics.warn("sandbox.spawnFootball.failed", { reason: "THREE scene not ready" });
@@ -165,7 +165,7 @@ export class ClientPhysicsSandbox {
   }
 
   startStress(runtime: RuntimeLike, rate = 250): boolean {
-    const THREE = readThree();
+    const THREE = readThree(runtime);
     const scene = readScene(runtime);
     if (!THREE || !scene?.add) {
       runtime.diagnostics.warn("sandbox.startStress.failed", { reason: "THREE scene not ready" });
@@ -266,14 +266,8 @@ export class ClientPhysicsSandbox {
   }
 
   private readColliders(runtime: RuntimeLike): Collider[] {
-    const getter = runtime.world.getsceneHandles().getColliders;
-    if (typeof getter !== "function") return [];
-    try {
-      const colliders = getter();
-      return Array.isArray(colliders) ? colliders.filter(isCollider) : [];
-    } catch {
-      return [];
-    }
+    const colliders = runtime.worldColliders?.colliders;
+    return Array.isArray(colliders) ? colliders.filter(isCollider) : [];
   }
 
   private selectStressColliders(runtime: RuntimeLike, colliders: Collider[]): Collider[] {
@@ -292,11 +286,7 @@ export class ClientPhysicsSandbox {
   }
 
   private kickFromPlayer(runtime: RuntimeLike, ball: SandboxBall): void {
-    const vortex = runtime.vortex.get();
-    if (!vortex || typeof vortex !== "object") return;
-    const getCharacter = (vortex as { getCharacter?: unknown }).getCharacter;
-    if (typeof getCharacter !== "function") return;
-    const character = getCharacter();
+    const character = runtime.localAvatar?.getCharacter?.() as { position?: Vec3 } | null | undefined;
     const position = character?.position;
     if (!position) return;
     const dx = ball.mesh.position.x - Number(position.x || 0);
@@ -421,7 +411,7 @@ export class ClientPhysicsSandbox {
     );
     if (count <= 0) return;
     this.stressAccumulator -= count;
-    const THREE = readThree();
+    const THREE = readThree(runtime);
     const color = THREE && this.stressMesh?.setColorAt ? new THREE.Color() : null;
     const origin = readPlayerSpawn(runtime);
     for (let i = 0; i < count; i += 1) {
@@ -611,8 +601,8 @@ export class ClientPhysicsSandbox {
   }
 }
 
-function readThree(): any {
-  return (globalThis as typeof globalThis & { THREE?: unknown }).THREE;
+function readThree(runtime?: RuntimeLike): any {
+  return runtime?.renderer.getHandles().three || null;
 }
 
 function readScene(runtime: RuntimeLike): { add?(object: unknown): void; remove?(object: unknown): void } | null {
@@ -638,21 +628,15 @@ function readPlayerPosition(runtime: RuntimeLike): Vec3 | null {
 }
 
 function readPlayerTransform(runtime: RuntimeLike): (Vec3 & { rotationY: number }) | null {
-  const vortex = runtime.vortex.get();
-  if (vortex && typeof vortex === "object") {
-    const getCharacter = (vortex as { getCharacter?: unknown }).getCharacter;
-    if (typeof getCharacter === "function") {
-      const ch = getCharacter();
-      if (ch?.position) {
-        const ry = Number(ch.rotation?.y || 0);
-        return {
-          x: Number(ch.position.x || 0),
-          y: Number(ch.position.y || 4),
-          z: Number(ch.position.z || 0),
-          rotationY: ry
-        };
-      }
-    }
+  const ch = runtime.localAvatar?.getCharacter?.() as { position?: Vec3; rotation?: { y?: unknown } } | null | undefined;
+  if (ch?.position) {
+    const ry = Number(ch.rotation?.y || 0);
+    return {
+      x: Number(ch.position.x || 0),
+      y: Number(ch.position.y || 4),
+      z: Number(ch.position.z || 0),
+      rotationY: ry
+    };
   }
   return null;
 }

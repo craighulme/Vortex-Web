@@ -71,6 +71,10 @@ class StaticPhysicsWorld implements PhysicsWorld {
     return null;
   }
 
+  raycast(): null {
+    return null;
+  }
+
   debugRender(): null {
     return null;
   }
@@ -165,6 +169,10 @@ class RapierPhysicsWorld implements PhysicsWorld {
       normal: [hit.normal.x, hit.normal.y, hit.normal.z],
       distance: hit.timeOfImpact
     };
+  }
+
+  raycast(origin: [number, number, number], direction: [number, number, number], maxDistance: number): RayHit | null {
+    return this.castRay(origin, direction, maxDistance);
   }
 
   debugRender(): PhysicsDebugRender | null {

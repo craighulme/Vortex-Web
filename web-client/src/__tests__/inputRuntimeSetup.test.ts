@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InputRuntimeBridgeService } from "../input/InputRuntimeBridgeService";
+import { InputRuntimeSetupService } from "../input/InputRuntimeSetupService";
 
 class FakeElement extends EventTarget {
   style: Record<string, string> = {};
@@ -10,7 +10,7 @@ class FakeElement extends EventTarget {
   }
 }
 
-describe("InputRuntimeBridgeService", () => {
+describe("InputRuntimeSetupService", () => {
   it("routes gameplay input and canvas clicks through runtime services", () => {
     const documentRef = new EventTarget() as Document;
     Object.defineProperty(documentRef, "pointerLockElement", { value: null, configurable: true });
@@ -80,7 +80,7 @@ describe("InputRuntimeBridgeService", () => {
       panel: () => null
     };
 
-    new InputRuntimeBridgeService().configure({
+    new InputRuntimeSetupService().configure({
       document: documentRef,
       rendererElement,
       overlay,

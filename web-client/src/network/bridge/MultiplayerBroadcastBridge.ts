@@ -1,13 +1,37 @@
-// @ts-nocheck
-
 const BROADCAST_TICK_MS = 50;
 
-export function createMultiplayerBroadcastBridge(context) {
+type BroadcastBridgeContext = {
+  window: Window;
+  setInterval: Window["setInterval"];
+  clearInterval: Window["clearInterval"];
+  runtimeApi: {
+    keys: Record<string, boolean>;
+    getCharacter(): { position: { x: number; y: number; z: number }; rotation: { y: number } } | null;
+    getGrounded(): boolean;
+    getClimbState(): unknown;
+  };
+  runtimeSession(): {
+    startBroadcast(options: Record<string, unknown>): void;
+    runBroadcastTick(options: Record<string, unknown>): void;
+    stopBroadcast(clearIntervalRef: Window["clearInterval"]): void;
+  };
+  runtimeMultiplayer(): {
+    buildLocalBroadcastState(options: Record<string, unknown>): unknown;
+    shouldBroadcastLocalState(state: unknown): boolean;
+    resetLocalBroadcast?(): void;
+  };
+  sceneYToNativeY(y: unknown): number;
+  bridgeOpen(): boolean;
+  encodeNetworkData(data: unknown): unknown;
+  bridgeSend(payload: unknown): unknown;
+};
+
+export function createMultiplayerBroadcastBridge(context: BroadcastBridgeContext) {
   const {
     window,
     setInterval,
     clearInterval,
-    vortex,
+    runtimeApi,
     runtimeSession,
     runtimeMultiplayer,
     sceneYToNativeY,
@@ -23,9 +47,9 @@ export function createMultiplayerBroadcastBridge(context) {
       tick: () => {
         runtimeSession().runBroadcastTick({
           isOpen: bridgeOpen,
-          getCharacter: () => vortex.getCharacter(),
-          buildState: (char) => {
-            const keys = vortex.keys;
+          getCharacter: () => runtimeApi.getCharacter(),
+          buildState: (char: { position: { x: number; y: number; z: number }; rotation: { y: number } }) => {
+            const keys = runtimeApi.keys;
             const moving = keys["KeyW"] || keys["KeyS"] || keys["KeyA"] || keys["KeyD"] ||
               keys["ArrowUp"] || keys["ArrowDown"] || keys["ArrowLeft"] || keys["ArrowRight"];
             return runtimeMultiplayer().buildLocalBroadcastState({
@@ -34,12 +58,12 @@ export function createMultiplayerBroadcastBridge(context) {
               z: char.position.z,
               rotationY: char.rotation.y,
               moving: !!moving,
-              grounded: !!vortex.getGrounded(),
-              climbState: vortex.getClimbState(),
+              grounded: !!runtimeApi.getGrounded(),
+              climbState: runtimeApi.getClimbState(),
               convertSceneYToNative: sceneYToNativeY
             });
           },
-          shouldBroadcast: (state) => runtimeMultiplayer().shouldBroadcastLocalState(state),
+          shouldBroadcast: (state: unknown) => runtimeMultiplayer().shouldBroadcastLocalState(state),
           encode: encodeNetworkData,
           send: bridgeSend
         });

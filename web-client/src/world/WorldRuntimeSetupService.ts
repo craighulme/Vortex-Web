@@ -9,7 +9,7 @@ type CharacterDebugMetrics = {
   footOffset: number;
 };
 
-export type WorldRuntimeBridgeOptions = {
+export type WorldRuntimeSetupOptions = {
   THREE: ThreeLike;
   scene: unknown;
   renderer: unknown;
@@ -23,6 +23,7 @@ export type WorldRuntimeBridgeOptions = {
   materials: unknown;
   colliders: unknown;
   parts: unknown;
+  dynamicObjects: unknown;
   sceneSettings: unknown;
   shadows: unknown;
   debugVisuals: any;
@@ -32,7 +33,7 @@ export type WorldRuntimeBridgeOptions = {
   studsPerTile: number;
 };
 
-export type WorldRuntimeBridgeHandles = {
+export type WorldRuntimeSetupHandles = {
   debugVisuals: any;
   worldRuntime: any;
   objects: unknown[];
@@ -45,8 +46,8 @@ export type WorldRuntimeBridgeHandles = {
   updateDebug(character: unknown, metrics: CharacterDebugMetrics): void;
 };
 
-export class WorldRuntimeBridgeService {
-  configure(options: WorldRuntimeBridgeOptions): WorldRuntimeBridgeHandles {
+export class WorldRuntimeSetupService {
+  configure(options: WorldRuntimeSetupOptions): WorldRuntimeSetupHandles {
     if (!options.assets) {
       throw new Error("[assets] VortexRuntime asset manager is required before the runtime starts.");
     }
@@ -82,6 +83,7 @@ export class WorldRuntimeBridgeService {
       materials: options.materials,
       colliders: options.colliders,
       parts: options.parts,
+      dynamicObjects: options.dynamicObjects,
       sceneSettings: options.sceneSettings,
       shadows: options.shadows,
       studsPerTile: options.studsPerTile,

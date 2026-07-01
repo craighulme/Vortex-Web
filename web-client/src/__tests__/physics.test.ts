@@ -29,7 +29,7 @@ describe("PhysicsWorld", () => {
 
     await waitFor(() => physics.snapshot().status === "ready");
 
-    const hit = physics.castRay([0, 5, 0], [0, -1, 0], 20);
+    const hit = physics.raycast([0, 5, 0], [0, -1, 0], 20);
     expect(hit?.collider).toBe("static-0");
     expect(hit?.point[1]).toBeCloseTo(1, 4);
     expect(physics.snapshot().colliders).toBe(1);

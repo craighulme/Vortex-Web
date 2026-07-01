@@ -1,6 +1,7 @@
 import { ShadowService, type ShadowServiceOptions } from "./ShadowService";
 
 export type RendererHandles = {
+  three?: unknown;
   scene?: unknown;
   camera?: unknown;
   renderer?: unknown;

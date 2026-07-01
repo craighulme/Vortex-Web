@@ -1,5 +1,5 @@
 import { createVortexRuntime } from "./runtime/createRuntime";
-import { installWindowRuntimeBridge } from "./runtime/WindowRuntimeBridge";
+import { installWindowRuntimeHandles } from "./runtime/WindowRuntimeHandles";
 import { launchRuntime } from "./runtime/RuntimeLauncher";
 import { readRuntimeDisplaySettings } from "./ui/RuntimeDisplaySettings";
 
@@ -31,7 +31,7 @@ declare global {
     location
   });
 
-  installWindowRuntimeBridge(window, runtime);
+  installWindowRuntimeHandles(window, runtime);
   hydrateCommunityCosmetics(runtime);
   applyRuntimeThemeCss();
   installRuntimeThemeListener();
@@ -127,17 +127,13 @@ function mountCameraSensitivityControl(runtime: ReturnType<typeof createVortexRu
   };
   const apply = (next: number) => {
     value.textContent = `${next.toFixed(2)}x`;
-    const vortex = runtime.vortex.get();
-    if (vortex && typeof vortex === "object") {
-      const setSens = (vortex as { setSens?: unknown }).setSens;
-      if (typeof setSens === "function") setSens.call(vortex, next);
-    }
+    runtime.camera.setSensitivity(next);
   };
 
   const initial = readStored();
   slider.value = String(initial);
   apply(initial);
-  runtime.events.on("vortex:ready", () => apply(readStored()));
+  runtime.events.on("runtime-api:ready", () => apply(readStored()));
   slider.addEventListener("input", () => {
     const next = Number.parseFloat(slider.value);
     const safeValue = Number.isFinite(next) ? next : 1;
@@ -156,9 +152,9 @@ function mountRuntimeMultiplayer(runtime: ReturnType<typeof createVortexRuntime>
       });
     }
   };
-  runtime.events.on("vortex:ready", mount);
+  runtime.events.on("runtime-api:ready", mount);
   window.addEventListener("vweb-runtime-exports-ready", mount);
-  if (runtime.vortex.get()) mount();
+  if (runtime.renderer.getHandles().scene) mount();
 }
 
 function installRuntimeDevTools(runtime: ReturnType<typeof createVortexRuntime>): void {
