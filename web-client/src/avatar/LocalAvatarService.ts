@@ -1,5 +1,5 @@
 import type { AvatarAssetService } from "./AvatarAssetService";
-import type { AvatarMaterialService } from "./AvatarMaterialService";
+import type { AvatarMaterialService } from "./materials/AvatarMaterialService";
 import { DEFAULT_BODY_COLORS, type AvatarService, type NativeAvatarState } from "./AvatarService";
 
 type ThreeLike = Record<string, any>;

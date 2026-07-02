@@ -1,14 +1,25 @@
-// @ts-nocheck
-let THREE = null;
-let windowRef = globalThis;
-let documentRef = globalThis.document;
-let textureLoader = null;
+type RuntimeTexture = Record<string, any>;
+type RuntimeMesh = Record<string, any>;
+type RuntimeMaterial = Record<string, any>;
+type AvatarTextureKind = "shirt" | "pants" | "face";
+type AvatarTextureBuckets = {
+  shirtMaterials: RuntimeMaterial[];
+  pantMaterials: RuntimeMaterial[];
+  headMaterials: RuntimeMaterial[];
+  tickets: Record<AvatarTextureKind, number>;
+};
+type DiagnosticEntry = Record<string, any>;
 
-const diagnostics = [];
+let THREE: any = null;
+let windowRef: any = globalThis;
+let documentRef: Document = globalThis.document;
+let textureLoader: any = null;
+
+const diagnostics: DiagnosticEntry[] = [];
 const DIAGNOSTIC_LIMIT = 120;
 const RETRY_DELAYS_MS = [600, 1800];
 
-export function configureAvatarTexturePipeline(config = {}) {
+export function configureAvatarTexturePipeline(config: Record<string, any> = {}) {
   THREE = config.THREE || THREE;
   windowRef = config.window || globalThis;
   documentRef = config.document || globalThis.document;
@@ -23,7 +34,7 @@ export function clearAvatarTextureDiagnostics() {
   diagnostics.length = 0;
 }
 
-export function applyAvatarTextureToOverlay(mesh, textureUrl, context = {}) {
+export function applyAvatarTextureToOverlay(mesh: RuntimeMesh | null | undefined, textureUrl: string | null | undefined, context: Record<string, any> = {}) {
   const label = String(mesh?.name || mesh?.parent?.name || "avatar-overlay");
   const diagnosticContext = { ...context, label };
   if (!mesh) {
@@ -43,7 +54,7 @@ export function applyAvatarTextureToOverlay(mesh, textureUrl, context = {}) {
       ...diagnosticContext
     });
     mesh.visible = false;
-    mesh.traverse?.((child) => {
+    mesh.traverse?.((child: RuntimeMesh) => {
       if (/Overlay$/.test(child.name || "")) child.visible = false;
     });
     return;
@@ -51,7 +62,7 @@ export function applyAvatarTextureToOverlay(mesh, textureUrl, context = {}) {
 
   const startedAt = performance.now?.() || Date.now();
   const retryAttempt = Number(context?.retryAttempt || 0) || 0;
-  loader().load(textureUrl, (texture) => {
+  loader().load(textureUrl, (texture: RuntimeTexture) => {
     if (mesh.userData.vwebTextureTicket !== ticket) {
       recordDiagnostic({ status: "skipped", reason: "stale-texture-ticket", textureUrl, ...diagnosticContext });
       texture.dispose?.();
@@ -60,9 +71,9 @@ export function applyAvatarTextureToOverlay(mesh, textureUrl, context = {}) {
 
     texture.colorSpace = THREE.SRGBColorSpace;
 
-    const targets = new Set();
+    const targets = new Set<RuntimeMesh>();
     if (mesh.material) targets.add(mesh);
-    mesh.traverse?.((child) => {
+    mesh.traverse?.((child: RuntimeMesh) => {
       if (child.material && /Overlay$/.test(child.name || "")) targets.add(child);
     });
 
@@ -95,7 +106,7 @@ export function applyAvatarTextureToOverlay(mesh, textureUrl, context = {}) {
       targets: targets.size,
       elapsedMs: Math.round(((performance.now?.() || Date.now()) - startedAt) * 10) / 10
     });
-  }, undefined, (error) => {
+  }, undefined, (error: unknown) => {
     if (mesh.userData.vwebTextureTicket !== ticket) return;
     if (retryAttempt < RETRY_DELAYS_MS.length) {
       const delayMs = RETRY_DELAYS_MS[retryAttempt];
@@ -106,7 +117,7 @@ export function applyAvatarTextureToOverlay(mesh, textureUrl, context = {}) {
         ...diagnosticContext,
         retryAttempt: retryAttempt + 1,
         retryDelayMs: delayMs,
-        error: error?.message || String(error || "")
+        error: errorMessage(error)
       });
       windowRef.setTimeout?.(() => {
         if (mesh.userData.vwebTextureTicket !== ticket) return;
@@ -121,12 +132,12 @@ export function applyAvatarTextureToOverlay(mesh, textureUrl, context = {}) {
       textureUrl,
       ...diagnosticContext,
       retryAttempt,
-      error: error?.message || String(error || "")
+      error: errorMessage(error)
     });
   });
 }
 
-export function loadModernAvatarTexture(materials, textureUrl, kind) {
+export function loadModernAvatarTexture(materials: AvatarTextureBuckets | null | undefined, textureUrl: string | null | undefined, kind: AvatarTextureKind) {
   if (!materials) return;
 
   const targets =
@@ -144,7 +155,7 @@ export function loadModernAvatarTexture(materials, textureUrl, kind) {
     return;
   }
 
-  loader().load(textureUrl, (texture) => {
+  loader().load(textureUrl, (texture: RuntimeTexture) => {
     if (materials.tickets[kind] !== ticket) {
       texture.dispose?.();
       return;
@@ -161,7 +172,7 @@ export function loadModernAvatarTexture(materials, textureUrl, kind) {
   });
 }
 
-function recordDiagnostic(event) {
+function recordDiagnostic(event: DiagnosticEntry) {
   const entry = { at: Date.now(), ...event };
   diagnostics.push(entry);
   if (diagnostics.length > DIAGNOSTIC_LIMIT) {
@@ -179,16 +190,24 @@ function loader() {
   return textureLoader;
 }
 
-function colorDistance(r, g, b, color) {
-  const dr = r - color[0];
-  const dg = g - color[1];
-  const db = b - color[2];
+function colorDistance(r: number, g: number, b: number, color: number[]) {
+  const dr = r - (color[0] ?? 0);
+  const dg = g - (color[1] ?? 0);
+  const db = b - (color[2] ?? 0);
   return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
-function sampleImageBackground(data, width, height) {
-  const samples = [];
-  const points = [
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || "");
+}
+
+function pixel(data: Uint8ClampedArray, index: number): number {
+  return data[index] ?? 0;
+}
+
+function sampleImageBackground(data: Uint8ClampedArray, width: number, height: number) {
+  const samples: number[][] = [];
+  const points: Array<[number, number]> = [
     [0, 0],
     [width - 1, 0],
     [0, height - 1],
@@ -201,18 +220,18 @@ function sampleImageBackground(data, width, height) {
 
   for (const [x, y] of points) {
     const i = (y * width + x) * 4;
-    if (data[i + 3] > 0) samples.push([data[i], data[i + 1], data[i + 2]]);
+    if (pixel(data, i + 3) > 0) samples.push([pixel(data, i), pixel(data, i + 1), pixel(data, i + 2)]);
   }
 
   if (!samples.length) return [0, 0, 0];
 
   return [0, 1, 2].map((channel) => {
-    const values = samples.map((sample) => sample[channel]).sort((a, b) => a - b);
-    return values[Math.floor(values.length / 2)];
+    const values = samples.map((sample) => sample[channel] ?? 0).sort((a, b) => a - b);
+    return values[Math.floor(values.length / 2)] ?? 0;
   });
 }
 
-function boostFaceTexture(texture) {
+function boostFaceTexture(texture: RuntimeTexture) {
   const image = texture?.image;
   if (!image || !image.width || !image.height) return texture;
 
@@ -222,25 +241,26 @@ function boostFaceTexture(texture) {
     canvas.height = image.height;
 
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return texture;
     ctx.drawImage(image, 0, 0);
 
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     let transparentPixels = 0;
     for (let i = 3; i < data.data.length; i += 4) {
-      if (data.data[i] < 16) transparentPixels += 1;
+      if (pixel(data.data, i) < 16) transparentPixels += 1;
     }
     if (transparentPixels > canvas.width * canvas.height * 0.2) return texture;
 
     const background = sampleImageBackground(data.data, canvas.width, canvas.height);
-    const backgroundBrightness = (background[0] + background[1] + background[2]) / 3;
+    const backgroundBrightness = ((background[0] ?? 0) + (background[1] ?? 0) + (background[2] ?? 0)) / 3;
 
     for (let i = 0; i < data.data.length; i += 4) {
-      const alpha = data.data[i + 3];
+      const alpha = pixel(data.data, i + 3);
       if (alpha === 0) continue;
 
-      const r = data.data[i];
-      const g = data.data[i + 1];
-      const b = data.data[i + 2];
+      const r = pixel(data.data, i);
+      const g = pixel(data.data, i + 1);
+      const b = pixel(data.data, i + 2);
       const distance = colorDistance(r, g, b, background);
       const brightness = (r + g + b) / 3;
 
@@ -269,7 +289,7 @@ function boostFaceTexture(texture) {
   }
 }
 
-function maskClothingTexture(texture) {
+function maskClothingTexture(texture: RuntimeTexture) {
   const image = texture?.image;
   if (!image || !image.width || !image.height) return texture;
 
@@ -279,19 +299,20 @@ function maskClothingTexture(texture) {
     canvas.height = image.height;
 
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return texture;
     ctx.drawImage(image, 0, 0);
 
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const key = [195, 195, 195];
 
     for (let i = 0; i < data.data.length; i += 4) {
-      if (data.data[i + 3] === 0) continue;
+      if (pixel(data.data, i + 3) === 0) continue;
 
-      const distance = colorDistance(data.data[i], data.data[i + 1], data.data[i + 2], key);
+      const distance = colorDistance(pixel(data.data, i), pixel(data.data, i + 1), pixel(data.data, i + 2), key);
       if (distance <= 18) {
         data.data[i + 3] = 0;
       } else if (distance <= 34) {
-        data.data[i + 3] = Math.min(data.data[i + 3], Math.round((distance - 18) / 16 * 255));
+        data.data[i + 3] = Math.min(pixel(data.data, i + 3), Math.round((distance - 18) / 16 * 255));
       }
     }
 

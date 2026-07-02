@@ -1,5 +1,5 @@
 import type { AvatarAssetService } from "./AvatarAssetService";
-import type { AvatarMaterialService } from "./AvatarMaterialService";
+import type { AvatarMaterialService } from "./materials/AvatarMaterialService";
 import type { AvatarService, NativeAvatarState } from "./AvatarService";
 import type { RemotePlayerMeshes } from "./RemotePlayerService";
 

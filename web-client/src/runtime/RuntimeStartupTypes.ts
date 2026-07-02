@@ -1,5 +1,5 @@
 import type { AvatarAssetService } from "../avatar/AvatarAssetService";
-import type { AvatarMaterialService } from "../avatar/AvatarMaterialService";
+import type { AvatarMaterialService } from "../avatar/materials/AvatarMaterialService";
 import type { CharacterSpawnService } from "../avatar/CharacterSpawnService";
 import type { LocalAvatarService } from "../avatar/LocalAvatarService";
 import type { RemoteAvatarAppearanceService } from "../avatar/RemoteAvatarAppearanceService";

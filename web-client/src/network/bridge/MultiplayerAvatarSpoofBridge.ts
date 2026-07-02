@@ -1,6 +1,12 @@
-// @ts-nocheck
+type AvatarPatch = Record<string, any>;
+type AvatarSpoofOptions = Record<string, any>;
+type MultiplayerAvatarSpoofBridgeContext = Record<string, any> & {
+  localStorage: Storage;
+  console: Console;
+  setTimeout: Window["setTimeout"];
+};
 
-export function createMultiplayerAvatarSpoofBridge(context) {
+export function createMultiplayerAvatarSpoofBridge(context: MultiplayerAvatarSpoofBridgeContext) {
   const {
     localStorage,
     console,
@@ -42,7 +48,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     }
   }
 
-  function setJoinAvatarOverride(patch = {}) {
+  function setJoinAvatarOverride(patch: AvatarPatch = {}) {
     if (!hasAvatarSpoofAccess()) throw new Error("avatar spoofing is not enabled on this license");
     const next = normalizeAvatarFields({ ...currentLaunchAvatar(), ...patch });
     localStorage.setItem("vwebJoinAvatar", JSON.stringify(next));
@@ -54,12 +60,12 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     return true;
   }
 
-  function applyJoinAvatarToLaunchInfo(avatar) {
+  function applyJoinAvatarToLaunchInfo(avatar: AvatarPatch | null | undefined) {
     if (!avatar || !getLaunchInfo()) return null;
     return runtimeSession().updateLaunchAvatar(avatar);
   }
 
-  function setOutboundAvatar(patch = {}, rememberOriginal = true, options = {}) {
+  function setOutboundAvatar(patch: AvatarPatch = {}, rememberOriginal = true, options: AvatarSpoofOptions = {}) {
     if (!hasAvatarSpoofAccess()) throw new Error("avatar spoofing is not enabled on this license");
     if (!getLaunchInfo()) throw new Error("not connected yet");
     if (rememberOriginal) runtimePacketDebug().rememberOriginalAvatar(currentLaunchAvatar());
@@ -83,7 +89,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     return next;
   }
 
-  function setMovementFormat(format = "native-auto") {
+  function setMovementFormat(format: unknown = "native-auto") {
     const requested = String(format || "").toLowerCase();
     const next = requested === "compact" ? "compact"
       : requested === "lite" || requested === "native-lite" || requested === "no-pants" ? "native-lite"
@@ -106,7 +112,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     });
   }
 
-  function stateAtScenePosition(pos, ry, anim = "idle") {
+  function stateAtScenePosition(pos: Record<string, any>, ry: unknown, anim = "idle") {
     return runtimeMultiplayer().buildStateAtScenePosition({
       position: pos,
       rotationY: ry,
@@ -115,7 +121,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     });
   }
 
-  function sendStateBurst(state, count = 3, intervalMs = 50) {
+  function sendStateBurst(state: unknown, count = 3, intervalMs = 50) {
     return runtimeSession().sendStateBurst(state, {
       count,
       intervalMs,
@@ -124,11 +130,11 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     });
   }
 
-  function holdBroadcastState(state, durationMs) {
+  function holdBroadcastState(state: unknown, durationMs: unknown) {
     runtimeSession().holdBroadcastState(state, durationMs);
   }
 
-  function spoofAvatarResync(patch = {}, options = {}) {
+  function spoofAvatarResync(patch: AvatarPatch = {}, options: AvatarSpoofOptions = {}) {
     const delayMs = Math.max(1000, Math.min(15000, Number(options.delayMs ?? options.delay ?? 8000) || 8000));
     const next = setOutboundAvatar(patch || {}, true, {
       persistFormat: options.firstFormat || "native-lite",
@@ -145,7 +151,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     return { ...next, resync_delay_ms: delayMs };
   }
 
-  function spoofAvatarDropResync(patch = {}, options = {}) {
+  function spoofAvatarDropResync(patch: AvatarPatch = {}, options: AvatarSpoofOptions = {}) {
     const delayMs = Math.max(3000, Math.min(20000, Number(options.delayMs ?? options.delay ?? 8000) || 8000));
     const next = setOutboundAvatar(patch || {}, true, {
       compact: true,
@@ -169,7 +175,7 @@ export function createMultiplayerAvatarSpoofBridge(context) {
     };
   }
 
-  function spoofAvatarReset(patch = {}, options = {}) {
+  function spoofAvatarReset(patch: AvatarPatch = {}, options: AvatarSpoofOptions = {}) {
     if (!runtimeSession().hubMode || !bridgeOpen()) throw new Error("avatar reset sync requires the local relay connection");
     const char = runtimeApi.getCharacter?.();
     if (!char) throw new Error("character is not ready");

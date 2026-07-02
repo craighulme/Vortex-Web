@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createMultiplayerAccessBridge } from "./MultiplayerAccessBridge";
 import { resolveMultiplayerBridgeDependencies } from "./MultiplayerBridgeDependencies";
 import { createMultiplayerAvatarSpoofBridge } from "./MultiplayerAvatarSpoofBridge";
@@ -14,22 +13,24 @@ import { createMultiplayerRemoteBridge } from "./MultiplayerRemoteBridge";
 import { createMultiplayerRuntimeServices } from "./MultiplayerRuntimeServices";
 import { handleMultiplayerBridgeMessage } from "./MultiplayerRouterBridgeContext";
 import { createMultiplayerLaunchState } from "./MultiplayerLaunchState";
+import { createMultiplayerProfileBridge } from "./MultiplayerProfileBridge";
+import { createMultiplayerReconnectBridge } from "./MultiplayerReconnectBridge";
 
 export class MultiplayerBridgeService {
   private mounted = false;
-  private frameBridge = null;
-  private runtimeApi = null;
+  private frameBridge: { updateFrame?: (dt: number) => void } | null = null;
+  private runtimeApi: Record<string, any> | null = null;
 
   constructor(
     private readonly windowRef: Window,
     private readonly documentRef: Document
   ) {}
 
-  setRuntimeApi(api) {
-    this.runtimeApi = api;
+  setRuntimeApi(api: unknown) {
+    this.runtimeApi = api && typeof api === "object" ? api as Record<string, any> : null;
   }
 
-  mount(runtime: unknown): boolean {
+  mount(runtime: any): boolean {
     if (this.mounted) return false;
 
     const resolved = resolveMultiplayerBridgeDependencies(this.windowRef, this.documentRef, this.runtimeApi);
@@ -59,7 +60,7 @@ export class MultiplayerBridgeService {
         return !!runtimeApi;
     }
     
-    function _queueUntilRuntimeApi(message) {
+    function _queueUntilRuntimeApi(message: unknown) {
         return _runtimeMultiplayer().queueUntilRuntimeApiReady(message, _hasRuntimeApi());
     }
     
@@ -70,13 +71,13 @@ export class MultiplayerBridgeService {
     window.addEventListener("vweb-runtime-exports-ready", _flushPendingRuntimeApiMessages);
     window.addEventListener("vweb-runtime-ready", () => setTimeout(_flushPendingRuntimeApiMessages, 0));
     
-    function _normalizeAvatarFields(data = {}) {
+    function _normalizeAvatarFields(data: Record<string, any> = {}) {
         return services.normalizeAvatarFields(data);
     }
     
     const launchState = createMultiplayerLaunchState();
     
-    function _statusFor(id) {
+    function _statusFor(id: unknown) {
         return _runtimeMultiplayer().friendStatus(id);
     }
     
@@ -139,49 +140,22 @@ export class MultiplayerBridgeService {
         remotePlayers: runtimeServices.remotePlayers,
         animation: runtimeServices.animation
     });
-    
-    function _playerDisplayName(id, username) {
-        return _runtimeMultiplayer().playerDisplayName(id, username);
-    }
-    
-    function _applyKnownPlayerName(id, username) {
-        const playerId = Number(id);
-        if (!Number.isFinite(playerId) || playerId <= 0) return;
-        return _runtimeRemoteSession().applyKnownPlayerName(playerId, username, {
-            remember: (id, value) => _runtimeMultiplayer().rememberPlayerName(id, value),
-            setNameLabel: remoteAvatarBridge.setNameLabel,
-            addLeaderboard: (player) => _leaderboard().addPlayer(player)
-        });
-    }
 
-    _runtimeCommunity()?.onVortexUserProfile?.((profile) => {
-        if (!profile?.username) return;
-        _applyKnownPlayerName(profile.id, profile.username);
+    const profileBridge = createMultiplayerProfileBridge({
+        fetch,
+        community: _runtimeCommunity,
+        runtimeMultiplayer: _runtimeMultiplayer,
+        runtimeRemoteSession: _runtimeRemoteSession,
+        leaderboard: _leaderboard,
+        setRemoteNameLabel: remoteAvatarBridge.setNameLabel
     });
-    
-    async function fetchFriendData() {
-        await _runtimeMultiplayer().fetchAndReplaceFriendLists(fetch);
-        _leaderboard().setFriendStatuses(_runtimeMultiplayer().friendStatusMap(_runtimeRemoteSession().remotes.keys()));
-    }
-    
-    function _scheduleReconnect(label = "relay") {
-        broadcastBridge.stop();
-        const closedWs = _runtimeSession().resetForReconnect();
-        const plan = _runtimeMultiplayer().planReconnect(label, !!closedWs?._kicked);
-        if (plan.kicked) return;
-        if (plan.exhausted) {
-            try { Chat.warn(plan.message); } catch { }
-            return;
-        }
-        try { Chat.system(plan.message); } catch { }
-        setTimeout(connect, plan.delayMs);
-    }
     
     function getBridgeConfig() {
         return services.bridgeConfig();
     }
 
-    let connectionBridge = null;
+    let connectionBridge: any = null;
+    let broadcastBridge: any = null;
     
     function bridgeOpen() {
         return connectionBridge ? connectionBridge.isOpen() : _runtimeMultiplayer().isSocketOpen(_runtimeSession().socket);
@@ -193,7 +167,7 @@ export class MultiplayerBridgeService {
         return services.packetDebug();
     }
     
-    function _recordReplicatedPlayers(source, players) {
+    function _recordReplicatedPlayers(source: unknown, players: unknown) {
         return _runtimePacketDebug().recordReplicatedPlayers(source, players, {
             fallbackGameId: window.GAME_ID || 0,
             normalizeAvatar: _normalizeAvatarFields,
@@ -201,11 +175,11 @@ export class MultiplayerBridgeService {
         });
     }
     
-    function _avatarSignature(avatar) {
+    function _avatarSignature(avatar: unknown) {
         return _runtimePacketDebug().avatarSignature(avatar, _normalizeAvatarFields);
     }
     
-    function _recordProbeEvent(event) {
+    function _recordProbeEvent(event: unknown) {
         return _runtimePacketDebug().recordProbeEvent(event, console);
     }
 
@@ -222,7 +196,7 @@ export class MultiplayerBridgeService {
         normalizeAvatarFields: _normalizeAvatarFields,
         avatarSignature: _avatarSignature,
         nativeYToSceneY: _nativeYToSceneY,
-        playerDisplayName: _playerDisplayName,
+        playerDisplayName: profileBridge.playerDisplayName,
         makeRemote: remoteAvatarBridge.make,
         setRemoteNameLabel: remoteAvatarBridge.setNameLabel,
         disposeRemote: remoteAvatarBridge.dispose,
@@ -257,9 +231,18 @@ export class MultiplayerBridgeService {
         sceneYToNativeY: _sceneYToNativeY,
         getLaunchInfo: launchState.getLaunchInfo,
         updateLaunchAvatar: launchState.updateLaunchAvatar,
-        setSkipNextRemoteAvatarRebuild(value) {
+        setSkipNextRemoteAvatarRebuild(value: unknown) {
             _skipNextRemoteAvatarRebuild = !!value;
         }
+    });
+
+    const reconnectBridge = createMultiplayerReconnectBridge({
+        Chat,
+        setTimeout,
+        stopBroadcast: () => broadcastBridge?.stop?.(),
+        runtimeSession: _runtimeSession,
+        runtimeMultiplayer: _runtimeMultiplayer,
+        connect
     });
 
     connectionBridge = createMultiplayerConnectionBridge({
@@ -279,13 +262,13 @@ export class MultiplayerBridgeService {
         getSelfId: launchState.getSelfId,
         getFallbackGameId: () => window.GAME_ID || 0,
         handleMessage: handle,
-        scheduleReconnect: _scheduleReconnect,
+        scheduleReconnect: reconnectBridge.scheduleReconnect,
         protocol: () => runtimeServices.protocol,
         avatarSpoof,
         accessBridge
     });
     
-    function _sendProbe(options = {}) {
+    function _sendProbe(options: Record<string, any> = {}) {
         accessBridge.assertPacketDebugAccess();
         if (!_runtimeSession().hubMode || !bridgeOpen()) throw new Error("probe requires the local relay connection");
         const probeCase = String(options.case || options.probe || "append_tail");
@@ -323,8 +306,8 @@ export class MultiplayerBridgeService {
         sendProbe: _sendProbe,
         currentLaunchAvatar: avatarSpoof.currentLaunchAvatar
     });
-    
-    function bridgeSend(payload) {
+
+    function bridgeSend(payload: unknown) {
         return connectionBridge.send(payload);
     }
     
@@ -332,11 +315,11 @@ export class MultiplayerBridgeService {
         return connectionBridge.connect();
     }
     
-    function encodeNetworkData(data) {
+    function encodeNetworkData(data: unknown) {
         return connectionBridge.encodeNetworkData(data);
     }
 
-    const broadcastBridge = createMultiplayerBroadcastBridge({
+    broadcastBridge = createMultiplayerBroadcastBridge({
         window,
         setInterval,
         clearInterval,
@@ -349,7 +332,7 @@ export class MultiplayerBridgeService {
         bridgeSend
     });
     
-    function handle(d) {
+    function handle(d: Record<string, any>) {
         handleMultiplayerBridgeMessage(d, {
             window,
             Chat,
@@ -365,19 +348,19 @@ export class MultiplayerBridgeService {
             setSelfId: launchState.setSelfId,
             getLaunchInfo: launchState.getLaunchInfo,
             setLaunchInfo: launchState.setLaunchInfo,
-            playerDisplayName: _playerDisplayName,
-            applyKnownPlayerName: _applyKnownPlayerName,
+            playerDisplayName: profileBridge.playerDisplayName,
+            applyKnownPlayerName: profileBridge.applyKnownPlayerName,
             recordReplicatedPlayers: _recordReplicatedPlayers,
             recordProbeEvent: _recordProbeEvent,
             normalizeAvatarFields: _normalizeAvatarFields,
             leaderboard: _leaderboard,
-            fetchFriendData,
+            fetchFriendData: profileBridge.fetchFriendData,
             startBroadcast: broadcastBridge.start,
             showBubble: bubbleBridge.show
         });
     }
     
-    window._mpSetFriendStatus = function (id, status) {
+    window._mpSetFriendStatus = function (id: unknown, status: unknown) {
         const next = _runtimeMultiplayer().setFriendStatus(id, status);
         _leaderboard().setFriendStatus(id, next);
     };
@@ -387,7 +370,7 @@ export class MultiplayerBridgeService {
         runtimeRemoteSession: _runtimeRemoteSession,
         remotePlayerService: remoteAvatarBridge.service,
         normalizeAvatarFields: _normalizeAvatarFields,
-        playerDisplayName: _playerDisplayName,
+        playerDisplayName: profileBridge.playerDisplayName,
         noteRemoteState: remoteBridge.noteRemoteState,
         animateRemote: remoteAvatarBridge.animate,
         hasBubbles: bubbleBridge.hasBubbles,
@@ -420,14 +403,14 @@ export class MultiplayerBridgeService {
     });
     runtimeServices.chat?.configureOutbound?.({
         handleCommand: consoleBridge.handleChatCommand,
-        sendMessage: (msg) => bridgeSend({ type: "chat", msg })
+        sendMessage: (msg: unknown) => bridgeSend({ type: "chat", msg })
     });
     
     connect();
     return true;
   }
 
-  updateFrame(dt) {
+  updateFrame(dt: number) {
     this.frameBridge?.updateFrame?.(dt);
   }
 }

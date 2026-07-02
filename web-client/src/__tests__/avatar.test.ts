@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AvatarMaterialService } from "../avatar/AvatarMaterialService";
+import { AvatarMaterialService } from "../avatar/materials/AvatarMaterialService";
 import { AvatarService, DEFAULT_BODY_COLORS } from "../avatar/AvatarService";
 import { AVATAR_ATTACHMENT_SLOTS } from "../avatar/AvatarEquipmentService";
 

@@ -1,15 +1,18 @@
-// @ts-nocheck
+type RuntimeMesh = any;
+type UvBox = number[];
+type UvTemplate = Record<string, UvBox>;
+type Bounds = { xMin: number; xMax: number; yMin: number; yMax: number; zMin: number; zMax: number };
 
-let THREE = null;
+let THREE: any = null;
 
-export function configureAvatarOverlayGeometry(config = {}) {
+export function configureAvatarOverlayGeometry(config: Record<string, any> = {}) {
   THREE = config.THREE || THREE;
 }
 
-function _canonicalBoneName(name) {
+function _canonicalBoneName(name: unknown) {
   return String(name || "").replace(/\s+/g, "_");
 }
-function _uvTemplates() {
+function _uvTemplates(): { torso: UvTemplate; leftLimb: UvTemplate; rightLimb: UvTemplate } {
   const torso = {
     top:    [0.39487179487179486, 0.8711985688729875, 0.6136752136752137, 0.9856887298747764],
     front:  [0.39487179487179486, 0.6386404293381038, 0.6136752136752137, 0.8676207513416816],
@@ -40,15 +43,15 @@ function _uvTemplates() {
   return { torso, leftLimb, rightLimb };
 }
 
-function _buildClothingOverlay(characterModel, kind = "shirt") {
+function _buildClothingOverlay(characterModel: RuntimeMesh, kind = "shirt") {
   const { torso, leftLimb, rightLimb } = _uvTemplates();
   const wantedBones = kind === "pants"
     ? new Set(["Left_Leg", "Right_Leg"])
     : new Set(["Torso", "Left_Arm", "Right_Arm"]);
 
-  const bodyMeshes = [];
+  const bodyMeshes: RuntimeMesh[] = [];
 
-  characterModel.traverse((child) => {
+  characterModel.traverse((child: RuntimeMesh) => {
     if (child.isSkinnedMesh && !/Overlay$/.test(child.name || "")) {
       bodyMeshes.push(child);
     }
@@ -58,7 +61,7 @@ function _buildClothingOverlay(characterModel, kind = "shirt") {
     return null;
   }
 
-  const overlays = [];
+  const overlays: RuntimeMesh[] = [];
   for (const bodyMesh of bodyMeshes) {
     const overlay = _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLimb, rightLimb);
     if (overlay) overlays.push(overlay);
@@ -70,7 +73,7 @@ function _buildClothingOverlay(characterModel, kind = "shirt") {
   }
 
   if (overlays.length === 1) {
-    bodyMeshes[0].parent.add(overlays[0]);
+    bodyMeshes[0]?.parent?.add(overlays[0]);
     return overlays[0];
   }
 
@@ -82,7 +85,14 @@ function _buildClothingOverlay(characterModel, kind = "shirt") {
   return group;
 }
 
-function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLimb, rightLimb) {
+function _buildClothingOverlayForMesh(
+  bodyMesh: RuntimeMesh,
+  kind: string,
+  wantedBones: Set<string>,
+  torso: UvTemplate,
+  leftLimb: UvTemplate,
+  rightLimb: UvTemplate
+) {
   const geometry = bodyMesh.geometry;
   const positions = geometry.attributes.position.array;
   const normals = geometry.attributes.normal.array;
@@ -90,9 +100,9 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
   const skinIndices = geometry.attributes.skinIndex.array;
   const skinWeights = geometry.attributes.skinWeight.array;
   const indices = geometry.index ? geometry.index.array : null;
-  const boneNames = bodyMesh.skeleton.bones.map((bone) => _canonicalBoneName(bone.name));
+  const boneNames = bodyMesh.skeleton.bones.map((bone: RuntimeMesh) => _canonicalBoneName(bone.name));
 
-  function getDominantBone(vertexIndex) {
+  function getDominantBone(vertexIndex: number) {
     let bestWeight = -1;
     let bestBoneName = "";
 
@@ -109,7 +119,7 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
 
   const triangleCount = indices ? indices.length / 3 : positions.length / 9;
 
-  function chooseTriangleBone(a, b, c) {
+  function chooseTriangleBone(a: number, b: number, c: number) {
     const boneA = getDominantBone(a);
     const boneB = getDominantBone(b);
     const boneC = getDominantBone(c);
@@ -121,7 +131,7 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
     return null;
   }
 
-  const boneBounds = {};
+  const boneBounds: Record<string, Bounds> = {};
   for (const boneName of wantedBones) {
     boneBounds[boneName] = {
       xMin: Infinity,
@@ -146,6 +156,7 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
       const y = positions[vertexIndex * 3 + 1];
       const z = positions[vertexIndex * 3 + 2];
       const bounds = boneBounds[boneName];
+      if (!bounds) continue;
 
       bounds.xMin = Math.min(bounds.xMin, x);
       bounds.xMax = Math.max(bounds.xMax, x);
@@ -156,11 +167,11 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
     }
   }
 
-  const outPositions = [];
-  const outNormals = [];
-  const outUvs = [];
-  const outSkinIndices = [];
-  const outSkinWeights = [];
+  const outPositions: number[] = [];
+  const outNormals: number[] = [];
+  const outUvs: number[] = [];
+  const outSkinIndices: number[] = [];
+  const outSkinWeights: number[] = [];
 
   for (let tri = 0; tri < triangleCount; tri++) {
     const a = indices ? indices[tri * 3 + 0] : tri * 3 + 0;
@@ -171,14 +182,17 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
     if (!boneName) continue;
 
     const triangleNormals = [a, b, c].map((vertexIndex) => [
-      normals[vertexIndex * 3 + 0],
-      normals[vertexIndex * 3 + 1],
-      normals[vertexIndex * 3 + 2]
+      normals[vertexIndex * 3 + 0] ?? 0,
+      normals[vertexIndex * 3 + 1] ?? 0,
+      normals[vertexIndex * 3 + 2] ?? 0
     ]);
 
-    let nx = (triangleNormals[0][0] + triangleNormals[1][0] + triangleNormals[2][0]) / 3;
-    let ny = (triangleNormals[0][1] + triangleNormals[1][1] + triangleNormals[2][1]) / 3;
-    let nz = (triangleNormals[0][2] + triangleNormals[1][2] + triangleNormals[2][2]) / 3;
+    const n0 = triangleNormals[0] || [0, 0, 0];
+    const n1 = triangleNormals[1] || [0, 0, 0];
+    const n2 = triangleNormals[2] || [0, 0, 0];
+    let nx = ((n0[0] ?? 0) + (n1[0] ?? 0) + (n2[0] ?? 0)) / 3;
+    let ny = ((n0[1] ?? 0) + (n1[1] ?? 0) + (n2[1] ?? 0)) / 3;
+    let nz = ((n0[2] ?? 0) + (n1[2] ?? 0) + (n2[2] ?? 0)) / 3;
 
     const length = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
     nx /= length;
@@ -193,7 +207,7 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
     const signY = dominantAxis === absY ? Math.sign(ny) : 0;
     const signZ = dominantAxis === absZ ? Math.sign(nz) : 0;
 
-    let faceDirection;
+    let faceDirection: string;
     if (signZ < 0) faceDirection = "front";
     else if (signZ > 0) faceDirection = "back";
     else if (signX > 0) faceDirection = "+x";
@@ -218,6 +232,7 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
     }[faceDirection];
 
     const bounds = boneBounds[boneName];
+    if (!bounds) continue;
 
     for (const vertexIndex of [a, b, c]) {
       const x = positions[vertexIndex * 3 + 0];
@@ -275,7 +290,7 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
         uvX = Math.min(1, Math.max(0, uvX));
         uvY = Math.min(1, Math.max(0, uvY));
 
-        const [u0, v0, u1, v1] = faceUvBox;
+        const [u0 = 0, v0 = 0, u1 = 1, v1 = 1] = faceUvBox || [0, 0, 1, 1];
         outUvs.push(u0 + uvX * (u1 - u0), v0 + uvY * (v1 - v0));
       }
 
@@ -319,22 +334,22 @@ function _buildClothingOverlayForMesh(bodyMesh, kind, wantedBones, torso, leftLi
   return overlayMesh;
 }
 
-function _buildShirtOverlay(characterModel) {
+function _buildShirtOverlay(characterModel: RuntimeMesh) {
   return _buildClothingOverlay(characterModel, "shirt");
 }
 
-function _buildPantsOverlay(characterModel) {
+function _buildPantsOverlay(characterModel: RuntimeMesh) {
   return _buildClothingOverlay(characterModel, "pants");
 }
 
-function _buildFaceOverlay(characterModel) {
-  let bodyMesh = null;
+function _buildFaceOverlay(characterModel: RuntimeMesh) {
+  let bodyMesh: RuntimeMesh | null = null;
   let headBoneIndex = -1;
 
-  characterModel.traverse((child) => {
+  characterModel.traverse((child: RuntimeMesh) => {
     if (!bodyMesh && child.isSkinnedMesh && !/Overlay$/.test(child.name || "")) {
       const bones = child.skeleton?.bones || [];
-      const index = bones.findIndex((bone) => _canonicalBoneName(bone.name) === "Head");
+      const index = bones.findIndex((bone: RuntimeMesh) => _canonicalBoneName(bone.name) === "Head");
       if (index >= 0) {
         bodyMesh = child;
         headBoneIndex = index;

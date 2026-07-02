@@ -4,7 +4,7 @@ import { TextureService } from "../assets/TextureService";
 import { AnimationService } from "../animation/AnimationService";
 import { AudioService } from "../audio/AudioService";
 import { CameraService } from "../camera/CameraService";
-import { AvatarMaterialService } from "../avatar/AvatarMaterialService";
+import { AvatarMaterialService } from "../avatar/materials/AvatarMaterialService";
 import { AvatarEquipmentService } from "../avatar/AvatarEquipmentService";
 import { AvatarAssetService } from "../avatar/AvatarAssetService";
 import { CharacterSpawnService } from "../avatar/CharacterSpawnService";

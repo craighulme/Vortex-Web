@@ -1,6 +1,8 @@
-// @ts-nocheck
+type MultiplayerChatCommandBridgeContext = Record<string, any> & {
+  window: Window;
+};
 
-export function createMultiplayerChatCommandBridge(context) {
+export function createMultiplayerChatCommandBridge(context: MultiplayerChatCommandBridgeContext) {
   const {
     window,
     Chat,
@@ -30,12 +32,12 @@ export function createMultiplayerChatCommandBridge(context) {
     };
   }
 
-  function setMovementMods(patch = {}) {
+  function setMovementMods(patch: Record<string, unknown> = {}) {
     if (!runtimeApi.setMovementMods) throw new Error("movement modifiers are not available in this build");
     return runtimeApi.setMovementMods(patch);
   }
 
-  function teleportLocalToScene(x, y, z) {
+  function teleportLocalToScene(x: unknown, y: unknown, z: unknown) {
     const char = runtimeApi.getCharacter?.();
     if (!char) return false;
     char.position.set(Number(x), Number(y), Number(z));
@@ -44,7 +46,7 @@ export function createMultiplayerChatCommandBridge(context) {
     return true;
   }
 
-  function handleChatCommand(text) {
+  function handleChatCommand(text: string) {
     return chatCommands.handle(text, {
       chat: Chat,
       players: commandPlayerList,
@@ -53,7 +55,7 @@ export function createMultiplayerChatCommandBridge(context) {
       setMovementMods,
       requireFeature: requireLicenseFeature,
       teleportLocal: teleportLocalToScene,
-      bringPlayer: (player) => {
+      bringPlayer: (player: Record<string, any>) => {
         const char = runtimeApi.getCharacter?.();
         const remote = runtimeRemoteSession().get(player.id);
         if (!char || !remote) return false;

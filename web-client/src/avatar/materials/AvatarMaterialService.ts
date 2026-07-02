@@ -1,25 +1,34 @@
-// @ts-nocheck
-import { DEFAULT_BODY_COLORS } from "./AvatarService";
-import { setLocalFirstPersonHidden } from "./materials/AvatarFirstPersonVisibility";
+import { DEFAULT_BODY_COLORS } from "../AvatarService";
+import { setLocalFirstPersonHidden } from "./AvatarFirstPersonVisibility";
 import {
   applyAvatarTextureToOverlay,
   avatarTextureDiagnosticsSnapshot,
   clearAvatarTextureDiagnostics,
   configureAvatarTexturePipeline,
   loadModernAvatarTexture
-} from "./materials/AvatarTexturePipeline";
+} from "./AvatarTexturePipeline";
 import {
   buildFaceOverlay,
   buildPantsOverlay,
   buildShirtOverlay,
   configureAvatarOverlayGeometry
-} from "./materials/AvatarOverlayGeometry";
+} from "./AvatarOverlayGeometry";
 
-let THREE = null;
+type RuntimeMaterial = Record<string, any>;
+type RuntimeMesh = Record<string, any>;
+type AvatarMaterialBuckets = {
+  shirtMaterials: RuntimeMaterial[];
+  pantMaterials: RuntimeMaterial[];
+  headMaterials: RuntimeMaterial[];
+  bodySlotMaterials: RuntimeMaterial[][];
+  tickets: { shirt: number; pants: number; face: number };
+};
+
+let THREE: any = null;
 let webGpuRuntime = false;
 
 
-function _bodyPartIndexForMaterial(material, fallbackIndex = 0) {
+function _bodyPartIndexForMaterial(material: RuntimeMaterial | null | undefined, fallbackIndex = 0) {
   const materialName = String(material?.name || "");
   if (/Material\.002/i.test(materialName)) return 0;
   if (/Material\.001|Material\.003/i.test(materialName)) return 1;
@@ -35,7 +44,7 @@ function _isWebGpuRuntime() {
   return webGpuRuntime;
 }
 
-function _makeWebGpuSafeAvatarMaterial(source) {
+function _makeWebGpuSafeAvatarMaterial(source: RuntimeMaterial | null | undefined) {
   const color = source?.color?.clone?.() || new THREE.Color(0xffffff);
   const material = new THREE.MeshStandardMaterial({
     name: source?.name || "",
@@ -50,7 +59,7 @@ function _makeWebGpuSafeAvatarMaterial(source) {
   return material;
 }
 
-function _replaceAvatarMaterial(node, index, material) {
+function _replaceAvatarMaterial(node: RuntimeMesh, index: number, material: RuntimeMaterial) {
   if (Array.isArray(node.material)) {
     node.material[index] = material;
   } else {
@@ -58,7 +67,7 @@ function _replaceAvatarMaterial(node, index, material) {
   }
 }
 
-function _setBodyMaterialColor(material, color) {
+function _setBodyMaterialColor(material: RuntimeMaterial | null | undefined, color: string) {
   if (!material) return;
 
   if (!material.userData?.vwebKeepVertexColors) {
@@ -72,11 +81,11 @@ const _MODERN_SHIRT_MATS = new Set(["Material.001", "Material.003", "Material.00
 const _MODERN_PANT_MATS = new Set(["Material.007", "Material.008"]);
 const _MODERN_HEAD_MAT = "Material.002";
 
-function _cloneMaterialForAvatar(mesh) {
+function _cloneMaterialForAvatar(mesh: RuntimeMesh) {
   if (!mesh?.material || mesh.userData.vwebCatalogMaterialsCloned) return;
 
   if (Array.isArray(mesh.material)) {
-    mesh.material = mesh.material.map((material) => material?.clone ? material.clone() : material);
+    mesh.material = mesh.material.map((material: RuntimeMaterial) => material?.clone ? material.clone() : material);
     mesh.userData.vwebClonedBodyMaterials = true;
   } else if (mesh.material.clone) {
     mesh.material = mesh.material.clone();
@@ -85,23 +94,23 @@ function _cloneMaterialForAvatar(mesh) {
   mesh.userData.vwebCatalogMaterialsCloned = true;
 }
 
-function _prepareModernAvatarMaterials(characterModel) {
+function _prepareModernAvatarMaterials(characterModel: RuntimeMesh | null | undefined): AvatarMaterialBuckets | null {
   if (!characterModel) return null;
   if (characterModel.userData.vwebModernAvatarMaterials) {
     return characterModel.userData.vwebModernAvatarMaterials;
   }
 
   const webGpuRuntime = _isWebGpuRuntime();
-  const materials = {
+  const materials: AvatarMaterialBuckets = {
     shirtMaterials: [],
     pantMaterials: [],
     headMaterials: [],
     bodySlotMaterials: [[], [], [], [], [], []],
     tickets: { shirt: 0, pants: 0, face: 0 }
   };
-  const seen = new Set();
+  const seen = new Set<string>();
 
-  characterModel.traverse((node) => {
+  characterModel.traverse((node: RuntimeMesh) => {
     if (!node.isMesh || /Overlay$/.test(node.name || "")) return;
     _cloneMaterialForAvatar(node);
 
@@ -121,7 +130,7 @@ function _prepareModernAvatarMaterials(characterModel) {
       const materialName = String(material.name || "");
       const slot = _bodyPartIndexForMaterial(material, -1);
       if (slot >= 0 && slot < 6 && /Material\.00[1234578]/i.test(materialName)) {
-        materials.bodySlotMaterials[slot].push(material);
+        materials.bodySlotMaterials[slot]?.push(material);
       }
 
       if (_MODERN_SHIRT_MATS.has(materialName)) {
@@ -149,7 +158,7 @@ function _prepareModernAvatarMaterials(characterModel) {
   return materials;
 }
 
-function _applyModernAvatarTextures(characterModel, urls = {}) {
+function _applyModernAvatarTextures(characterModel: RuntimeMesh, urls: Record<string, any> = {}) {
   if (_isWebGpuRuntime()) return;
   const materials = _prepareModernAvatarMaterials(characterModel);
   loadModernAvatarTexture(materials, urls.shirtUrl, "shirt");
@@ -157,9 +166,9 @@ function _applyModernAvatarTextures(characterModel, urls = {}) {
   loadModernAvatarTexture(materials, urls.faceUrl, "face");
 }
 
-function _applyBodyColors(characterModel, bodyColors) {
+function _applyBodyColors(characterModel: RuntimeMesh, bodyColors: unknown) {
   const colors = Array.isArray(bodyColors) ? bodyColors : [];
-  const normalized = [];
+  const normalized: string[] = [];
   for (let i = 0; i < 6; i += 1) {
     const fallback = DEFAULT_BODY_COLORS[i] || "#ffffff";
     const value = String(colors[i] || fallback).trim();
@@ -170,23 +179,24 @@ function _applyBodyColors(characterModel, bodyColors) {
   if (modernMaterials) {
     for (let slot = 0; slot < 6; slot += 1) {
       for (const material of modernMaterials.bodySlotMaterials[slot] || []) {
-        _setBodyMaterialColor(material, normalized[slot]);
+        _setBodyMaterialColor(material, normalized[slot] || DEFAULT_BODY_COLORS[slot] || "#ffffff");
       }
     }
     return;
   }
 
-  characterModel.traverse((mesh) => {
+  characterModel.traverse((mesh: RuntimeMesh) => {
     if (!mesh.isMesh || /Overlay$/.test(mesh.name || "")) return;
 
     if (Array.isArray(mesh.material) && mesh.material.length >= 6) {
       if (!mesh.userData.vwebClonedBodyMaterials) {
-        mesh.material = mesh.material.map((m) => m.clone());
+        mesh.material = mesh.material.map((m: RuntimeMaterial) => m.clone());
         mesh.userData.vwebClonedBodyMaterials = true;
       }
 
       for (let i = 0; i < Math.min(6, mesh.material.length); i += 1) {
-        _setBodyMaterialColor(mesh.material[i], normalized[_bodyPartIndexForMaterial(mesh.material[i], i)]);
+        const color = normalized[_bodyPartIndexForMaterial(mesh.material[i], i)] || DEFAULT_BODY_COLORS[i] || "#ffffff";
+        _setBodyMaterialColor(mesh.material[i], color);
       }
       return;
     }
@@ -208,13 +218,13 @@ function _applyBodyColors(characterModel, bodyColors) {
         /RLeg|Right.?Leg|Material\.008/i.test(`${meshName} ${materialName}`) ? 5 :
         0;
 
-      _setBodyMaterialColor(mesh.material, normalized[partIndex]);
+      _setBodyMaterialColor(mesh.material, normalized[partIndex] || DEFAULT_BODY_COLORS[partIndex] || "#ffffff");
     }
   });
 }
 
 export class AvatarMaterialService {
-  configure(config = {}) {
+  configure(config: Record<string, any> = {}) {
     THREE = config.THREE || THREE;
     webGpuRuntime = config.isWebGpuRuntime === true;
     configureAvatarTexturePipeline(config);
@@ -222,23 +232,23 @@ export class AvatarMaterialService {
     return this;
   }
 
-  applyShirtToMesh(mesh, textureUrl, context = {}) {
+  applyShirtToMesh(mesh: any, textureUrl: string | null | undefined, context: Record<string, unknown> = {}) {
     return applyAvatarTextureToOverlay(mesh, textureUrl, context);
   }
 
-  prepareModernAvatarMaterials(characterModel) {
+  prepareModernAvatarMaterials(characterModel: any) {
     return _prepareModernAvatarMaterials(characterModel);
   }
 
-  applyModernAvatarTextures(characterModel, urls = {}) {
+  applyModernAvatarTextures(characterModel: any, urls: Record<string, any> = {}) {
     return _applyModernAvatarTextures(characterModel, urls);
   }
 
-  applyBodyColors(characterModel, bodyColors) {
+  applyBodyColors(characterModel: any, bodyColors: unknown) {
     return _applyBodyColors(characterModel, bodyColors);
   }
 
-  alignVisualToRootFoot(visual, footOffset) {
+  alignVisualToRootFoot(visual: any, footOffset: unknown) {
     if (!visual || !THREE?.Box3) return 0;
     visual.updateMatrixWorld?.(true);
     const box = new THREE.Box3().setFromObject(visual);
@@ -248,19 +258,19 @@ export class AvatarMaterialService {
     return delta;
   }
 
-  buildShirtOverlay(characterModel) {
+  buildShirtOverlay(characterModel: any) {
     return buildShirtOverlay(characterModel);
   }
 
-  buildPantsOverlay(characterModel) {
+  buildPantsOverlay(characterModel: any) {
     return buildPantsOverlay(characterModel);
   }
 
-  buildFaceOverlay(characterModel) {
+  buildFaceOverlay(characterModel: any) {
     return buildFaceOverlay(characterModel);
   }
 
-  setLocalFirstPersonHidden(characterModel, hidden, options = {}) {
+  setLocalFirstPersonHidden(characterModel: any, hidden: boolean, options: Record<string, unknown> = {}) {
     return setLocalFirstPersonHidden(characterModel, hidden, options, _prepareModernAvatarMaterials);
   }
 

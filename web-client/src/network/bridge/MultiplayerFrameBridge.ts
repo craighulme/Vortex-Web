@@ -1,6 +1,19 @@
-// @ts-nocheck
+type MultiplayerFrameBridgeContext = {
+  window: Window;
+  runtimeApi: any;
+  runtimeRemoteSession: () => any;
+  remotePlayerService: () => any;
+  normalizeAvatarFields: (data?: Record<string, unknown>) => any;
+  playerDisplayName: (id: unknown, username: unknown) => string;
+  noteRemoteState: (...args: any[]) => void;
+  animateRemote: (...args: any[]) => void;
+  hasBubbles: () => boolean;
+  updateBubblePositions: () => void;
+  shouldSkipAvatarRebuild: () => boolean;
+  clearSkipAvatarRebuild: () => void;
+};
 
-export function installMultiplayerFrameBridge(context) {
+export function installMultiplayerFrameBridge(context: MultiplayerFrameBridgeContext) {
   const {
     window,
     runtimeApi,
@@ -16,7 +29,7 @@ export function installMultiplayerFrameBridge(context) {
     clearSkipAvatarRebuild
   } = context;
 
-  function updateFrame(dt) {
+  function updateFrame(dt: number) {
     const remoteSession = runtimeRemoteSession();
     if (remoteSession.pendingAvatars.size === 0 && remoteSession.remotes.size === 0 && !hasBubbles()) return;
 
@@ -28,9 +41,9 @@ export function installMultiplayerFrameBridge(context) {
       shouldAnimate: !!cam?.position,
       normalizeAvatar: normalizeAvatarFields,
       displayName: playerDisplayName,
-      noteState: (remote, status, reason) => noteRemoteState(remote, status, reason),
+      noteState: (remote: unknown, status: unknown, reason: unknown) => noteRemoteState(remote, status, reason),
       animate: animateRemote,
-      onCreateError: (error) => console.error("[mp] makeRemote failed:", error),
+      onCreateError: (error: unknown) => console.error("[mp] makeRemote failed:", error),
       cameraPosition: cam?.position || null,
     });
 
@@ -41,7 +54,7 @@ export function installMultiplayerFrameBridge(context) {
     runtimeRemoteSession().rebuildAll({
       service: remotePlayerService(),
       normalizeAvatar: normalizeAvatarFields,
-      onError: (error) => console.error("[mp] avatar rebuild failed:", error),
+      onError: (error: unknown) => console.error("[mp] avatar rebuild failed:", error),
     });
   }
 

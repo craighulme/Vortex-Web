@@ -1,7 +1,17 @@
-// @ts-nocheck
 import { createMultiplayerChatCommandBridge } from "./MultiplayerChatCommandBridge";
 
-export function installMultiplayerConsoleBridge(context) {
+type ConsoleBridgeWindow = Window & {
+  VortexMovement?: unknown;
+  VortexAvatar?: unknown;
+  VortexAvatarDiagnostics?: unknown;
+};
+
+type MultiplayerConsoleBridgeContext = Record<string, any> & {
+  window: ConsoleBridgeWindow;
+  fetch: typeof fetch;
+};
+
+export function installMultiplayerConsoleBridge(context: MultiplayerConsoleBridgeContext) {
   const {
     window,
     fetch,
@@ -41,7 +51,7 @@ export function installMultiplayerConsoleBridge(context) {
   });
 
   window.VortexAvatar = avatar.createConsoleApi({
-    async persistOutfit(normalized) {
+    async persistOutfit(normalized: Record<string, any>) {
       const res = await fetch("/api/clothing/outfit", {
         method: "PUT",
         credentials: "same-origin",
@@ -56,12 +66,12 @@ export function installMultiplayerConsoleBridge(context) {
       });
       if (!res.ok) throw new Error(`outfit update failed: HTTP ${res.status} ${await res.text().catch(() => "")}`);
     },
-    syncLaunchInfo(normalized) {
+    syncLaunchInfo(normalized: Record<string, any>) {
       setLaunchInfoAvatar(normalized);
     },
   });
 
-  window.VortexAvatarDiagnostics = {
+  const avatarDiagnosticsApi = {
     snapshot() {
       return {
         assets: avatarAssets?.snapshot?.() || null,
@@ -75,13 +85,13 @@ export function installMultiplayerConsoleBridge(context) {
       console.table(rows);
       return rows;
     },
-    remote(id) {
+    remote(id: unknown) {
       const row = remoteAvatarRows().find((item) => Number(item.id) === Number(id));
       console.log("[Vortex Web] remote avatar", row || null);
       return row || null;
     },
     log() {
-      const snapshot = this.snapshot();
+      const snapshot = avatarDiagnosticsApi.snapshot();
       console.log("[Vortex Web] avatar diagnostics", snapshot);
       const assetRows = snapshot.assets?.diagnostics || [];
       const materialRows = snapshot.materials?.diagnostics || [];
@@ -96,14 +106,15 @@ export function installMultiplayerConsoleBridge(context) {
       return true;
     }
   };
+  window.VortexAvatarDiagnostics = avatarDiagnosticsApi;
 
   function remoteAvatarRows() {
     const materialDiagnostics = avatarMaterials?.snapshot?.().diagnostics || [];
-    const packetPlayers = new Map((packetDebug?.players?.() || []).map((player) => [Number(player.id), player]));
-    return [...runtimeRemoteSession().remotes.entries()].map(([id, remote]) => {
+    const packetPlayers = new Map((packetDebug?.players?.() || []).map((player: Record<string, any>) => [Number(player.id), player]));
+    return [...(runtimeRemoteSession().remotes as Map<unknown, Record<string, any>>).entries()].map(([id, remote]) => {
       const playerId = Number(id);
       const avatar = normalizeAvatarFields(remote.avatar || {});
-      const packet = packetPlayers.get(playerId) || null;
+      const packet = (packetPlayers.get(playerId) || null) as Record<string, any> | null;
       return {
         id: playerId,
         username: String(remote.username || ""),
@@ -125,11 +136,11 @@ export function installMultiplayerConsoleBridge(context) {
     });
   }
 
-  function overlayState(mesh) {
+  function overlayState(mesh: any) {
     if (!mesh) return "missing-overlay";
     let hasMap = Boolean(mesh.material?.map);
     let visible = Boolean(mesh.visible);
-    mesh.traverse?.((child) => {
+    mesh.traverse?.((child: any) => {
       if (!/Overlay$/.test(child.name || "")) return;
       if (child.material?.map) hasMap = true;
       if (child.visible) visible = true;
@@ -140,9 +151,10 @@ export function installMultiplayerConsoleBridge(context) {
     return "hidden-no-map";
   }
 
-  function latestIssue(diagnostics, playerId, slot) {
+  function latestIssue(diagnostics: Array<Record<string, any>>, playerId: unknown, slot: string) {
     for (let index = diagnostics.length - 1; index >= 0; index -= 1) {
       const row = diagnostics[index];
+      if (!row) continue;
       if (Number(row.playerId) !== Number(playerId) || row.slot !== slot) continue;
       if (row.status === "loaded") return "";
       return `${row.status}:${row.reason || ""}`.replace(/:$/, "");

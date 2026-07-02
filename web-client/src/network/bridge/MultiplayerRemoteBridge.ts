@@ -1,6 +1,11 @@
-// @ts-nocheck
+type RemoteBridgeContext = Record<string, any> & {
+  localStorage: Storage;
+  console: Console;
+};
+type RemoteRecord = Record<string, any>;
+type RemoteStatePayload = Record<string, any>;
 
-export function createMultiplayerRemoteBridge(context) {
+export function createMultiplayerRemoteBridge(context: RemoteBridgeContext) {
   const {
     THREE,
     runtimeApi,
@@ -30,11 +35,11 @@ export function createMultiplayerRemoteBridge(context) {
     return Number.isFinite(value) ? clampRemoteYOffset(value) : 0;
   }
 
-  function clampRemoteYOffset(value) {
+  function clampRemoteYOffset(value: number) {
     return Math.max(-10, Math.min(10, value));
   }
 
-  function applyRemoteYOffsetDelta(delta) {
+  function applyRemoteYOffsetDelta(delta: number) {
     if (!delta) return;
     for (const remote of runtimeRemoteSession().remotes.values()) {
       if (remote?.pos) remote.pos.y += delta;
@@ -44,7 +49,7 @@ export function createMultiplayerRemoteBridge(context) {
     }
   }
 
-  function setRemoteYOffset(value = 0) {
+  function setRemoteYOffset(value: unknown = 0) {
     const next = clampRemoteYOffset(Number(value) || 0);
     const delta = next - remoteYOffset;
     remoteYOffset = next;
@@ -58,7 +63,7 @@ export function createMultiplayerRemoteBridge(context) {
     return remoteYOffset;
   }
 
-  function readRemoteScenePositionResult(playerData) {
+  function readRemoteScenePositionResult(playerData: RemoteStatePayload) {
     const result = runtimeMultiplayer().readRemoteScenePosition(playerData, nativeYToSceneY);
     if (!result.state) return result;
     const pos = result.state.pos;
@@ -66,7 +71,7 @@ export function createMultiplayerRemoteBridge(context) {
     return { state: { pos: scenePos, ry: result.state.ry }, reason: "" };
   }
 
-  function recordMultiplayerMessage(message) {
+  function recordMultiplayerMessage(message: unknown) {
     runtimeMultiplayer().recordMessage(message, runtimePacketDebug().enabled);
   }
 
@@ -74,11 +79,11 @@ export function createMultiplayerRemoteBridge(context) {
     return runtimeMultiplayer().remoteDebugRows(runtimeRemoteSession().remotes);
   }
 
-  function readRemoteScenePosition(playerData) {
+  function readRemoteScenePosition(playerData: RemoteStatePayload) {
     return readRemoteScenePositionResult(playerData).state;
   }
 
-  function logBadRemoteState(playerData, reason) {
+  function logBadRemoteState(playerData: RemoteStatePayload, reason: unknown) {
     if (!runtimePacketDebug().enabled) return;
     if (!runtimeMultiplayer().shouldLogBadRemoteState(playerData?.id)) return;
     console.warn("[mp] ignored invalid remote state", {
@@ -91,19 +96,19 @@ export function createMultiplayerRemoteBridge(context) {
     });
   }
 
-  function noteRemoteState(remote, status, reason, playerData, source) {
+  function noteRemoteState(remote: RemoteRecord, status: unknown, reason?: unknown, playerData?: unknown, source?: unknown) {
     runtimeMultiplayer().noteRemoteState(remote, status, reason || "", playerData || null, source || "");
   }
 
-  function decodeNetworkData(playerData, remote, source = "states") {
+  function decodeNetworkData(playerData: RemoteStatePayload, remote: RemoteRecord, source = "states") {
     return runtimeRemoteSession().applyRemoteState(playerData, remote, {
       source,
       normalizeAvatar: normalizeAvatarFields,
       avatarSignature,
-      avatarPatch: (data) => runtimeMultiplayer().remoteAvatarPatch(data),
+      avatarPatch: (data: RemoteStatePayload) => runtimeMultiplayer().remoteAvatarPatch(data),
       readScenePosition: readRemoteScenePositionResult,
       noteState: noteRemoteState,
-      applyAvatar: (target, avatar) => runtimeApi.applyAvatarToMeshes?.(target.meshes, {
+      applyAvatar: (target: RemoteRecord, avatar: RemoteStatePayload) => runtimeApi.applyAvatarToMeshes?.(target.meshes, {
         ...avatar,
         id: target.id,
         playerId: target.id,
@@ -113,7 +118,7 @@ export function createMultiplayerRemoteBridge(context) {
     });
   }
 
-  function addRemote(id, username, isStaff, isBooster, avatarData) {
+  function addRemote(id: unknown, username: unknown, isStaff: unknown, isBooster: unknown, avatarData?: RemoteStatePayload) {
     const remote = runtimeRemoteSession().addRemote({
       id,
       username,
@@ -122,17 +127,17 @@ export function createMultiplayerRemoteBridge(context) {
       avatarData: avatarData || {},
       displayName: playerDisplayName,
       normalizeAvatar: normalizeAvatarFields,
-      readInitialState: (data) => readRemoteScenePosition(data || {}),
+      readInitialState: (data: RemoteStatePayload) => readRemoteScenePosition(data || {}),
       createPosition: () => new THREE.Vector3(),
       canCreateMeshes: () => !!runtimeApi.getCharacter(),
       makeRemote,
       setNameLabel: setRemoteNameLabel,
       decodeRemoteState: decodeNetworkData,
       noteState: noteRemoteState,
-      addLeaderboard: (player) => leaderboard().addPlayer(player),
-      setFriendStatus: (playerId, status) => leaderboard().setFriendStatus(playerId, status),
+      addLeaderboard: (player: unknown) => leaderboard().addPlayer(player),
+      setFriendStatus: (playerId: unknown, status: unknown) => leaderboard().setFriendStatus(playerId, status),
       statusFor,
-      onCreateError: (error) => console.error("[mp] makeRemote failed:", error)
+      onCreateError: (error: unknown) => console.error("[mp] makeRemote failed:", error)
     });
     if (runtimeMultiplayer().isPlaceholderPlayerName(id, remote?.username || username)) {
       community()?.requestVortexUser?.(id).catch(() => {});
@@ -140,11 +145,11 @@ export function createMultiplayerRemoteBridge(context) {
     return remote;
   }
 
-  function removeRemote(id) {
+  function removeRemote(id: unknown) {
     return runtimeRemoteSession().removeRemote(id, {
       clearBubble,
       disposeMeshes: disposeRemote,
-      removeLeaderboard: (playerId) => leaderboard().removePlayer(playerId)
+      removeLeaderboard: (playerId: unknown) => leaderboard().removePlayer(playerId)
     });
   }
 

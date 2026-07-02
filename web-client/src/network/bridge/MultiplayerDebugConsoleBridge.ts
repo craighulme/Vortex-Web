@@ -1,6 +1,23 @@
-// @ts-nocheck
+type DebugConsoleWindow = Window & {
+  VortexPacketDebug?: unknown;
+};
 
-export function installMultiplayerDebugConsole(context) {
+type MultiplayerDebugConsoleContext = Record<string, any> & {
+  window: DebugConsoleWindow;
+  console: Console;
+  setTimeout: Window["setTimeout"];
+  setInterval: Window["setInterval"];
+  clearInterval: Window["clearInterval"];
+};
+
+type DebugRow = Record<string, any>;
+type ColliderLike = Record<string, any>;
+type ColliderSource = {
+  colliders?: ColliderLike[];
+  getNearbyColliders?: (x: number, y: number, z: number) => ColliderLike[];
+};
+
+export function installMultiplayerDebugConsole(context: MultiplayerDebugConsoleContext) {
   const {
     window,
     console,
@@ -53,7 +70,7 @@ export function installMultiplayerDebugConsole(context) {
     remotes() {
       assertPacketDebugAccess();
       const rows = remoteDebugRows();
-      console.table(rows.map((r) => ({
+      console.table(rows.map((r: Record<string, any>) => ({
         id: r.id,
         username: r.username,
         visible: r.visible,
@@ -77,8 +94,8 @@ export function installMultiplayerDebugConsole(context) {
       const footOffset = Number(runtime?.vortex?.get?.()?.getCharFootOffset?.() ?? 2);
       const colliders = runtime?.worldColliders;
       const renderRows = runtime?.remotePlayers?.profile?.(runtime?.remoteSession?.remotes)?.rows || [];
-      const renderById = new Map(renderRows.map((row) => [Number(row.id), row]));
-      const heightRows = rows.map((r) => {
+      const renderById = new Map<number, DebugRow>(renderRows.map((row: DebugRow) => [Number(row.id), row]));
+      const heightRows = rows.map((r: Record<string, any>) => {
         const target = r.target;
         const mesh = r.mesh;
         const render = renderById.get(Number(r.id));
@@ -144,16 +161,16 @@ export function installMultiplayerDebugConsole(context) {
       assertPacketDebugAccess();
       return typeof getRemoteYOffset === "function" ? getRemoteYOffset() : 0;
     },
-    setRemoteYOffset(value = 0) {
+    setRemoteYOffset(value: unknown = 0) {
       assertPacketDebugAccess();
       const next = typeof setRemoteYOffset === "function" ? setRemoteYOffset(value) : 0;
       console.log("[Vortex Web] remote Y debug offset", next);
       return next;
     },
-    ground(id) {
+    ground(id: unknown) {
       assertPacketDebugAccess();
       const rows = remoteDebugRows();
-      const row = rows.find((item) => Number(item.id) === Number(id)) || rows[0];
+      const row = rows.find((item: DebugRow) => Number(item.id) === Number(id)) || rows[0];
       if (!row?.target) return null;
       const result = groundCandidates(runtime?.worldColliders, row.target.x, row.target.y, row.target.z);
       console.table(result);
@@ -171,7 +188,7 @@ export function installMultiplayerDebugConsole(context) {
       console.table(messages);
       return messages;
     },
-    last(id) {
+    last(id: unknown) {
       assertPacketDebugAccess();
       return runtimePacketDebug().last(id);
     },
@@ -179,7 +196,7 @@ export function installMultiplayerDebugConsole(context) {
       assertPacketDebugAccess();
       return runtimePacketDebug().history();
     },
-    setJoinAvatar(patch = {}) {
+    setJoinAvatar(patch: Record<string, unknown> = {}) {
       return setJoinAvatarOverride(patch || {});
     },
     getJoinAvatar() {
@@ -188,46 +205,46 @@ export function installMultiplayerDebugConsole(context) {
     clearJoinAvatar() {
       return clearJoinAvatarOverride();
     },
-    setJoinOutfit(patch = {}) {
+    setJoinOutfit(patch: Record<string, unknown> = {}) {
       return setJoinAvatarOverride(patch || {});
     },
-    spoofAvatar(patch) {
+    spoofAvatar(patch: Record<string, unknown>) {
       return setOutboundAvatar(patch || {});
     },
-    spoofAvatarCompact(patch, options = {}) {
+    spoofAvatarCompact(patch: Record<string, unknown>, options: Record<string, any> = {}) {
       return setOutboundAvatar(patch || {}, true, { ...options, compact: true, persistCompact: !!options.persist });
     },
-    spoofAvatarResync(patch, options = {}) {
+    spoofAvatarResync(patch: Record<string, unknown>, options: Record<string, unknown> = {}) {
       return spoofAvatarResync(patch || {}, options);
     },
-    spoofAvatarDropResync(patch, options = {}) {
+    spoofAvatarDropResync(patch: Record<string, unknown>, options: Record<string, unknown> = {}) {
       return spoofAvatarDropResync(patch || {}, options);
     },
-    spoofAvatarReset(patch, options = {}) {
+    spoofAvatarReset(patch: Record<string, unknown>, options: Record<string, unknown> = {}) {
       return spoofAvatarReset(patch || {}, options);
     },
-    spoofAvatarRejoin(patch, options = {}) {
+    spoofAvatarRejoin(patch: Record<string, unknown>, options: Record<string, unknown> = {}) {
       return spoofAvatarRejoin(patch || {}, options);
     },
-    setMovementFormat(format = "native-auto") {
+    setMovementFormat(format: unknown = "native-auto") {
       assertPacketDebugAccess();
       return setMovementFormat(format);
     },
-    spoofShirt(id) {
+    spoofShirt(id: unknown) {
       return setOutboundAvatar({ shirt_id: Number(id) || 0 });
     },
-    spoofOutfit(shirtId, pantId, faceId) {
+    spoofOutfit(shirtId: unknown, pantId: unknown, faceId: unknown) {
       return setOutboundAvatar({ shirt_id: Number(shirtId) || 0, pant_id: Number(pantId) || 0, face_id: Number(faceId) || 0 });
     },
-    spoofColors(colors) {
+    spoofColors(colors: unknown) {
       return setOutboundAvatar({ body_colors: colors });
     },
-    randomSpoof(options = {}) {
+    randomSpoof(options: Record<string, unknown> = {}) {
       return runtimePacketDebug().startRandomSpoof(options, {
         bridgeOpen,
         bridgeSend,
-        setOutboundAvatar: (patch, outboundOptions) => setOutboundAvatar(patch, true, outboundOptions),
-        log: (message, patch) => console.log(message, patch),
+        setOutboundAvatar: (patch: Record<string, unknown>, outboundOptions: Record<string, unknown>) => setOutboundAvatar(patch, true, outboundOptions),
+        log: (message: unknown, patch: unknown) => console.log(message, patch),
         setTimeoutRef: setTimeout,
         setIntervalRef: setInterval,
         clearIntervalRef: clearInterval
@@ -242,7 +259,7 @@ export function installMultiplayerDebugConsole(context) {
       console.table(latencies);
       return latencies;
     },
-    probe(options = {}) {
+    probe(options: Record<string, unknown> = {}) {
       return sendProbe(options);
     },
     probeCases() {
@@ -278,27 +295,27 @@ export function installMultiplayerDebugConsole(context) {
   };
 }
 
-function numberOrNull(value) {
+function numberOrNull(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
 
-function roundNumber(value) {
+function roundNumber(value: unknown): number | null {
   const number = numberOrNull(value);
   return number === null ? null : Math.round(number * 1000) / 1000;
 }
 
-function roundNumberDiff(a, b) {
+function roundNumberDiff(a: unknown, b: unknown): number | null {
   const left = numberOrNull(a);
   const right = numberOrNull(b);
   return left === null || right === null ? null : roundNumber(left - right);
 }
 
-function nearestGroundY(colliders, x, y, z) {
+function nearestGroundY(colliders: ColliderSource | null | undefined, x: number, y: number, z: number): number | null {
   if (!colliders || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
   const nearby = typeof colliders.getNearbyColliders === "function" ? colliders.getNearbyColliders(x, y, z) : colliders.colliders;
   if (!nearby) return null;
-  let best = null;
+  let best: number | null = null;
   for (const collider of nearby) {
     if (!collider || collider.isOBB) continue;
     if (x < Number(collider.minX) || x > Number(collider.maxX)) continue;
@@ -311,11 +328,11 @@ function nearestGroundY(colliders, x, y, z) {
   return best;
 }
 
-function groundCandidates(colliders, x, y, z) {
+function groundCandidates(colliders: ColliderSource | null | undefined, x: number, y: number, z: number) {
   if (!colliders || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return [];
   const nearby = typeof colliders.getNearbyColliders === "function" ? colliders.getNearbyColliders(x, y, z) : colliders.colliders;
   if (!nearby) return [];
-  const rows = [];
+  const rows: Array<Record<string, any>> = [];
   for (const collider of nearby) {
     if (!collider || collider.isOBB) continue;
     const insideX = x >= Number(collider.minX) && x <= Number(collider.maxX);

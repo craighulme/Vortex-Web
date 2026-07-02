@@ -1,6 +1,11 @@
-// @ts-nocheck
+type MultiplayerConnectionBridgeContext = Record<string, any> & {
+  window: Window;
+  fetch: typeof fetch;
+  crypto: Crypto;
+  WebSocket: typeof WebSocket;
+};
 
-export function createMultiplayerConnectionBridge(context) {
+export function createMultiplayerConnectionBridge(context: MultiplayerConnectionBridgeContext) {
   const {
     window,
     fetch,
@@ -24,7 +29,7 @@ export function createMultiplayerConnectionBridge(context) {
     accessBridge
   } = context;
 
-  function encodeMovementPacket(data) {
+  function encodeMovementPacket(data: unknown) {
     return runtimeSession().encodeMovementPacket(protocol(), data);
   }
 
@@ -32,18 +37,18 @@ export function createMultiplayerConnectionBridge(context) {
     return runtimeSession().encodeHeartbeat(protocol());
   }
 
-  function encodeChatPacket(msg) {
+  function encodeChatPacket(msg: unknown) {
     return runtimeSession().encodeChatPacket(protocol(), msg);
   }
 
-  function handleNativePacket(buffer) {
+  function handleNativePacket(buffer: unknown) {
     for (const message of protocol().nativePacketMessages(buffer, {
       selfId: getSelfId(),
-      hasRemote: (id) => runtimeRemoteSession().has(id)
+      hasRemote: (id: unknown) => runtimeRemoteSession().has(id)
     })) handleMessage(message);
   }
 
-  function send(payload) {
+  function send(payload: unknown) {
     return runtimeSession().sendPayload(payload, {
       encodeMovement: encodeMovementPacket,
       encodeChat: encodeChatPacket
@@ -58,14 +63,14 @@ export function createMultiplayerConnectionBridge(context) {
     return {
       config: getBridgeConfig(),
       currentLaunchInfo: getLaunchInfo(),
-      setLaunchInfo(info) {
+      setLaunchInfo(info: unknown) {
         setLaunchInfo(info);
         runtimeSession().launchInfo = info;
       },
       fallbackGameId: getFallbackGameId(),
       fetcher: fetch,
       cryptoRef: crypto,
-      createWebSocket: (url) => new WebSocket(url),
+      createWebSocket: (url: string | URL) => new WebSocket(url),
       handleMessage,
       handleNativePacket,
       encodeHeartbeat,
@@ -92,6 +97,6 @@ export function createMultiplayerConnectionBridge(context) {
     isOpen,
     connect,
     connectOnce,
-    encodeNetworkData: (data) => runtimeMultiplayer().encodeNetworkData(data)
+    encodeNetworkData: (data: unknown) => runtimeMultiplayer().encodeNetworkData(data)
   };
 }

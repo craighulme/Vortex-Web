@@ -1,5 +1,11 @@
 export type MultiplayerBridgeDependencies = {
-  window: Window & { VortexRuntime?: any; Chat?: any; WebSocket: typeof WebSocket };
+  window: Window & {
+    VortexRuntime?: any;
+    Chat?: any;
+    WebSocket: typeof WebSocket;
+    GAME_ID?: unknown;
+    _mpSetFriendStatus?: (id: unknown, status: unknown) => void;
+  };
   document: Document;
   localStorage: Storage;
   setTimeout: Window["setTimeout"];
