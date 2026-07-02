@@ -6,6 +6,7 @@ import { AudioService } from "../audio/AudioService";
 import { CameraService } from "../camera/CameraService";
 import { AvatarMaterialService } from "../avatar/materials/AvatarMaterialService";
 import { AvatarEquipmentService } from "../avatar/AvatarEquipmentService";
+import { AvatarItemCatalogService } from "../avatar/AvatarItemCatalogService";
 import { AvatarAssetService } from "../avatar/AvatarAssetService";
 import { CharacterSpawnService } from "../avatar/CharacterSpawnService";
 import { AvatarRuntimeSetupService } from "../avatar/AvatarRuntimeSetupService";
@@ -94,6 +95,8 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
   const multiplayer = new MultiplayerService();
   const multiplayerSession = new MultiplayerSessionService();
   const remoteSession = new RemoteSessionService();
+  const streaming = new AssetStreamService(diagnostics);
+  const avatarEquipment = new AvatarEquipmentService();
   const players = new PlayerService();
   players.attachRemoteSession(remoteSession);
   animation.setFootIk({ enabled: false });
@@ -140,7 +143,8 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     physics: createPhysicsWorld({ backend: readPhysicsBackend(options.window), diagnostics }),
     avatarMaterials: new AvatarMaterialService(),
     avatarAssets: new AvatarAssetService(options.window),
-    avatarEquipment: new AvatarEquipmentService(),
+    avatarEquipment,
+    avatarItems: new AvatarItemCatalogService(avatarEquipment, streaming),
     avatar: new AvatarService(),
     avatarSetup: new AvatarRuntimeSetupService(),
     characterSpawn: new CharacterSpawnService(),
@@ -182,7 +186,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     diagnostics,
     perf: new PerformanceService(options.window),
     community: new CommunityProfileService(options.window),
-    streaming: new AssetStreamService(diagnostics),
+    streaming,
     quality: new QualityService()
   };
 

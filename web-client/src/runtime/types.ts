@@ -7,6 +7,7 @@ import type { CameraService } from "../camera/CameraService";
 import type { AvatarMaterialService } from "../avatar/materials/AvatarMaterialService";
 import type { AvatarAssetService } from "../avatar/AvatarAssetService";
 import type { AvatarEquipmentService } from "../avatar/AvatarEquipmentService";
+import type { AvatarItemCatalogService } from "../avatar/AvatarItemCatalogService";
 import type { CharacterSpawnService } from "../avatar/CharacterSpawnService";
 import type { AvatarRuntimeSetupService } from "../avatar/AvatarRuntimeSetupService";
 import type { LocalAvatarService } from "../avatar/LocalAvatarService";
@@ -125,6 +126,7 @@ export type VortexRuntime = {
   avatarMaterials: AvatarMaterialService;
   avatarAssets: AvatarAssetService;
   avatarEquipment: AvatarEquipmentService;
+  avatarItems: AvatarItemCatalogService;
   avatar: AvatarService;
   avatarSetup: AvatarRuntimeSetupService;
   characterSpawn: CharacterSpawnService;
