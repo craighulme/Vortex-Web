@@ -53,8 +53,8 @@ describe("WorldBootstrapService", () => {
   it("checks for the runtime handles needed by current map loading", () => {
     const service = new WorldBootstrapService(makeDocument(), makeWindow(), makeLocation());
     const handles = {
-      addPart() {},
-      removePart() {},
+      spawnPart() {},
+      removeObject() {},
       createRuntimeMesh() {},
       setSpawn() {},
       scene: {},
@@ -62,7 +62,7 @@ describe("WorldBootstrapService", () => {
     };
 
     expect(service.ready({ world: { getSceneHandles: () => handles, loadOfficialMap() {} } as never })).toBe(true);
-    expect(service.ready({ world: { getSceneHandles: () => ({ ...handles, addPart: null }), loadOfficialMap() {} } as never })).toBe(false);
+    expect(service.ready({ world: { getSceneHandles: () => ({ ...handles, spawnPart: null }), loadOfficialMap() {} } as never })).toBe(false);
   });
 
   it("falls back to a baseplate when official map loading fails", async () => {

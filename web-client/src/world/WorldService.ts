@@ -5,6 +5,7 @@ import {
   type WorldRenderChunkCamera,
   type WorldRenderChunkSnapshot
 } from "./WorldRenderChunkService";
+import type { SpawnPartOptions, WorldDynamicAdapter } from "./WorldDynamicObjectService";
 
 export type WorldPart = {
   id?: string;
@@ -63,14 +64,12 @@ export type LoadMapOptions = {
 };
 
 export type WorldSceneHandles = {
-  addPart?: unknown;
-  removePart?: unknown;
-  spawnPart?: unknown;
-  removeObject?: unknown;
-  spawnMesh?: unknown;
-  createBatchMesh?: unknown;
-  createRuntimeMesh?: unknown;
-  createGeometry?: unknown;
+  spawnPart?: WorldDynamicAdapter["spawnPart"];
+  removeObject?: WorldDynamicAdapter["removeObject"];
+  spawnMesh?: WorldDynamicAdapter["spawnMesh"];
+  createBatchMesh?: WorldDynamicAdapter["createBatchMesh"];
+  createRuntimeMesh?: WorldDynamicAdapter["createRuntimeMesh"];
+  createGeometry?: WorldDynamicAdapter["createGeometry"];
   scene?: unknown;
   objects?: unknown;
   bufferGeometryUtils?: unknown;
@@ -116,7 +115,7 @@ export class WorldService {
     return this.remove(id);
   }
 
-  spawnMesh(geometry: unknown, material: unknown, options?: unknown): unknown {
+  spawnMesh(geometry: unknown, material: unknown, options?: { addToScene?: boolean; trackObject?: boolean }): unknown {
     const spawnMesh = this.sceneHandles.spawnMesh;
     if (typeof spawnMesh !== "function") throw new Error("World dynamic mesh spawning is not ready");
     return spawnMesh(geometry, material, options);
@@ -247,55 +246,31 @@ export class WorldService {
 
   private spawnRuntimePart(part: WorldPart, staticMesh: boolean): unknown {
     const spawnPart = this.sceneHandles.spawnPart;
-    if (typeof spawnPart === "function") {
-      return spawnPart({
-        size: part.size,
-        position: [part.position[0], part.position[1] - part.size[1] * 0.5, part.position[2]],
-        color: part.color,
-        rotation: part.rotation,
-        shape: part.shape ?? "Block",
-        transparency: part.transparency ?? 0,
-        staticMesh,
-        canCollide: part.canCollide !== false,
-        rotationOrder: part.rotationOrder || "YXZ",
-        type: part.type
-      });
-    }
-    const addPart = this.sceneHandles.addPart;
-    if (typeof addPart === "function") {
-      return addPart(
-        part.size[0],
-        part.size[1],
-        part.size[2],
-        part.color,
-        part.position[0],
-        part.position[1] - part.size[1] * 0.5,
-        part.position[2],
-        part.rotation?.[0] ?? 0,
-        part.rotation?.[1] ?? 0,
-        part.rotation?.[2] ?? 0,
-        part.shape ?? "Block",
-        part.transparency ?? 0,
-        staticMesh,
-        part.canCollide !== false,
-        part.rotationOrder || "YXZ",
-        part.type
-      );
-    }
-    return null;
+    if (typeof spawnPart !== "function") return null;
+    return spawnPart(this.toSpawnPartOptions(part, staticMesh));
   }
 
   private removeRuntimePart(runtimePartId: unknown): void {
     const removeObject = this.sceneHandles.removeObject;
     if (typeof removeObject === "function") {
-      removeObject(runtimePartId);
-      return;
+      removeObject(Number(runtimePartId));
     }
-    const removePart = this.sceneHandles.removePart;
-    if (typeof removePart === "function") {
-      removePart(runtimePartId);
-      return;
-    }
+  }
+
+  private toSpawnPartOptions(part: WorldPart, staticMesh: boolean): SpawnPartOptions {
+    const options: SpawnPartOptions = {
+      size: part.size,
+      position: [part.position[0], part.position[1] - part.size[1] * 0.5, part.position[2]],
+      shape: part.shape ?? "Block",
+      transparency: part.transparency ?? 0,
+      staticMesh,
+      canCollide: part.canCollide !== false,
+      rotationOrder: part.rotationOrder || "YXZ"
+    };
+    if (part.color !== undefined) options.color = part.color;
+    if (part.rotation !== undefined) options.rotation = part.rotation;
+    if (part.type !== undefined) options.type = part.type;
+    return options;
   }
 
   private createMapBatches(name: string, sourceMeshes: unknown[]): unknown[] {

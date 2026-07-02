@@ -1,3 +1,5 @@
+import type { WorldDynamicAdapter } from "../world/WorldDynamicObjectService";
+
 export type RuntimeApi = Record<string, unknown>;
 
 export type RuntimeApiExportOptions = {
@@ -15,16 +17,7 @@ export type RuntimeApiExportOptions = {
   worldService: {
     attachRuntimeAdapter(handles: Record<string, unknown>): void;
   };
-  worldHandles: {
-    addPart: unknown;
-    removePart: unknown;
-    createRuntimeMesh(geometry: unknown, material: unknown): unknown;
-    createGeometry(attributes: Record<string, { array: ArrayLike<number>; itemSize: number }>): unknown;
-    scene: unknown;
-    objects: unknown[];
-    bufferGeometryUtils?: unknown;
-    shadowsActive: unknown;
-  };
+  worldHandles: WorldDynamicAdapter;
 };
 
 export class RuntimeApiExportService {

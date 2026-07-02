@@ -65,8 +65,6 @@ describe("WorldRuntimeService", () => {
       configure(config: any) {
         this.configured = config;
         return {
-          addPart: partService.addPart.bind(partService),
-          removePart: partService.removePart.bind(partService),
           createRuntimeMesh: () => ({}),
           createGeometry: () => ({}),
           spawnPart: () => ["mesh", 1],
@@ -103,9 +101,11 @@ describe("WorldRuntimeService", () => {
     expect(dynamicObjects.configured.parts).toBe(partService);
     expect(handles.objects).toEqual(partService.objects);
     expect(handles.colliders).toEqual(colliderService.colliders);
-    expect(handles.addPart(1, 2, 3, 4, 5, 6, 7)).toEqual(["mesh", 7]);
-    handles.removePart(42);
-    expect(partService.removed).toBe(42);
+    expect(handles.dynamicObjects.spawnPart({
+      size: [1, 2, 3],
+      position: [5, 6, 7],
+      color: 4
+    })).toEqual(["mesh", 1]);
 
     textureService.config.onTextureChanged();
     expect(materialService.refreshes).toBe(1);

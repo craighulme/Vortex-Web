@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { WorldService } from "../world/WorldService";
 
 describe("WorldService", () => {
-  it("uses the runtime stud backend when it is available", () => {
+  it("uses the dynamic object backend when it is available", () => {
     const world = new WorldService();
-    const added: unknown[][] = [];
+    const added: unknown[] = [];
     const removed: unknown[] = [];
     world.attachRuntimeAdapter({
-      addPart: (...args: unknown[]) => {
-        added.push(args);
-        return [null, `stud-${added.length}`];
+      spawnPart: (options: unknown) => {
+        added.push(options);
+        return [null, added.length];
       },
-      removePart: (id: unknown) => removed.push(id)
+      removeObject: (id: number) => removed.push(id)
     });
 
     world.loadMapParts("studs", [
@@ -19,13 +19,17 @@ describe("WorldService", () => {
     ], 0, 0, 0, { preserveWorldCoords: true, rotationRadians: false, rotationOrder: "XYZ" });
 
     expect(added).toHaveLength(1);
-    expect(added[0]?.slice(0, 7)).toEqual([4, 2, 6, 0xff0000, 10, 1, 20]);
-    expect(added[0]?.[10]).toBe("Block");
-    expect(added[0]?.[14]).toBe("XYZ");
-    expect(added[0]?.[15]).toBe("Truss");
+    expect(added[0]).toMatchObject({
+      size: [4, 2, 6],
+      position: [10, 1, 20],
+      color: 0xff0000,
+      shape: "Block",
+      rotationOrder: "XYZ",
+      type: "Truss"
+    });
 
     expect(world.unloadMap("studs")).toBe(true);
-    expect(removed).toEqual(["stud-1"]);
+    expect(removed).toEqual([1]);
   });
 
   it("exposes dynamic part spawning through the world service", () => {
@@ -35,7 +39,7 @@ describe("WorldService", () => {
     world.attachRuntimeAdapter({
       spawnPart: (part: unknown) => {
         spawned.push(part);
-        return ["mesh", "dynamic-1"];
+        return ["mesh", 1];
       },
       removeObject: (id: unknown) => removed.push(id)
     });
@@ -62,18 +66,18 @@ describe("WorldService", () => {
       type: undefined
     }]);
     expect(world.removeObject("ball")).toBe(true);
-    expect(removed).toEqual(["dynamic-1"]);
+    expect(removed).toEqual([1]);
   });
 
   it("loads official maps through the runtime service and sets spawn from map bounds", async () => {
     const world = new WorldService();
     const requests: unknown[][] = [];
     const spawns: unknown[][] = [];
-    const added: unknown[][] = [];
+    const added: unknown[] = [];
     world.attachRuntimeAdapter({
-      addPart: (...args: unknown[]) => {
-        added.push(args);
-        return [null, `stud-${added.length}`];
+      spawnPart: (options: unknown) => {
+        added.push(options);
+        return [null, added.length];
       },
       setSpawn: (...args: unknown[]) => spawns.push(args)
     });
@@ -129,16 +133,16 @@ describe("WorldService", () => {
         userData: {},
         updateMatrix: () => {}
       }),
-      addPart: (...args: unknown[]) => {
-        const x = Number(args[4] || 0);
-        const z = Number(args[6] || 0);
+      spawnPart: (options: any) => {
+        const x = Number(options.position?.[0] || 0);
+        const z = Number(options.position?.[2] || 0);
         return [{
           userData: { vwebRenderChunk: `${Math.floor(x / 128)},${Math.floor(z / 128)}` },
           material,
           geometry: makeGeometry(),
           matrix: {},
           updateMatrix: () => {}
-        }, `stud-${x}`];
+        }, Math.floor(x)];
       }
     });
 

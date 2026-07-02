@@ -71,8 +71,8 @@ export class WorldBootstrapService {
     const world = runtime.world;
     if (!world || typeof world.loadOfficialMap !== "function" || typeof world.getSceneHandles !== "function") return false;
     const handles = world.getSceneHandles();
-    return typeof handles.addPart === "function" &&
-      typeof handles.removePart === "function" &&
+    return typeof handles.spawnPart === "function" &&
+      typeof handles.removeObject === "function" &&
       typeof handles.createRuntimeMesh === "function" &&
       typeof handles.setSpawn === "function" &&
       Boolean(handles.scene) &&

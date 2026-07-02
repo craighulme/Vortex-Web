@@ -10,6 +10,7 @@ import type { RendererService } from "../renderer/RendererService";
 import type { SceneSettingsService } from "../renderer/SceneSettingsService";
 import type { RuntimeApiExportService } from "./RuntimeApiExportService";
 import type { FrameLoopService } from "./FrameLoopService";
+import type { WorldDynamicAdapter } from "../world/WorldDynamicObjectService";
 
 export type ThreeLike = {
   [key: string]: unknown;
@@ -22,22 +23,7 @@ export type WorldRuntimeLike = {
   partService: { snapshot(): unknown };
   objects: unknown[];
   colliders: unknown[];
-  addPart: unknown;
-  removePart: unknown;
-  dynamicObjects: {
-    addPart: unknown;
-    removePart: unknown;
-    spawnPart?(options: unknown): unknown;
-    removeObject?(id: number): void;
-    spawnMesh?(geometry: unknown, material: unknown, options?: unknown): unknown;
-    createBatchMesh?(geometry: unknown, material: unknown): unknown;
-    createRuntimeMesh(geometry: unknown, material: unknown): unknown;
-    createGeometry(attributes: Record<string, { array: ArrayLike<number>; itemSize: number }>): unknown;
-    scene: unknown;
-    objects: unknown[];
-    bufferGeometryUtils?: unknown;
-    shadowsActive(): boolean;
-  };
+  dynamicObjects: WorldDynamicAdapter;
   useStudTextures(): boolean;
   refreshStudMaterialTextures(): void;
   textureDiagnostics(): unknown;

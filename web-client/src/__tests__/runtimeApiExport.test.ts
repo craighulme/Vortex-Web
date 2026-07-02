@@ -32,8 +32,10 @@ describe("RuntimeApiExportService", () => {
       rendererService: { attachRuntimeAdapter: (handles) => rendererHandles.push(handles) },
       worldService: { attachRuntimeAdapter: (handles) => worldHandles.push(handles) },
       worldHandles: {
-        addPart: "addPart",
-        removePart: "removePart",
+        spawnPart: () => ["part", 1],
+        removeObject: () => undefined,
+        spawnMesh: () => ({}),
+        createBatchMesh: () => ({}),
         createRuntimeMesh: () => ({}),
         createGeometry: () => ({}),
         scene: "scene",
@@ -47,7 +49,8 @@ describe("RuntimeApiExportService", () => {
     expect(installedRuntimeApi).toBe(runtimeApi);
     expect(windowRef.THREE).toBeUndefined();
     expect(rendererHandles[0]).toMatchObject({ three: "three", scene: "scene", camera: "camera", renderer: "renderer" });
-    expect(worldHandles[0]).toMatchObject({ addPart: "addPart", setSpawn: runtimeApi.setSpawn });
+    expect(worldHandles[0]).toMatchObject({ setSpawn: runtimeApi.setSpawn });
+    expect(typeof worldHandles[0]?.spawnPart).toBe("function");
     expect(readyDetail).toBe(runtimeApi);
   });
 });

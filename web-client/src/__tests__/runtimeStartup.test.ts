@@ -99,12 +99,8 @@ describe("RuntimeStartupService", () => {
         partService: { snapshot: () => ({}) },
         objects: [],
         colliders: [],
-        addPart: () => {},
-        removePart: () => {},
         dynamicObjects: {
-          addPart: () => {},
-          removePart: () => {},
-          spawnPart: () => ({}),
+          spawnPart: () => [{}, 1],
           removeObject: () => {},
           spawnMesh: () => ({}),
           createBatchMesh: () => ({}),

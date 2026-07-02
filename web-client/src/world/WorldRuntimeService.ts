@@ -37,8 +37,6 @@ export type WorldRuntimeHandles = {
   partService: WorldPartService;
   objects: WorldPartService["objects"];
   colliders: WorldColliderService["colliders"];
-  addPart: WorldPartService["addPart"];
-  removePart: WorldPartService["removePart"];
   dynamicObjects: WorldDynamicAdapter;
   getNearbyColliders(px: number, py: number, pz: number): Set<WorldCollider>;
   useStudTextures(): boolean;
@@ -89,7 +87,6 @@ export class WorldRuntimeService {
       colliders: colliderService,
       shadowsActive: () => config.shadows.active()
     });
-    const removePart = partService.removePart.bind(partService) as WorldPartService["removePart"];
     const dynamicObjects = config.dynamicObjects.configure({
       THREE: config.THREE,
       scene: config.scene,
@@ -107,8 +104,6 @@ export class WorldRuntimeService {
       partService,
       objects: partService.objects,
       colliders: colliderService.colliders,
-      addPart: dynamicObjects.addPart,
-      removePart,
       dynamicObjects,
       getNearbyColliders: (px, py, pz) => colliderService.getNearbyColliders(px, py, pz),
       useStudTextures: () => textureService.useStudTextures(),

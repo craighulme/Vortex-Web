@@ -25,8 +25,6 @@ export type SpawnPartOptions = {
 };
 
 export type WorldDynamicAdapter = {
-  addPart: WorldPartService["addPart"];
-  removePart: WorldPartService["removePart"];
   spawnPart(options: SpawnPartOptions): [unknown, number];
   removeObject(id: number): void;
   spawnMesh(geometry: unknown, material: unknown, options?: { addToScene?: boolean; trackObject?: boolean }): unknown;
@@ -44,11 +42,7 @@ export class WorldDynamicObjectService {
 
   configure(config: WorldDynamicObjectConfig): WorldDynamicAdapter {
     this.config = config;
-    const addPart = config.parts.addPart.bind(config.parts) as WorldPartService["addPart"];
-    const removePart = config.parts.removePart.bind(config.parts) as WorldPartService["removePart"];
     return {
-      addPart,
-      removePart,
       spawnPart: (options) => this.spawnPart(options),
       removeObject: (id) => this.removeObject(id),
       spawnMesh: (geometry, material, options) => this.spawnMesh(geometry, material, options),
