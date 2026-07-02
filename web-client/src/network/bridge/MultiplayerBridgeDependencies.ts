@@ -1,9 +1,10 @@
 import type { RuntimeApi } from "../../runtime/RuntimeApiExportService";
+import type { VortexRuntime } from "../../runtime/types";
 
 export type MultiplayerBridgeDependencies = {
   window: Window & {
-    VortexRuntime?: any;
-    Chat?: any;
+    VortexRuntime?: VortexRuntime;
+    Chat?: MultiplayerChatApi;
     WebSocket: typeof WebSocket;
     GAME_ID?: unknown;
     _mpSetFriendStatus?: (id: unknown, status: unknown) => void;
@@ -17,10 +18,19 @@ export type MultiplayerBridgeDependencies = {
   crypto: Crypto;
   WebSocket: typeof WebSocket;
   location: Location;
-  THREE: any;
-  Chat: any;
+  THREE: unknown;
+  Chat: MultiplayerChatApi;
   runtimeApi: RuntimeApi;
-  scene: any;
+  scene: RuntimeApi["scene"];
+};
+
+export type MultiplayerChatApi = {
+  system(message: unknown): void;
+  systemRed(message: unknown): void;
+  systemPlayer(username: unknown, message: unknown): void;
+  clearPlayerMsg(username: unknown): void;
+  message(username: unknown, message: unknown, self?: unknown, isStaff?: unknown, isOwner?: unknown, isBooster?: unknown, playerId?: unknown): void;
+  warn(message: unknown): void;
 };
 
 export type MultiplayerBridgeDependencyResult =

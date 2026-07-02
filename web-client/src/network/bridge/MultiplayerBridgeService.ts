@@ -16,6 +16,7 @@ import { createMultiplayerLaunchState } from "./MultiplayerLaunchState";
 import { createMultiplayerProfileBridge } from "./MultiplayerProfileBridge";
 import { createMultiplayerReconnectBridge } from "./MultiplayerReconnectBridge";
 import type { RuntimeApi } from "../../runtime/RuntimeApiExportService";
+import type { ThreeLike } from "../../avatar/remote/RemotePlayerTypes";
 
 export class MultiplayerBridgeService {
   private mounted = false;
@@ -126,7 +127,7 @@ export class MultiplayerBridgeService {
     } = coordinateBridge;
 
     const bubbleBridge = createMultiplayerBubbleBridge({
-        THREE,
+        THREE: THREE as ThreeLike,
         document,
         window,
         runtimeApi,
@@ -135,7 +136,7 @@ export class MultiplayerBridgeService {
     });
 
     const remoteAvatarBridge = createMultiplayerRemoteAvatarBridge({
-        THREE,
+        THREE: THREE as ThreeLike,
         document,
         runtimeApi,
         remotePlayers: runtimeServices.remotePlayers,
@@ -148,7 +149,7 @@ export class MultiplayerBridgeService {
         runtimeMultiplayer: _runtimeMultiplayer,
         runtimeRemoteSession: _runtimeRemoteSession,
         leaderboard: _leaderboard,
-        setRemoteNameLabel: remoteAvatarBridge.setNameLabel
+        setRemoteNameLabel: (id: number, username: string) => remoteAvatarBridge.setNameLabel(_runtimeRemoteSession().get(id), username)
     });
     
     function getBridgeConfig() {

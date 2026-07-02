@@ -1,14 +1,13 @@
+import type { RemotePlayerService } from "../../avatar/RemotePlayerService";
+import type { NativeAvatarState } from "../../avatar/AvatarService";
+import type { RemotePlayerMeshes, RemotePlayerRecord, ThreeLike } from "../../avatar/remote/RemotePlayerTypes";
+import type { RuntimeApi } from "../../runtime/RuntimeApiExportService";
+
 type RemoteAvatarBridgeContext = {
-  THREE: unknown;
+  THREE: ThreeLike;
   document: Document;
-  runtimeApi: unknown;
-  remotePlayers: {
-    configure(options: { THREE: unknown; document: Document; runtimeApi: unknown }): {
-      makeRemote(username: string, id: number, avatar: unknown): unknown;
-      setNameLabel(remote: unknown, username: string): void;
-      disposeRemote(meshes: unknown): void;
-    };
-  } | null | undefined;
+  runtimeApi: RuntimeApi;
+  remotePlayers: RemotePlayerService | null | undefined;
   animation?: {
     animateRuntimeRemote?(remote: unknown, dt: number): void;
   } | null;
@@ -28,15 +27,15 @@ export function createMultiplayerRemoteAvatarBridge(context: RemoteAvatarBridgeC
     return remotePlayers.configure({ THREE, document, runtimeApi });
   }
 
-  function make(username: string, id: number, avatar: unknown) {
+  function make(username: string, id: number, avatar: NativeAvatarState) {
     return service().makeRemote(username, id, avatar);
   }
 
-  function setNameLabel(remote: unknown, username: string) {
-    service().setNameLabel(remote, username);
+  function setNameLabel(remote: RemotePlayerRecord | null | undefined, username: string) {
+    service().setNameLabel(remote ? { meshes: remote.meshes ?? null } : null, username);
   }
 
-  function dispose(meshes: unknown) {
+  function dispose(meshes: RemotePlayerMeshes | null | undefined) {
     service().disposeRemote(meshes);
   }
 
