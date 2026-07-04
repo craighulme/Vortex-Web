@@ -362,7 +362,8 @@ export class LocalMovementRuntimeService {
       dt: safeDt,
       moving,
       grounded: this.grounded,
-      climbing: this.climbState !== "none"
+      climbing: this.climbState !== "none",
+      verticalVelocity: this.velY
     });
     this.applyRuntimeFootIk(safeDt, moving);
   }

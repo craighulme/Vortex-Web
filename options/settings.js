@@ -2,7 +2,7 @@ const extensionApi = globalThis.chrome || globalThis.browser;
 
 const LOCAL_NATIVE_RELAY = "ws://127.0.0.1:27822/ws";
 const HOSTED_NATIVE_RELAY = "wss://v22-relay.116.203.155.30.sslip.io/ws";
-const HOSTED_LICENSE_API = "https://v22.irongiant.vip";
+const HOSTED_LICENSE_API = "https://vweb.irongiant.vip";
 
 const SITE_THEME_DARK = `/* Vortex Web dark site theme */
 :root {
@@ -47,6 +47,32 @@ html[theme='light'] {
 .navbar .btn-signout-sm:hover {
   background: rgba(255, 255, 255, 0.08) !important;
   color: var(--textcol1) !important;
+}
+body[data-vweb-ugc-route="1"] {
+  --vweb-ugc-bg: #10171d;
+  --vweb-ugc-panel: rgba(20, 31, 42, 0.94);
+  --vweb-ugc-panel-strong: rgba(24, 36, 48, 0.96);
+  --vweb-ugc-panel-soft: rgba(26, 38, 50, 0.70);
+  --vweb-ugc-input: rgba(10, 17, 24, 0.58);
+  --vweb-ugc-border: rgba(220, 236, 246, 0.20);
+  --vweb-ugc-border-soft: rgba(220, 236, 246, 0.14);
+  --vweb-ugc-text: rgba(245, 250, 252, 0.96);
+  --vweb-ugc-heading: rgba(248, 250, 252, 0.98);
+  --vweb-ugc-muted: rgba(210, 224, 232, 0.72);
+  --vweb-ugc-faint: rgba(210, 224, 232, 0.62);
+  --vweb-ugc-accent: #35d39a;
+  --vweb-ugc-accent-soft: rgba(53, 211, 154, 0.22);
+  --vweb-ugc-button: rgba(245, 250, 252, 0.08);
+  --vweb-ugc-button-hover: rgba(245, 250, 252, 0.14);
+  --vweb-ugc-canvas-bg: #07111d;
+  --vweb-ugc-nav-menu: rgba(17, 25, 32, 0.95);
+}
+.vweb-ugc-nav-menu {
+  background: rgba(17, 25, 32, 0.95) !important;
+  border-color: rgba(220, 236, 246, 0.18) !important;
+}
+.vweb-ugc-nav-menu a {
+  color: rgba(245, 250, 252, 0.96) !important;
 }`;
 
 const SITE_THEME_LIGHT = `/* Vortex Web light site theme */
@@ -92,6 +118,33 @@ html[theme='light'] {
 .navbar [aria-current='page'] {
   background: rgba(14, 165, 233, 0.22) !important;
   color: #0f172a !important;
+}
+body[data-vweb-ugc-route="1"] {
+  --vweb-ugc-bg: #f8fafc;
+  --vweb-ugc-panel: rgba(255, 255, 255, 0.92);
+  --vweb-ugc-panel-strong: rgba(255, 255, 255, 0.98);
+  --vweb-ugc-panel-soft: rgba(241, 245, 249, 0.82);
+  --vweb-ugc-input: rgba(255, 255, 255, 0.86);
+  --vweb-ugc-border: rgba(15, 23, 42, 0.16);
+  --vweb-ugc-border-soft: rgba(15, 23, 42, 0.10);
+  --vweb-ugc-text: #111827;
+  --vweb-ugc-heading: #0f172a;
+  --vweb-ugc-muted: rgba(17, 24, 39, 0.66);
+  --vweb-ugc-faint: rgba(17, 24, 39, 0.52);
+  --vweb-ugc-accent: #0ea5e9;
+  --vweb-ugc-accent-soft: rgba(14, 165, 233, 0.16);
+  --vweb-ugc-button: rgba(15, 23, 42, 0.06);
+  --vweb-ugc-button-hover: rgba(14, 165, 233, 0.13);
+  --vweb-ugc-canvas-bg: #eef6ff;
+  --vweb-ugc-nav-menu: rgba(255, 255, 255, 0.97);
+  --vweb-ugc-nav-menu-text: #0f172a;
+}
+.vweb-ugc-nav-menu {
+  background: rgba(255, 255, 255, 0.97) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+.vweb-ugc-nav-menu a {
+  color: #0f172a !important;
 }`;
 
 const SITE_THEME_GLASS = `/* Vortex Web glass site theme */
@@ -135,6 +188,33 @@ const SITE_THEME_GLASS = `/* Vortex Web glass site theme */
 .navbar .nav-link:hover,
 .navbar .btn-signout-sm:hover {
   background: rgba(255, 255, 255, 0.10) !important;
+}
+body[data-vweb-ugc-route="1"] {
+  --vweb-ugc-bg: #0f1720;
+  --vweb-ugc-panel: color-mix(in srgb, rgba(20, 31, 40, 0.78) 88%, transparent);
+  --vweb-ugc-panel-strong: color-mix(in srgb, rgba(34, 48, 60, 0.76) 88%, transparent);
+  --vweb-ugc-panel-soft: rgba(255, 255, 255, 0.07);
+  --vweb-ugc-input: rgba(8, 13, 20, 0.38);
+  --vweb-ugc-border: rgba(255, 255, 255, 0.18);
+  --vweb-ugc-border-soft: rgba(255, 255, 255, 0.12);
+  --vweb-ugc-text: rgba(248, 250, 252, 0.96);
+  --vweb-ugc-heading: rgba(248, 250, 252, 0.98);
+  --vweb-ugc-muted: rgba(226, 232, 240, 0.72);
+  --vweb-ugc-faint: rgba(226, 232, 240, 0.58);
+  --vweb-ugc-accent: #7dd3fc;
+  --vweb-ugc-accent-soft: rgba(125, 211, 252, 0.20);
+  --vweb-ugc-button: rgba(255, 255, 255, 0.08);
+  --vweb-ugc-button-hover: rgba(255, 255, 255, 0.14);
+  --vweb-ugc-canvas-bg: #07111d;
+  --vweb-ugc-nav-menu: rgba(10, 16, 23, 0.92);
+}
+.vweb-ugc-nav-menu {
+  background: rgba(10, 16, 23, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  backdrop-filter: blur(16px) saturate(1.12) !important;
+}
+.vweb-ugc-nav-menu a {
+  color: rgba(248, 250, 252, 0.96) !important;
 }`;
 
 const SITE_THEME_COMPACT = `/* Vortex Web compact site theme */
@@ -178,6 +258,32 @@ const SITE_THEME_COMPACT = `/* Vortex Web compact site theme */
 .navbar .nav-link:hover,
 .navbar .btn-signout-sm:hover {
   background: rgba(255, 255, 255, 0.08) !important;
+}
+body[data-vweb-ugc-route="1"] {
+  --vweb-ugc-bg: #121212;
+  --vweb-ugc-panel: #202020;
+  --vweb-ugc-panel-strong: #242424;
+  --vweb-ugc-panel-soft: #292929;
+  --vweb-ugc-input: #171717;
+  --vweb-ugc-border: rgba(255, 255, 255, 0.16);
+  --vweb-ugc-border-soft: rgba(255, 255, 255, 0.10);
+  --vweb-ugc-text: rgba(245, 245, 245, 0.94);
+  --vweb-ugc-heading: #ffffff;
+  --vweb-ugc-muted: rgba(245, 245, 245, 0.64);
+  --vweb-ugc-faint: rgba(245, 245, 245, 0.52);
+  --vweb-ugc-accent: #7dd3fc;
+  --vweb-ugc-accent-soft: rgba(125, 211, 252, 0.18);
+  --vweb-ugc-button: rgba(255, 255, 255, 0.07);
+  --vweb-ugc-button-hover: rgba(255, 255, 255, 0.12);
+  --vweb-ugc-canvas-bg: #090909;
+  --vweb-ugc-nav-menu: rgba(21, 21, 21, 0.96);
+}
+.vweb-ugc-nav-menu {
+  background: rgba(21, 21, 21, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+.vweb-ugc-nav-menu a {
+  color: rgba(245, 245, 245, 0.94) !important;
 }`;
 
 const RUNTIME_THEME_DEFAULT = "";
@@ -355,8 +461,14 @@ const els = {
   hubUrl: byId("hubUrl"),
   licenseKey: byId("licenseKey"),
   leaseStatus: byId("leaseStatus"),
+  tierStatus: byId("tierStatus"),
   featureStatus: byId("featureStatus"),
   accountStatus: byId("accountStatus"),
+  sessionCapStatus: byId("sessionCapStatus"),
+  accountCapStatus: byId("accountCapStatus"),
+  ugcUploadStatus: byId("ugcUploadStatus"),
+  ugcBandwidthStatus: byId("ugcBandwidthStatus"),
+  ugcQueueStatus: byId("ugcQueueStatus"),
   siteProfileCosmetics: byId("siteProfileCosmetics"),
   chatNameGradients: byId("chatNameGradients"),
   leaderboardCosmetics: byId("leaderboardCosmetics"),
@@ -487,19 +599,75 @@ function render(stored) {
 
 function renderLease(stored) {
   const wrapped = stored.vwebLastLicenseLease && typeof stored.vwebLastLicenseLease === "object" ? stored.vwebLastLicenseLease : null;
-  const lease = wrapped?.lease && typeof wrapped.lease === "object" ? wrapped.lease : wrapped;
+  const activation = wrapped?.activation && typeof wrapped.activation === "object" ? wrapped.activation : wrapped;
+  const lease = activation?.lease && typeof activation.lease === "object" ? activation.lease : wrapped?.lease && typeof wrapped.lease === "object" ? wrapped.lease : wrapped;
   const savedAt = Number(wrapped?.savedAt || 0);
   if (!lease) {
     els.leaseStatus.textContent = "None";
+    els.tierStatus.textContent = "Unknown";
     els.featureStatus.textContent = "Unknown";
     els.accountStatus.textContent = linkedAccountsLabel(stored) || "Unknown";
+    renderLimitRows(null);
     return;
   }
 
   els.leaseStatus.textContent = savedAt ? `Saved ${new Date(savedAt).toLocaleString()}` : "Available";
+  els.tierStatus.textContent = formatTier(activation?.tier || lease.tier || "unknown");
   const features = readFeatureList(lease);
   els.featureStatus.textContent = features.length ? features.map(formatFeatureName).join(", ") : "None in saved lease";
   els.accountStatus.textContent = linkedAccountsLabel(stored) || "Not included in saved lease";
+  renderLimitRows(activation);
+}
+
+function renderLimitRows(activation) {
+  const limits = activation?.limits && typeof activation.limits === "object" ? activation.limits : {};
+  const session = limits.sessions && typeof limits.sessions === "object" ? limits.sessions : {};
+  const account = limits.accounts && typeof limits.accounts === "object" ? limits.accounts : {};
+  const ugc = limits.ugc && typeof limits.ugc === "object" ? limits.ugc : {};
+  els.sessionCapStatus.textContent = session.effectiveMax != null ? formatEffectiveCap(session) : "Unknown";
+  els.accountCapStatus.textContent = account.effectiveMax != null ? formatEffectiveCap(account) : activation?.max_accounts != null ? formatCap(activation.max_accounts) : "Unknown";
+  els.ugcUploadStatus.textContent = ugc.maxUploadBytes ? formatBytes(ugc.maxUploadBytes) : "Unknown";
+  els.ugcBandwidthStatus.textContent = ugc.dailyBytes ? `${formatBytes(ugc.dailyBytes)} / day` : "Unknown";
+  els.ugcQueueStatus.textContent = ugc.pendingItems || ugc.dailySubmissions
+    ? `${formatNumber(ugc.pendingItems)} pending, ${formatNumber(ugc.dailySubmissions)} submits/day`
+    : "Unknown";
+}
+
+function formatEffectiveCap(limit) {
+  const raw = Number(limit.rawOverride || 0);
+  const effective = Number(limit.effectiveMax || 0);
+  const tierDefault = Number(limit.tierDefault || 0);
+  if (raw > 0) return `Override: ${formatCap(raw)}`;
+  return `Tier default: ${formatCap(tierDefault || effective)}`;
+}
+
+function formatCap(value) {
+  const numeric = Number(value || 0);
+  return numeric > 0 ? String(numeric) : "Unlimited";
+}
+
+function formatNumber(value) {
+  const numeric = Number(value || 0);
+  return numeric > 0 ? numeric.toLocaleString() : "0";
+}
+
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "Unknown";
+  const units = ["B", "KB", "MB", "GB"];
+  let amount = bytes;
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) {
+    amount /= 1024;
+    unit += 1;
+  }
+  return `${amount >= 10 || unit === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unit]}`;
+}
+
+function formatTier(value) {
+  return String(value || "unknown")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function readFeatureList(lease) {

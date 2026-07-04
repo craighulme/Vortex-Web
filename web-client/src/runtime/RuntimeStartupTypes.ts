@@ -3,6 +3,7 @@ import type { AvatarMaterialService } from "../avatar/materials/AvatarMaterialSe
 import type { CharacterSpawnService } from "../avatar/CharacterSpawnService";
 import type { LocalAvatarService } from "../avatar/LocalAvatarService";
 import type { RemoteAvatarAppearanceService } from "../avatar/RemoteAvatarAppearanceService";
+import type { AvatarUgcEquipmentRuntimeService } from "../avatar/AvatarUgcEquipmentRuntimeService";
 import type { CameraService } from "../camera/CameraService";
 import type { LocalMovementRuntimeService } from "../movement/LocalMovementRuntimeService";
 import type { QualityService } from "../renderer/QualityService";
@@ -40,6 +41,7 @@ export type RuntimeStartupConfig = {
   avatarAssets: AvatarAssetService;
   localAvatar: LocalAvatarService;
   remoteAvatarAppearance: RemoteAvatarAppearanceService;
+  avatarUgcEquipment: AvatarUgcEquipmentRuntimeService;
   characterSpawn: CharacterSpawnService;
   localMovement: LocalMovementRuntimeService;
   camera: CameraService;

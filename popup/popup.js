@@ -19,7 +19,7 @@ let openSettingsBtn = document.getElementById('openSettingsBtn')
 
 const LOCAL_NATIVE_RELAY = "ws://127.0.0.1:27822/ws";
 const HOSTED_NATIVE_RELAY = "wss://v22-relay.116.203.155.30.sslip.io/ws";
-const HOSTED_LICENSE_API = "https://v22.irongiant.vip";
+const HOSTED_LICENSE_API = "https://vweb.irongiant.vip";
 const UPDATE_MANIFEST_URLS = [
     "https://api.github.com/repos/craighulme/Vortex-Web/contents/extension-update.json?ref=main",
     "https://api.github.com/repos/craighulme/Vortex2plus2/contents/extension-update.json?ref=main"

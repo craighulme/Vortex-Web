@@ -1,10 +1,22 @@
 export const PROTOCOL_VERSION = 1;
 
+export type WebAvatarCosmeticsMessage = {
+  type: "web_avatar_cosmetics";
+  apiVersion: 1;
+  rigVersion: string;
+  playerId: number;
+  updatedAt: number;
+  equipped: unknown;
+  items: unknown[];
+  animationPack?: unknown;
+};
+
 export type ClientMessage =
   | { type: "hello"; protocolVersion: number; launchToken?: string; gameId?: number; lease?: unknown }
   | { type: "state"; x: number; y: number; z: number; ry: number; anim: string }
   | { type: "chat"; msg: string }
   | { type: "avatar_update"; avatar: unknown }
+  | WebAvatarCosmeticsMessage
   | { type: "tool_action"; toolId: string; action: string; payload?: unknown }
   | { type: "heartbeat"; at: number };
 
@@ -25,6 +37,7 @@ export type ServerMessage =
   | { type: "state"; id: number; x: number; y: number; z: number; ry: number; anim: string }
   | { type: "chat"; id: number; msg: string; username?: string; is_staff?: unknown; is_owner?: unknown; is_booster?: unknown }
   | { type: "avatar_update"; id: number; avatar: unknown }
+  | WebAvatarCosmeticsMessage
   | { type: "script_package"; package: unknown }
   | { type: "error"; code: string; message: string }
   | { type: "heartbeat"; at: number };
@@ -35,6 +48,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     "state",
     "chat",
     "avatar_update",
+    "web_avatar_cosmetics",
     "tool_action",
     "heartbeat"
   ].includes(value.type);
@@ -58,6 +72,7 @@ export function isServerMessage(value: unknown): value is ServerMessage {
     "state",
     "chat",
     "avatar_update",
+    "web_avatar_cosmetics",
     "script_package",
     "error",
     "heartbeat"

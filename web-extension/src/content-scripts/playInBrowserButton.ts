@@ -1,10 +1,10 @@
 const BTN_ID = "vweb-play-browser-btn";
-const HOSTED_LICENSE_API = "https://v22.irongiant.vip";
+const HOSTED_LICENSE_API = "https://vweb.irongiant.vip";
 const HOSTED_RELAY_URL = "wss://v22-relay.116.203.155.30.sslip.io/ws";
 const DEV_LOCAL_RELAY_KEY = "vwebDevLocalRelay";
 const DEV_FEATURES_KEY = "vwebDevFeatures";
 const LAST_LICENSE_LEASE_KEY = "vwebLastLicenseLease";
-const LICENSE_HELP_MESSAGE = 'Vortex Web license key is invalid or not set.\nContact "quackduck." on Discord for access.';
+const LICENSE_HELP_MESSAGE = "Vortex Web activation failed. Free access should work without a key; paid keys only unlock extra entitlements.";
 const REQUESTED_FEATURES = [
     "vortex-native-bridge",
     "teleport-commands",
@@ -42,8 +42,18 @@ type StoredConfig = {
 
 type ActivationResponse = {
     lease?: unknown;
+    expires_in?: unknown;
+    tier?: unknown;
+    limits?: unknown;
+    max_accounts?: unknown;
     error?: unknown;
     message?: unknown;
+};
+
+type InstallProof = {
+    installId: string;
+    publicJwk: JsonWebKey;
+    signature: string;
 };
 
 type LaunchStoreResponse = {
@@ -286,8 +296,100 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
             }
         }
         const material = `vortex-web-install\n${installId}`;
-        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+        return sha256Hex(material);
+    }
+
+    async function installId(): Promise<string> {
+        const api = extensionApi();
+        let id = "";
+        if (api?.storage?.local) {
+            const stored = await api.storage.local.get({ vwebInstallId: "" });
+            id = String(stored.vwebInstallId || "");
+            if (!id) {
+                id = crypto.randomUUID ? crypto.randomUUID() : randomHex(16);
+                await api.storage.local.set({ vwebInstallId: id });
+            }
+        }
+        return id || (crypto.randomUUID ? crypto.randomUUID() : randomHex(16));
+    }
+
+    async function sha256Hex(value: string): Promise<string> {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
         return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    function base64UrlEncode(data: Uint8Array): string {
+        let binary = "";
+        for (const byte of data) binary += String.fromCharCode(byte);
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    function installSigningText(input: { fingerprintHash: string; installIdHash: string; licenseScope: string; tier: string }): string {
+        return [
+            "vweb-install-proof-v1",
+            input.licenseScope,
+            input.tier,
+            input.fingerprintHash,
+            input.installIdHash
+        ].join("\n");
+    }
+
+    async function getInstallKeyPair(): Promise<CryptoKeyPair> {
+        const db = await openInstallDb();
+        const existing = await idbGet<CryptoKeyPair>(db, "install-key");
+        if (existing?.privateKey && existing?.publicKey) return existing;
+        const pair = await crypto.subtle.generateKey(
+            { name: "ECDSA", namedCurve: "P-256" },
+            false,
+            ["sign", "verify"]
+        ) as CryptoKeyPair;
+        await idbSet(db, "install-key", pair);
+        return pair;
+    }
+
+    function openInstallDb(): Promise<IDBDatabase> {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open("vweb-install-identity", 1);
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains("keys")) db.createObjectStore("keys");
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error || new Error("install identity database failed"));
+        });
+    }
+
+    function idbGet<T>(db: IDBDatabase, key: string): Promise<T | null> {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("keys", "readonly");
+            const request = tx.objectStore("keys").get(key);
+            request.onsuccess = () => resolve((request.result as T) || null);
+            request.onerror = () => reject(request.error || new Error("install identity read failed"));
+        });
+    }
+
+    function idbSet(db: IDBDatabase, key: string, value: unknown): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("keys", "readwrite");
+            tx.objectStore("keys").put(value, key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error("install identity write failed"));
+        });
+    }
+
+    async function createInstallProof(licenseKey: string, fingerprintHash: string): Promise<InstallProof> {
+        const id = await installId();
+        const installIdHash = await sha256Hex(`install:${id}`);
+        const licenseScope = licenseKey ? await sha256Hex(licenseKey) : `free:${fingerprintHash}`;
+        const tier = licenseKey ? "paid" : "free";
+        const pair = await getInstallKeyPair();
+        const publicJwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+        const signature = await crypto.subtle.sign(
+            { name: "ECDSA", hash: "SHA-256" },
+            pair.privateKey,
+            new TextEncoder().encode(installSigningText({ fingerprintHash, installIdHash, licenseScope, tier }))
+        );
+        return { installId: id, publicJwk, signature: base64UrlEncode(new Uint8Array(signature)) };
     }
 
     function randomHex(bytes: number): string {
@@ -297,18 +399,18 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
     }
 
     async function activateLicense(fetcher: typeof fetch, config: StoredConfig): Promise<unknown> {
-        if (!config.licenseKey) {
-            const err: LicenseError = new Error("missing license key");
-            err.code = "VWEB_LICENSE_INVALID";
-            throw err;
-        }
+        const fingerprintHash = await browserFingerprintHash();
+        const proof = await createInstallProof(config.licenseKey, fingerprintHash);
         const res = await fetcher(`${config.licenseApiUrl}/activate`, {
             method: "POST",
             cache: "no-store",
             headers: { "content-type": "application/json", accept: "application/json" },
             body: JSON.stringify({
                 license_key: config.licenseKey,
-                fingerprint_hash: await browserFingerprintHash(),
+                fingerprint_hash: fingerprintHash,
+                install_id: proof.installId,
+                install_public_jwk: proof.publicJwk,
+                install_signature: proof.signature,
                 features: requestedFeatures(config)
             })
         });
@@ -323,15 +425,15 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
             err.status = res.status;
             throw err;
         }
-        await storeLastLicenseLease(raw.lease);
+        await storeLastLicenseLease(raw);
         return raw.lease;
     }
 
-    async function storeLastLicenseLease(lease: unknown): Promise<void> {
+    async function storeLastLicenseLease(activation: ActivationResponse): Promise<void> {
         const api = extensionApi();
-        if (!api?.storage?.local || !lease) return;
+        if (!api?.storage?.local || !activation?.lease) return;
         try {
-            await api.storage.local.set({ [LAST_LICENSE_LEASE_KEY]: { lease, savedAt: Date.now() } });
+            await api.storage.local.set({ [LAST_LICENSE_LEASE_KEY]: { activation, lease: activation.lease, savedAt: Date.now() } });
         } catch {}
     }
 
@@ -411,11 +513,6 @@ function launchLocalRelay(documentRef: Document, gameId: number): void {
             const token = launch.searchParams.get("token");
             if (!token) throw new Error("launch URI did not contain a token");
             if (!isLocalRelayUrl(hubUrl)) {
-                if (!config.licenseKey) {
-                    const err: LicenseError = new Error("missing license key");
-                    err.code = "VWEB_LICENSE_INVALID";
-                    throw err;
-                }
                 mergedLicense = await activateLicense(fetcher, config);
             }
             const merged = mergeIdentity(identity, null, gameId);

@@ -10,5 +10,9 @@
   "devDependencies": {
     "typescript": "^5.9.2",
     "vite": "^6.4.3"
+  },
+  "dependencies": {
+    "@tweakpane/core": "^2.0.5",
+    "tweakpane": "^4.0.5"
   }
 }

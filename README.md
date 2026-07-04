@@ -18,8 +18,11 @@ The basic idea is simple: keep Vortex playable from the browser, keep multiplaye
 - It is not made by the official Vortex team
 - It is not finished
 
-## What this might get:
-- It may feature tools to publish/streamline assets such as: UGC, Maps, Content and maybe even a studio in the future.
+## What This Might Get
+
+- More web-only tools for testing UGC, avatar items, particles, themes, and runtime experiments
+- Better import/preview flows for models, animations, maps, and streamed assets
+- A proper game API layer once Vortex has more official game/studio support to mirror
 
 ## Current State
 
@@ -33,19 +36,23 @@ Some of the bigger things that are in right now:
 - Profile cosmetics, badges, name gradients, nameplates, and in-game leaderboard styling
 - WebGPU renderer path
 - Runtime settings menu with graphics, audio, controls, and dev tools
+- Extension settings page with local runtime/site options
 - Theme editing for site/runtime styling experiments
+- Early UGC Labs pages for trying avatar accessories, particles, draft publishing, and store previews
 - Map loading, chunk visibility work, runtime diagnostics, and performance tools
 - Modern GLB avatar path as the main direction
-- Early foundations for physics, asset streaming, SLIM-style optimisation, and scripting
+- Vortex Web rig and animation groundwork for future avatar/equipment work
+- Early foundations for physics, asset streaming, SLIM-style optimisation, UGC equipment, and scripting
 
 Some things are still rough or unfinished:
 
 - Rapier physics is not the main movement controller yet
 - Foot IK is disabled until the avatar rig is good enough
-- UGC/accessory support is planned but not done
-- Some compatibility bridge code still exists while the old runtime is being replaced
+- UGC/accessory support is early and still needs polish before it should be treated as stable
+- Some compatibility bridge code still exists while the runtime is being cleaned up
 - The scripting/game API work is only preparation right now
 - WebGPU shadows and renderer settings are still being tuned
+- Animation packs and the new rig are experimental while I work out what feels right in-game
 
 ## Multiplayer
 
@@ -62,6 +69,8 @@ Multiplayer access is currently license-gated because the project is still movin
 For access, contact `quackduck.` on Discord.
 
 Some browser/dev tools are feature-gated. See [COMMANDS_README.md](COMMANDS_README.md) if you are testing those.
+
+Vortex Web also has community profile cosmetics and early UGC support. Those are separate from normal Vortex accounts and are handled by the Vortex Web backend
 
 ## Installing
 
@@ -93,12 +102,15 @@ The long-term direction is to remove the remaining old Vortex2+2-style compatibi
 Things I want the runtime to support eventually:
 
 - Better avatar equipment and UGC-style attachments
+- A cleaner Vortex Web rig with stable bones, attachment anchors, and animation retargeting
+- Web-user UGC that can be seen by other Vortex Web users
 - Streamed meshes, textures, sounds, and game assets
 - Better map chunking, culling, instancing, and SLIM-style LOD
 - Rapier-backed physics where it makes sense
 - A safe game scripting API, with Lua/WASM as a possible later layer
 - More customisable site and in-game themes
 - Cleaner profile and community features for Vortex Web users
+- Admin/moderation tools for UGC review, abuse limits, linked accounts, and asset usage
 
 The old hardcoded 2+2 game modes and one-off features are not the direction anymore. Future game-specific tools, UI, items, and behaviour should come from proper runtime APIs and streamed game data.
 

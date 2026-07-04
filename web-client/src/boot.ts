@@ -33,6 +33,7 @@ declare global {
 
   installWindowRuntimeHandles(window, runtime);
   hydrateCommunityCosmetics(runtime);
+  hydrateRemoteAssetManifest(runtime);
   applyRuntimeThemeCss();
   installRuntimeThemeListener();
   mountRuntimeUi(runtime);
@@ -53,6 +54,33 @@ declare global {
       console.error("[Vortex Web] runtime launch failed", error);
     });
 })();
+
+function hydrateRemoteAssetManifest(runtime: ReturnType<typeof createVortexRuntime>): void {
+  const apiBase = readMetaContent("_vortexCommunityApi");
+  if (!apiBase) return;
+  try {
+    const manifestUrl = new URL("/assets/manifest", apiBase).toString();
+    void runtime.streaming.hydrateRemoteManifest(manifestUrl, {
+      fetcher: window.fetch.bind(window)
+    }).then((records) => {
+      const animationPacks = runtime.avatarAnimations.registerStreamRecords(records);
+      if (records.length) {
+        runtime.diagnostics.info("stream.manifest.ready", {
+          url: manifestUrl,
+          assets: records.length,
+          animationPacks: animationPacks.length
+        });
+      }
+    });
+  } catch {
+    runtime.diagnostics.warn("stream.manifest.bootstrap.failed");
+  }
+}
+
+function readMetaContent(id: string): string {
+  const meta = document.getElementById(id) as HTMLMetaElement | null;
+  return String(meta?.content || "").trim();
+}
 
 function applyRuntimeThemeCss(): void {
   setRuntimeThemeCss(readRuntimeDisplaySettings(document).runtimeThemeCss);

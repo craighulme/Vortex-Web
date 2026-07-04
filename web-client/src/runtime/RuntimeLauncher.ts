@@ -18,6 +18,7 @@ const THREE = {
 type RuntimeWindow = Window & {
     _importedAssets?: { content?: unknown };
     VortexChunkDebug?: unknown;
+    VortexAvatarRig?: unknown;
     G?: number;
     locked?: boolean;
 };
@@ -114,6 +115,23 @@ runtimeWindow.locked = false;
 const anim = { time: 0, bones: {}, rest: {} };
 
 const gltfLoader = new THREE.GLTFLoader();
+const storedAvatarRigVersion = localStorage.getItem("vwebAvatarRigVersion");
+const avatarRigVersion = storedAvatarRigVersion === "legacy-vortex-r7" ? "legacy-vortex-r7" : "vweb-rig-v1";
+runtimeWindow.VortexAvatarRig = createAvatarRigDebugController(localStorage, avatarRigVersion);
+VortexRuntime.avatarUgcEquipment.configure({
+    THREE,
+    loader: gltfLoader,
+    windowRef: runtimeWindow as Window,
+    localStorage,
+    diagnostics: VortexRuntime.diagnostics,
+    localAnimation: anim,
+    getLocalPlayerId: () => VortexRuntime.multiplayerSession.launchInfo?.id
+        || VortexRuntime.platform.normalizeLaunchIdentity(VortexRuntime.platform.bridgeConfig.identity, {
+            defaultGameId: Number(VortexRuntime.platform.bridgeConfig.officialGameId || 0),
+            includeLease: true,
+        })?.id
+        || null,
+});
 const avatarRuntime = VortexRuntime.avatarSetup.configure({
     THREE,
     scene,
@@ -130,11 +148,12 @@ const avatarRuntime = VortexRuntime.avatarSetup.configure({
     animation: anim,
     isWebGpuRuntime,
     floorY: G,
-    resolveAsset: (bodyType) => String(bodyType === "female"
-        ? runtimeAsset("meshes.femalePlayerGlb", "femalePlayerGlb")
-        : runtimeAsset("meshes.malePlayerGlb", "malePlayerGlb")),
+    resolveAsset: (bodyType) => String(resolveAvatarAsset(bodyType, avatarRigVersion, runtimeAsset)),
     shadowsActive,
     markShadowsDirty: () => shadows.markNeedsUpdate(),
+    onCharacterChanged: (character) => {
+        void VortexRuntime.avatarUgcEquipment.applyToLocal(character);
+    },
 });
 const {
     avatarMaterials,
@@ -224,6 +243,7 @@ VortexRuntime.runtimeStartup.install({
     avatarAssets,
     localAvatar,
     remoteAvatarAppearance,
+    avatarUgcEquipment: VortexRuntime.avatarUgcEquipment,
     characterSpawn,
     localMovement,
     camera: cameraService,
@@ -253,7 +273,10 @@ VortexRuntime.runtimeStartup.install({
     requestPointerLock: () => hudRuntime?.requestPointerLock(),
     resetCharacterToSpawn: () => localMovement.resetCharacterToSpawn(),
     pick: () => worldRuntime.getClicked3DPoint(),
-    update: (dt) => localMovement.update(dt),
+    update: (dt) => {
+        localMovement.update(dt);
+        VortexRuntime.avatarUgcEquipment.update(dt);
+    },
     updateCamera: (dt) => localMovement.updateCamera(dt),
     updateDebug: () => {
         camera.getWorldDirection?.(renderChunkForward);
@@ -283,6 +306,49 @@ function applyStoredRenderDistance(worldService: any, storage: StorageLike) {
     const rawProfile = storage.getItem("vwebRenderDistanceProfile");
     const profile = rawProfile === "performance" || rawProfile === "visual" ? rawProfile : "balanced";
     worldService.setRenderDistance?.(distance, profile);
+}
+
+function resolveAvatarAsset(
+    bodyType: "male" | "female",
+    rigVersion: "legacy-vortex-r7" | "vweb-rig-v1",
+    runtimeAsset: (path: string, fallbackKey?: string | null) => string | null
+) {
+    if (rigVersion === "vweb-rig-v1") {
+        const v1Asset = bodyType === "female"
+            ? runtimeAsset("meshes.femalePlayerGlbV1", "femalePlayerGlbV1")
+            : runtimeAsset("meshes.malePlayerGlbV1", "malePlayerGlbV1");
+        if (v1Asset) return v1Asset;
+    }
+    return bodyType === "female"
+        ? runtimeAsset("meshes.femalePlayerGlb", "femalePlayerGlb")
+        : runtimeAsset("meshes.malePlayerGlb", "malePlayerGlb");
+}
+
+function createAvatarRigDebugController(storage: StorageLike, current: "legacy-vortex-r7" | "vweb-rig-v1") {
+    return {
+        current() {
+            return {
+                version: current,
+                experimental: current === "vweb-rig-v1",
+                storageKey: "vwebAvatarRigVersion"
+            };
+        },
+        use(version: unknown) {
+            const next = version === "vweb-rig-v1" ? "vweb-rig-v1" : "legacy-vortex-r7";
+            if (next === "legacy-vortex-r7") storage.setItem("vwebAvatarRigVersion", next);
+            else storage.removeItem("vwebAvatarRigVersion");
+            return {
+                version: next,
+                reloadRequired: true
+            };
+        },
+        useV1() {
+            return this.use("vweb-rig-v1");
+        },
+        useLegacy() {
+            return this.use("legacy-vortex-r7");
+        }
+    };
 }
 
 function createChunkDebugController(THREE: any, scene: any, worldService: any) {

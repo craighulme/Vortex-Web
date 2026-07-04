@@ -57,9 +57,12 @@ export class RuntimeApiService {
       prefetchAvatarImages: (avatars: unknown) => config.avatarAssets.prefetchAvatarImages((Array.isArray(avatars) ? avatars : [avatars]) as Array<Record<string, unknown>>),
       applyAvatar: async (avatar: unknown) => {
         await config.localAvatar.applyAvatar(isRecord(avatar) ? avatar : {});
+        void config.avatarUgcEquipment.applyToLocal(config.getCharacter(), avatar);
       },
       applyAvatarToMeshes: async (meshes: unknown, avatar: unknown) => {
         await config.remoteAvatarAppearance.applyAvatarToMeshes(meshes as never, isRecord(avatar) ? avatar : {});
+        const playerId = isRecord(avatar) ? avatar.playerId ?? avatar.id : null;
+        void config.avatarUgcEquipment.applyToRemote(playerId, meshes);
       },
       getAvatar: () => config.localAvatar.getAvatar()
     };

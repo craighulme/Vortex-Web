@@ -1,6 +1,7 @@
 export const COSMETICS_PAGE_CACHE_KEY = "vortexWebCosmeticsLeaderboard";
 export const COSMETICS_TTL_MS = 10 * 60 * 1000;
 export const COSMETICS_RETRY_MS = 30 * 1000;
+const DEFAULT_COMMUNITY_API_BASE = "https://vweb.irongiant.vip";
 
 export type LeaderboardCosmeticsRecord = {
   badges?: Array<{ kind?: string; selected?: boolean }>;
@@ -65,12 +66,12 @@ export function writeLeaderboardCosmeticsCache(storage: Storage, cosmetics: Lead
 
 export function readCommunityApiBase(documentRef: Document): string {
   const meta = documentRef.getElementById("_vortexCommunityApi") as HTMLMetaElement | null;
-  if (!meta?.content) return "https://v22.irongiant.vip";
+  if (!meta?.content) return DEFAULT_COMMUNITY_API_BASE;
   try {
     const parsed = JSON.parse(meta.content) as unknown;
-    return String(parsed || "https://v22.irongiant.vip").replace(/\/+$/, "");
+    return String(parsed || DEFAULT_COMMUNITY_API_BASE).replace(/\/+$/, "");
   } catch {
-    return "https://v22.irongiant.vip";
+    return DEFAULT_COMMUNITY_API_BASE;
   }
 }
 

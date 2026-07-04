@@ -53,5 +53,7 @@ describe("AvatarItemCatalogService", () => {
     expect(rejected?.stream.status).toBe("rejected");
     expect(catalog.equip("ugc:bad-url")).toBeNull();
     expect(warnings).toHaveLength(1);
+    expect(catalog.manifests()).toEqual([]);
+    expect(catalog.manifests({ includeRejected: true })).toHaveLength(1);
   });
 });

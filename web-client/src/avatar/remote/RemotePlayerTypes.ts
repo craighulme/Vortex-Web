@@ -1,4 +1,5 @@
 import type { NativeAvatarState } from "../AvatarService";
+import type { AnimationClip } from "../../animation/AnimationPose";
 
 export type RemotePlayerMeshes = {
   grp: RuntimeObject3D;
@@ -9,6 +10,7 @@ export type RemotePlayerMeshes = {
   pantsMesh?: unknown;
   faceMesh?: unknown;
   nameSprite?: RuntimeSprite;
+  animationClips?: Record<string, AnimationClip> | null;
 };
 
 export type RemotePlayerRuntimeApi = {
@@ -34,7 +36,7 @@ export type RuntimeObject3D = {
   parent?: { remove?(object: unknown): void };
   userData: Record<string, unknown>;
   material?: RuntimeMaterial | RuntimeMaterial[];
-  geometry?: unknown;
+  geometry?: { dispose?(): void };
   castShadow?: boolean;
   receiveShadow?: boolean;
   skeleton?: { bones: RigBone[]; boneInverses: Array<{ clone(): unknown }> };
@@ -51,6 +53,11 @@ export type RuntimeObject3D = {
 export type RigBone = RuntimeObject3D & {
   rotation: { set?(x: number, y: number, z: number): void } & Record<string, number>;
   position: RuntimeVector3;
+  quaternion?: {
+    set?(x: number, y: number, z: number, w: number): void;
+    slerp?(target: unknown, alpha: number): void;
+  };
+  scale?: RuntimeVector3;
 };
 
 export type RuntimeVector3 = {
@@ -67,7 +74,12 @@ export type RigBoneRest = {
   x?: number;
   y?: number;
   z?: number;
+  px?: number;
   py?: number;
+  pz?: number;
+  sx?: number;
+  sy?: number;
+  sz?: number;
 };
 
 export type RuntimeMaterial = {

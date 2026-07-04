@@ -214,5 +214,102 @@
         "main_frame"
       ]
     }
+  },
+  {
+    "id": 120,
+    "priority": 6,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "url": "https://playvortex.io/home?VWEBUgcRoute=%2Fvweb%2Fugc%2Fstudio"
+      }
+    },
+    "condition": {
+      "urlFilter": "||playvortex.io/vweb/ugc/studio",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
+  },
+  {
+    "id": 121,
+    "priority": 6,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "url": "https://playvortex.io/home?VWEBUgcRoute=%2Fvweb%2Fugc%2Fstore"
+      }
+    },
+    "condition": {
+      "urlFilter": "||playvortex.io/vweb/ugc/store",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
+  },
+  {
+    "id": 122,
+    "priority": 5,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "url": "https://playvortex.io/home?VWEBUgcRoute=%2Fvweb%2Fugc%2Fstudio"
+      }
+    },
+    "condition": {
+      "urlFilter": "||playvortex.io/vweb/ugc",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
+  },
+  {
+    "id": 123,
+    "priority": 6,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "url": "https://vortex.towerstats.com/home?VWEBUgcRoute=%2Fvweb%2Fugc%2Fstudio"
+      }
+    },
+    "condition": {
+      "urlFilter": "||vortex.towerstats.com/vweb/ugc/studio",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
+  },
+  {
+    "id": 124,
+    "priority": 6,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "url": "https://vortex.towerstats.com/home?VWEBUgcRoute=%2Fvweb%2Fugc%2Fstore"
+      }
+    },
+    "condition": {
+      "urlFilter": "||vortex.towerstats.com/vweb/ugc/store",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
+  },
+  {
+    "id": 125,
+    "priority": 5,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "url": "https://vortex.towerstats.com/home?VWEBUgcRoute=%2Fvweb%2Fugc%2Fstudio"
+      }
+    },
+    "condition": {
+      "urlFilter": "||vortex.towerstats.com/vweb/ugc",
+      "resourceTypes": [
+        "main_frame"
+      ]
+    }
   }
 ]
+

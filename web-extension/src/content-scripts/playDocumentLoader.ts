@@ -56,6 +56,9 @@ const importedAssets = {
 
     malePlayerGlb: runtimeApi.getURL("runtime/assets/avatar/male.glb"),
     femalePlayerGlb: runtimeApi.getURL("runtime/assets/avatar/female.glb"),
+    malePlayerGlbV1: runtimeApi.getURL("runtime/assets/avatar/vweb-rig-v1/male.glb"),
+    femalePlayerGlbV1: runtimeApi.getURL("runtime/assets/avatar/vweb-rig-v1/female.glb"),
+    vwebDefaultAnimationsGlb: runtimeApi.getURL("runtime/assets/avatar/animations/vweb-default-v1.glb"),
 
     oofSound: runtimeApi.getURL("runtime/assets/audio/oof.mp3"),
 
@@ -361,7 +364,7 @@ async function rewritePlayDocument(html: string, url: URL, documentRef: Document
     });
     appendMeta(documentRef, "_vortexWebCosmetics", cosmeticsState || { ownUserId: null, records: {} });
     appendMeta(documentRef, "_vortexWebSettings", vortexWebSettings);
-    appendMeta(documentRef, "_vortexCommunityApi", cosmetics?.API_BASE || "https://v22.irongiant.vip");
+    appendMeta(documentRef, "_vortexCommunityApi", cosmetics?.API_BASE || "https://vweb.irongiant.vip");
 
     for (const scriptInfo of scripts) {
         await appendScriptSequential(documentRef, scriptInfo);

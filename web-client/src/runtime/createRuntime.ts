@@ -7,6 +7,10 @@ import { CameraService } from "../camera/CameraService";
 import { AvatarMaterialService } from "../avatar/materials/AvatarMaterialService";
 import { AvatarEquipmentService } from "../avatar/AvatarEquipmentService";
 import { AvatarItemCatalogService } from "../avatar/AvatarItemCatalogService";
+import { AvatarAnimationPackService } from "../avatar/AvatarAnimationPackService";
+import { AvatarWebCosmeticsService } from "../avatar/AvatarWebCosmeticsService";
+import { AvatarUgcEquipmentRuntimeService } from "../avatar/AvatarUgcEquipmentRuntimeService";
+import { AvatarRigValidator } from "../avatar/rig/AvatarRigValidator";
 import { AvatarAssetService } from "../avatar/AvatarAssetService";
 import { CharacterSpawnService } from "../avatar/CharacterSpawnService";
 import { AvatarRuntimeSetupService } from "../avatar/AvatarRuntimeSetupService";
@@ -99,7 +103,13 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
   const avatarEquipment = new AvatarEquipmentService();
   const players = new PlayerService();
   players.attachRemoteSession(remoteSession);
-  animation.setFootIk({ enabled: false });
+  animation.setFootIk({
+    enabled: true,
+    maxPelvisOffset: 0.2,
+    maxLegExtension: 0.55,
+    footProbeDistance: 2.2,
+    smoothing: 14
+  });
 
   const runtime: VortexRuntime = {
     version: options.version,
@@ -145,6 +155,10 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     avatarAssets: new AvatarAssetService(options.window),
     avatarEquipment,
     avatarItems: new AvatarItemCatalogService(avatarEquipment, streaming),
+    avatarAnimations: new AvatarAnimationPackService(streaming),
+    avatarWebCosmetics: new AvatarWebCosmeticsService(),
+    avatarUgcEquipment: new AvatarUgcEquipmentRuntimeService(),
+    avatarRigValidator: new AvatarRigValidator(),
     avatar: new AvatarService(),
     avatarSetup: new AvatarRuntimeSetupService(),
     characterSpawn: new CharacterSpawnService(),
@@ -228,7 +242,6 @@ function startPhysicsSync(
   currentTimer: number | null,
   setTimer: (timer: number | null) => void
 ): void {
-  if (runtime.physics.backend !== "rapier") return;
   if (!runtime.physics.syncStaticColliders) return;
   const sync = () => {
     try {

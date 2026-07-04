@@ -1,16 +1,19 @@
 {
-  "version": "0.6.0",
-  "date": "2026-06-30",
+  "version": "0.7.0",
+  "date": "2026-07-03",
   "url": "https://github.com/craighulme/Vortex-Web",
-  "title": "Vortex Web runtime and theme update",
-  "summary": "This update continues the move away from the old 2+2 layout and into the new Vortex Web runtime, with cleaner runtime bridges, WebGPU work, better settings, and early theme/profile customisation support.",
+  "title": "Vortex Web is now open to the public",
+  "summary": "Vortex Web is moving from a private experiment into something people can try, break, report issues for, and help improve. Some of the newer systems are still early, especially UGC Labs and theme editing.",
   "changelog": [
-    "Moved more of the browser client into the bundled Vortex Web runtime and cleaned up old runtime bridge naming.",
-    "Continued the WebGPU renderer migration with runtime quality controls, shadow settings, fog controls, and render distance options.",
-    "Added and improved in-game settings, keybind controls, dev tools, and cleaner HUD styling.",
-    "Added early site and in-game theme editing support, including runtime theme presets and live custom CSS work.",
-    "Improved profile customisation support with badges, name gradients, nameplates, and leaderboard cosmetic rendering.",
-    "Refactored multiplayer bridge services so relay, runtime exports, coordinate conversion, debug tools, chat, and remote players are better separated.",
-    "Kept moving legacy 2+2-only code out of the core direction while preparing for streamed assets, equipment, physics, and scripting APIs."
+    "Vortex Web is now intended for public testing. Expect bugs, but the project is ready for more people to try it and give feedback.",
+    "The old 2+2-style override setup has been reduced heavily. More of the client now runs through the newer Vortex Web runtime.",
+    "The game runtime has continued moving toward WebGPU, cleaner renderer settings, chunk visibility controls, diagnostics, and a less messy architecture.",
+    "The in-game UI has been reworked across chat, player list, settings, keybinds, graphics controls, and dev tools.",
+    "Site and in-game theming are now available in early form. This is still in development, but custom CSS, presets, and live theme experiments are in.",
+    "UGC Labs is now included in an early state, with a browser-based studio/store flow for testing accessories, particles, drafts, review, and local equip.",
+    "Avatar work now includes rig and animation groundwork for future accessories, animation packs, avatar upgrades, and web-user cosmetics.",
+    "Profile cosmetics have been improved, including badges, name gradients, nameplates, profile backgrounds, leaderboard styling, and chat name colouring.",
+    "Multiplayer and remote-player handling have had more cleanup around avatar textures, face overlays, UGC equipment sync, and runtime separation.",
+    "If you hit problems, please open a GitHub issue. Pull requests are welcome too, especially for fixes, UI polish, docs, and performance improvements."
   ]
 }

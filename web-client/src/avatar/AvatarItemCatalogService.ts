@@ -21,6 +21,7 @@ export type AvatarItemManifest = {
 export type AvatarItemRecord = {
   id: string;
   name: string;
+  manifest: AvatarItemManifest;
   attachment: AvatarAttachment;
   stream: StreamAssetRecord;
   registeredAt: number;
@@ -65,6 +66,7 @@ export class AvatarItemCatalogService {
     const record: AvatarItemRecord = {
       id: manifest.id,
       name: String(manifest.name || manifest.id),
+      manifest: cloneManifest(manifest),
       attachment,
       stream,
       registeredAt: Date.now()
@@ -88,6 +90,12 @@ export class AvatarItemCatalogService {
     return [...this.records.values()].map(cloneRecord);
   }
 
+  manifests(options: { includeRejected?: boolean } = {}): AvatarItemManifest[] {
+    return [...this.records.values()]
+      .filter((record) => options.includeRejected || record.stream.status !== "rejected")
+      .map((record) => cloneManifest(record.manifest));
+  }
+
   snapshot(): { total: number; ready: number; queued: number; rejected: number } {
     const result = { total: this.records.size, ready: 0, queued: 0, rejected: 0 };
     for (const record of this.records.values()) result[record.stream.status] += 1;
@@ -103,7 +111,28 @@ function cloneRecord(record: AvatarItemRecord): AvatarItemRecord {
   if (record.attachment.metadata) attachment.metadata = { ...record.attachment.metadata };
   return {
     ...record,
+    manifest: cloneManifest(record.manifest),
     attachment,
     stream: { ...record.stream }
   };
+}
+
+function cloneManifest(manifest: AvatarItemManifest): AvatarItemManifest {
+  const clone: AvatarItemManifest = {
+    id: manifest.id,
+    assetUrl: manifest.assetUrl,
+    slot: manifest.slot
+  };
+  if (manifest.name !== undefined) clone.name = manifest.name;
+  if (manifest.kind !== undefined) clone.kind = manifest.kind;
+  if (manifest.assetId !== undefined) clone.assetId = manifest.assetId;
+  if (manifest.bone !== undefined) clone.bone = manifest.bone;
+  if (manifest.offset !== undefined) clone.offset = [...manifest.offset];
+  if (manifest.rotation !== undefined) clone.rotation = [...manifest.rotation];
+  if (manifest.scale !== undefined) clone.scale = [...manifest.scale];
+  if (manifest.metadata !== undefined) clone.metadata = { ...manifest.metadata };
+  if (manifest.apiVersion !== undefined) clone.apiVersion = manifest.apiVersion;
+  if (manifest.integrity !== undefined) clone.integrity = manifest.integrity;
+  if (manifest.tags !== undefined) clone.tags = [...manifest.tags];
+  return clone;
 }

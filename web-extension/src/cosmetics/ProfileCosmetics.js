@@ -144,9 +144,11 @@
     const state = await withTimeout(api.load(), 1500).catch(() => cachedState);
     const cachedRecord = state.records[userId] || cachedState.records?.[userId] || null;
     const cacheFresh = isProfileCacheFresh(state, cachedState, userId);
-    const loadedRecord = cachedRecord || cacheFresh
+    const loadedRecord = cacheFresh
       ? null
-      : api.loadUser ? await withTimeout(api.loadUser(userId), 2000).catch(() => null) : null;
+      : api.refreshUser
+        ? await withTimeout(api.refreshUser(userId), 2000).catch(() => null)
+        : api.loadUser ? await withTimeout(api.loadUser(userId), 2000).catch(() => null) : null;
     const isOwnProfile = state.ownUserId === userId || detectOwnProfile(profile);
     const record = loadedRecord || cachedRecord || null;
     if (!record && !cacheFresh && shouldRetryProfileRender(userId)) {
@@ -844,7 +846,7 @@
 
   function badgeDescription(badge) {
     const kind = String(badge?.kind || "community");
-    if (kind === "developer") return "Project developer badge";
+    if (kind === "developer") return "Vortex Web project developer badge";
     if (kind === "sponsor") return "Monthly project sponsor badge";
     if (kind === "supporter") return "One-time project supporter badge";
     if (kind === "contributor") return "Code, design, testing, or community contribution badge";

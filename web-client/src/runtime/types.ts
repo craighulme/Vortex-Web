@@ -8,6 +8,10 @@ import type { AvatarMaterialService } from "../avatar/materials/AvatarMaterialSe
 import type { AvatarAssetService } from "../avatar/AvatarAssetService";
 import type { AvatarEquipmentService } from "../avatar/AvatarEquipmentService";
 import type { AvatarItemCatalogService } from "../avatar/AvatarItemCatalogService";
+import type { AvatarAnimationPackService } from "../avatar/AvatarAnimationPackService";
+import type { AvatarWebCosmeticsService } from "../avatar/AvatarWebCosmeticsService";
+import type { AvatarUgcEquipmentRuntimeService } from "../avatar/AvatarUgcEquipmentRuntimeService";
+import type { AvatarRigValidator } from "../avatar/rig/AvatarRigValidator";
 import type { CharacterSpawnService } from "../avatar/CharacterSpawnService";
 import type { AvatarRuntimeSetupService } from "../avatar/AvatarRuntimeSetupService";
 import type { LocalAvatarService } from "../avatar/LocalAvatarService";
@@ -127,6 +131,10 @@ export type VortexRuntime = {
   avatarAssets: AvatarAssetService;
   avatarEquipment: AvatarEquipmentService;
   avatarItems: AvatarItemCatalogService;
+  avatarAnimations: AvatarAnimationPackService;
+  avatarWebCosmetics: AvatarWebCosmeticsService;
+  avatarUgcEquipment: AvatarUgcEquipmentRuntimeService;
+  avatarRigValidator: AvatarRigValidator;
   avatar: AvatarService;
   avatarSetup: AvatarRuntimeSetupService;
   characterSpawn: CharacterSpawnService;

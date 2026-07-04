@@ -1,4 +1,5 @@
 _metadata/
+outputs/
 config/
 docs/
 cloudflare-hub/node_modules/
@@ -6,6 +7,7 @@ cloudflare-hub/.wrangler/
 web-client/node_modules/
 web-client/dist/
 web-extension/node_modules/
+web-extension/src/ugc/particlepack/
 native-relay/node_modules/
 native-relay/*.log
 native-relay/logs/
@@ -28,3 +30,4 @@ native-relay/PROTOCOL_NOTES_PRIVATE.md
 # Private Builds
 private-relay/
 /cloudflare-hub
+/tools

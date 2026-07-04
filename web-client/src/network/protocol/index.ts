@@ -4,7 +4,8 @@ import {
   isServerMessage,
   PROTOCOL_VERSION,
   type ClientMessage,
-  type ServerMessage
+  type ServerMessage,
+  type WebAvatarCosmeticsMessage
 } from "./schemas";
 import {
   classifySystemMessage,
@@ -27,6 +28,7 @@ export { PROTOCOL_VERSION, isClientMessage, isServerMessage, isCompatibleProtoco
 export type {
   ClientMessage,
   ServerMessage,
+  WebAvatarCosmeticsMessage,
   NativeLaunchInfo,
   NativeMovementInput,
   NativePlayerRecord,

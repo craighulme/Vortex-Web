@@ -34,6 +34,7 @@ export type AvatarRuntimeSetupOptions = {
   resolveAsset(bodyType: "male" | "female"): string;
   shadowsActive(): boolean;
   markShadowsDirty(): void;
+  onCharacterChanged?(character: unknown): void;
 };
 
 export type AvatarRuntimeSetupHandles = {
@@ -98,6 +99,7 @@ export class AvatarRuntimeSetupService {
       shadowsActive: options.shadowsActive,
       onCharacterChanged: (nextCharacter: any) => {
         character = nextCharacter;
+        options.onCharacterChanged?.(nextCharacter);
       },
       onMetricsChanged: ({ height, standY }: { height: number; standY: number }) => {
         charHeight = height;

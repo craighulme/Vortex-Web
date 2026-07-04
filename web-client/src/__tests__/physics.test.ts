@@ -19,6 +19,8 @@ describe("PhysicsWorld", () => {
       status: "static",
       colliders: 1
     });
+    const hit = physics.raycast([0, 4, 0], [0, -1, 0], 10);
+    expect(hit?.point[1]).toBeCloseTo(1, 4);
   });
 
   it("loads Rapier and raycasts against synced static colliders", async () => {

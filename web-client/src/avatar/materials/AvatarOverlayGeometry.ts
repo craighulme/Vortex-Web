@@ -1,3 +1,5 @@
+import { runtimeBoneAliases } from "../rig/RigBoneAliases";
+
 type RuntimeMesh = any;
 type UvBox = number[];
 type UvTemplate = Record<string, UvBox>;
@@ -12,6 +14,29 @@ export function configureAvatarOverlayGeometry(config: Record<string, any> = {})
 function _canonicalBoneName(name: unknown) {
   return String(name || "").replace(/\s+/g, "_");
 }
+
+function canonicalClothingBone(name: unknown): "Torso" | "Left_Arm" | "Right_Arm" | "Left_Leg" | "Right_Leg" | string {
+  const aliases = runtimeBoneAliases(name);
+  if (aliases.some((alias) => TORSO_CLOTHING_BONES.has(alias))) return "Torso";
+  if (aliases.some((alias) => LEFT_ARM_CLOTHING_BONES.has(alias))) return "Left_Arm";
+  if (aliases.some((alias) => RIGHT_ARM_CLOTHING_BONES.has(alias))) return "Right_Arm";
+  if (aliases.some((alias) => LEFT_LEG_CLOTHING_BONES.has(alias))) return "Left_Leg";
+  if (aliases.some((alias) => RIGHT_LEG_CLOTHING_BONES.has(alias))) return "Right_Leg";
+  return _canonicalBoneName(name);
+}
+
+function clothingBoneGroups(kind: string): Set<string> {
+  return kind === "pants"
+    ? new Set(["Left_Leg", "Right_Leg"])
+    : new Set(["Torso", "Left_Arm", "Right_Arm"]);
+}
+
+const TORSO_CLOTHING_BONES = new Set(["Torso", "Chest", "Spine", "Hips", "UpperTorso", "LowerTorso"]);
+const LEFT_ARM_CLOTHING_BONES = new Set(["Left_Arm", "LeftUpperArm", "LeftLowerArm", "LeftHand", "mixamorigLeftArm", "mixamorigLeftForeArm", "mixamorigLeftHand"]);
+const RIGHT_ARM_CLOTHING_BONES = new Set(["Right_Arm", "RightUpperArm", "RightLowerArm", "RightHand", "mixamorigRightArm", "mixamorigRightForeArm", "mixamorigRightHand"]);
+const LEFT_LEG_CLOTHING_BONES = new Set(["Left_Leg", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "mixamorigLeftUpLeg", "mixamorigLeftLeg", "mixamorigLeftFoot"]);
+const RIGHT_LEG_CLOTHING_BONES = new Set(["Right_Leg", "RightUpperLeg", "RightLowerLeg", "RightFoot", "mixamorigRightUpLeg", "mixamorigRightLeg", "mixamorigRightFoot"]);
+
 function _uvTemplates(): { torso: UvTemplate; leftLimb: UvTemplate; rightLimb: UvTemplate } {
   const torso = {
     top:    [0.39487179487179486, 0.8711985688729875, 0.6136752136752137, 0.9856887298747764],
@@ -45,9 +70,7 @@ function _uvTemplates(): { torso: UvTemplate; leftLimb: UvTemplate; rightLimb: U
 
 function _buildClothingOverlay(characterModel: RuntimeMesh, kind = "shirt") {
   const { torso, leftLimb, rightLimb } = _uvTemplates();
-  const wantedBones = kind === "pants"
-    ? new Set(["Left_Leg", "Right_Leg"])
-    : new Set(["Torso", "Left_Arm", "Right_Arm"]);
+  const wantedBones = clothingBoneGroups(kind);
 
   const bodyMeshes: RuntimeMesh[] = [];
 
@@ -100,7 +123,7 @@ function _buildClothingOverlayForMesh(
   const skinIndices = geometry.attributes.skinIndex.array;
   const skinWeights = geometry.attributes.skinWeight.array;
   const indices = geometry.index ? geometry.index.array : null;
-  const boneNames = bodyMesh.skeleton.bones.map((bone: RuntimeMesh) => _canonicalBoneName(bone.name));
+  const boneNames = bodyMesh.skeleton.bones.map((bone: RuntimeMesh) => canonicalClothingBone(bone.name));
 
   function getDominantBone(vertexIndex: number) {
     let bestWeight = -1;
@@ -349,7 +372,7 @@ function _buildFaceOverlay(characterModel: RuntimeMesh) {
   characterModel.traverse((child: RuntimeMesh) => {
     if (!bodyMesh && child.isSkinnedMesh && !/Overlay$/.test(child.name || "")) {
       const bones = child.skeleton?.bones || [];
-      const index = bones.findIndex((bone: RuntimeMesh) => _canonicalBoneName(bone.name) === "Head");
+      const index = bones.findIndex((bone: RuntimeMesh) => runtimeBoneAliases(bone.name).some((alias) => alias === "Head"));
       if (index >= 0) {
         bodyMesh = child;
         headBoneIndex = index;
@@ -406,17 +429,160 @@ function _buildFaceOverlay(characterModel: RuntimeMesh) {
   const x1 = cx + halfFaceWidth;
   const y0 = cy - halfFaceHeight;
   const y1 = cy + halfFaceHeight;
-  const z = headBounds.zMin - Math.max(0.01, (headBounds.zMax - headBounds.zMin) * 0.018);
+
+  const surfaceFace = _buildFaceSurfaceOverlay(bodyMesh, headBoneIndex, { x0, x1, y0, y1 });
+  if (surfaceFace) {
+    bodyMesh.parent.add(surfaceFace);
+    return surfaceFace;
+  }
+
+  const cardFace = _buildFaceCardOverlay(bodyMesh, headBoneIndex, { x0, x1, y0, y1, z: headBounds.zMin });
+  if (cardFace) bodyMesh.parent.add(cardFace);
+  return cardFace;
+}
+
+function _buildFaceSurfaceOverlay(
+  bodyMesh: RuntimeMesh,
+  headBoneIndex: number,
+  bounds: { x0: number; x1: number; y0: number; y1: number }
+) {
+  const geometry = bodyMesh.geometry;
+  const position = geometry?.attributes?.position;
+  const normal = geometry?.attributes?.normal;
+  const skinIndex = geometry?.attributes?.skinIndex;
+  const skinWeight = geometry?.attributes?.skinWeight;
+  if (!position?.array || !normal?.array || !skinIndex?.array || !skinWeight?.array) return null;
+
+  const indices = geometry.index?.array || null;
+  const triangleCount = indices ? indices.length / 3 : position.count / 3;
+  const frontCandidates = _collectFaceSurfaceTriangles({
+    position,
+    normal,
+    skinIndex,
+    skinWeight,
+    indices,
+    triangleCount,
+    headBoneIndex,
+    bounds,
+    frontSign: -1
+  });
+  const candidates = frontCandidates.positions.length ? frontCandidates : _collectFaceSurfaceTriangles({
+    position,
+    normal,
+    skinIndex,
+    skinWeight,
+    indices,
+    triangleCount,
+    headBoneIndex,
+    bounds,
+    frontSign: 1
+  });
+
+  if (!candidates.positions.length) return null;
+
+  const overlayGeometry = new THREE.BufferGeometry();
+  overlayGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(candidates.positions), 3));
+  overlayGeometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(candidates.normals), 3));
+  overlayGeometry.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(candidates.uvs), 2));
+  overlayGeometry.setAttribute("skinIndex", new THREE.BufferAttribute(new Uint16Array(candidates.skinIndices), 4));
+  overlayGeometry.setAttribute("skinWeight", new THREE.BufferAttribute(new Float32Array(candidates.skinWeights), 4));
+
+  const face = _createFaceOverlayMesh(overlayGeometry);
+  face.bind(bodyMesh.skeleton, bodyMesh.bindMatrix);
+  return face;
+}
+
+function _collectFaceSurfaceTriangles(options: {
+  position: RuntimeMesh;
+  normal: RuntimeMesh;
+  skinIndex: RuntimeMesh;
+  skinWeight: RuntimeMesh;
+  indices: RuntimeMesh | null;
+  triangleCount: number;
+  headBoneIndex: number;
+  bounds: { x0: number; x1: number; y0: number; y1: number };
+  frontSign: -1 | 1;
+}) {
+  const { position, normal, skinIndex, skinWeight, indices, triangleCount, headBoneIndex, bounds, frontSign } = options;
+  const outPositions: number[] = [];
+  const outNormals: number[] = [];
+  const outUvs: number[] = [];
+  const outSkinIndices: number[] = [];
+  const outSkinWeights: number[] = [];
+  const paddingX = Math.max(0.01, (bounds.x1 - bounds.x0) * 0.03);
+  const paddingY = Math.max(0.01, (bounds.y1 - bounds.y0) * 0.03);
+
+  for (let tri = 0; tri < triangleCount; tri += 1) {
+    const a = indices ? indices[tri * 3 + 0] : tri * 3 + 0;
+    const b = indices ? indices[tri * 3 + 1] : tri * 3 + 1;
+    const c = indices ? indices[tri * 3 + 2] : tri * 3 + 2;
+    if (!_isHeadTriangle([a, b, c], skinIndex.array, skinWeight.array, headBoneIndex)) continue;
+
+    const cx = (position.getX(a) + position.getX(b) + position.getX(c)) / 3;
+    const cy = (position.getY(a) + position.getY(b) + position.getY(c)) / 3;
+    if (cx < bounds.x0 - paddingX || cx > bounds.x1 + paddingX || cy < bounds.y0 - paddingY || cy > bounds.y1 + paddingY) continue;
+
+    const nx = (normal.getX(a) + normal.getX(b) + normal.getX(c)) / 3;
+    const ny = (normal.getY(a) + normal.getY(b) + normal.getY(c)) / 3;
+    const nz = (normal.getZ(a) + normal.getZ(b) + normal.getZ(c)) / 3;
+    const length = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+    const unitNormal = { x: nx / length, y: ny / length, z: nz / length };
+    if (unitNormal.z * frontSign < 0.2) continue;
+
+    for (const vertexIndex of [a, b, c]) {
+      const vx = position.getX(vertexIndex);
+      const vy = position.getY(vertexIndex);
+      const vz = position.getZ(vertexIndex);
+      outPositions.push(
+        vx + unitNormal.x * 0.002,
+        vy + unitNormal.y * 0.002,
+        vz + unitNormal.z * 0.002
+      );
+      outNormals.push(normal.getX(vertexIndex), normal.getY(vertexIndex), normal.getZ(vertexIndex));
+      outUvs.push(
+        clamp01((vx - bounds.x0) / (bounds.x1 - bounds.x0)),
+        clamp01(1 - (vy - bounds.y0) / (bounds.y1 - bounds.y0))
+      );
+      for (let i = 0; i < 4; i += 1) {
+        outSkinIndices.push(skinIndex.array[vertexIndex * 4 + i]);
+        outSkinWeights.push(skinWeight.array[vertexIndex * 4 + i]);
+      }
+    }
+  }
+
+  return { positions: outPositions, normals: outNormals, uvs: outUvs, skinIndices: outSkinIndices, skinWeights: outSkinWeights };
+}
+
+function _isHeadTriangle(vertexIndices: number[], skinIndices: RuntimeMesh, skinWeights: RuntimeMesh, headBoneIndex: number) {
+  let influencedVertices = 0;
+  for (const vertexIndex of vertexIndices) {
+    let headInfluence = 0;
+    for (let i = 0; i < 4; i += 1) {
+      const offset = vertexIndex * 4 + i;
+      if (skinIndices[offset] === headBoneIndex) headInfluence += skinWeights[offset] || 0;
+    }
+    if (headInfluence >= 0.45) influencedVertices += 1;
+  }
+  return influencedVertices >= 2;
+}
+
+function _buildFaceCardOverlay(
+  bodyMesh: RuntimeMesh,
+  headBoneIndex: number,
+  bounds: { x0: number; x1: number; y0: number; y1: number; z: number }
+) {
+  const headDepth = Math.max(0.01, Math.abs(bounds.z) * 0.002);
+  const z = bounds.z - headDepth;
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute(
     "position",
     new THREE.BufferAttribute(
       new Float32Array([
-        x0, y0, z,
-        x1, y0, z,
-        x1, y1, z,
-        x0, y1, z
+        bounds.x0, bounds.y0, z,
+        bounds.x1, bounds.y0, z,
+        bounds.x1, bounds.y1, z,
+        bounds.x0, bounds.y1, z
       ]),
       3
     )
@@ -471,6 +637,12 @@ function _buildFaceOverlay(characterModel: RuntimeMesh) {
   );
   geometry.setIndex([0, 2, 1, 0, 3, 2]);
 
+  const face = _createFaceOverlayMesh(geometry);
+  face.bind(bodyMesh.skeleton, bodyMesh.bindMatrix);
+  return face;
+}
+
+function _createFaceOverlayMesh(geometry: RuntimeMesh) {
   const face = new THREE.SkinnedMesh(
     geometry,
     new THREE.MeshBasicMaterial({
@@ -489,9 +661,11 @@ function _buildFaceOverlay(characterModel: RuntimeMesh) {
   face.visible = false;
   face.renderOrder = 0;
   face.userData.vwebTextureFlipY = false;
-  face.bind(bodyMesh.skeleton, bodyMesh.bindMatrix);
-  bodyMesh.parent.add(face);
   return face;
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
 }
 
 

@@ -20,7 +20,10 @@ export function normalizeAssetManifest(raw: unknown): AssetManifest {
     }),
     meshes: pickRecord({
       malePlayerGlb: value.malePlayerGlb,
-      femalePlayerGlb: value.femalePlayerGlb
+      femalePlayerGlb: value.femalePlayerGlb,
+      malePlayerGlbV1: value.malePlayerGlbV1,
+      femalePlayerGlbV1: value.femalePlayerGlbV1,
+      vwebDefaultAnimationsGlb: value.vwebDefaultAnimationsGlb
     }),
     sounds: pickRecord({
       oofSound: value.oofSound

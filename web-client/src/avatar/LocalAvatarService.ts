@@ -1,6 +1,7 @@
 import type { AvatarAssetService } from "./AvatarAssetService";
 import type { AvatarMaterialService } from "./materials/AvatarMaterialService";
 import { DEFAULT_BODY_COLORS, type AvatarService, type NativeAvatarState } from "./AvatarService";
+import { runtimeBoneAliases } from "./rig/RigBoneAliases";
 
 type ThreeLike = Record<string, any>;
 
@@ -198,8 +199,6 @@ export class LocalAvatarService {
 
   private registerBone(child: any): void {
     const options = this.requireOptions();
-    const name = child.name;
-    const alias = canonicalBoneName(name);
     const rest: BoneRest = {
       x: child.rotation.x,
       y: child.rotation.y,
@@ -211,10 +210,10 @@ export class LocalAvatarService {
       sy: child.scale.y,
       sz: child.scale.z
     };
-    options.animation.bones[name] = child;
-    options.animation.rest[name] = rest;
-    options.animation.bones[alias] = child;
-    options.animation.rest[alias] = rest;
+    for (const alias of runtimeBoneAliases(child.name)) {
+      options.animation.bones[alias] = child;
+      options.animation.rest[alias] = rest;
+    }
   }
 
   private disposeCharacter(root: any): void {
@@ -234,10 +233,6 @@ export class LocalAvatarService {
     if (!this.options) throw new Error("[avatar] LocalAvatarService is not configured.");
     return this.options;
   }
-}
-
-function canonicalBoneName(name: unknown): string {
-  return String(name || "").replace(/\s+/g, "_");
 }
 
 function cloneAvatar(avatar: NativeAvatarState): NativeAvatarState {

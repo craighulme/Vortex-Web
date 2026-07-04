@@ -13,7 +13,8 @@ export default defineConfig({
         "content-scripts/base": resolve("src/content-scripts/base.ts"),
         "content-scripts/site": resolve("src/content-scripts/site.ts"),
         "content-scripts/search": resolve("src/content-scripts/search.ts"),
-        "page-world/map-loader": resolve("src/page-world/map-loader.ts")
+        "page-world/map-loader": resolve("src/page-world/map-loader.ts"),
+        "page-world/ugc-studio-bridge": resolve("src/page-world/ugc-studio-bridge.ts")
       },
       output: {
         entryFileNames: "[name].js",

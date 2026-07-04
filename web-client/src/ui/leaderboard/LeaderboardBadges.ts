@@ -6,7 +6,7 @@ export const BOOST_ICON =
 
 export function badgeDescription(badge: unknown): string {
   const kind = String((badge as { kind?: unknown } | null)?.kind || "community");
-  if (kind === "developer") return "Project developer badge";
+  if (kind === "developer") return "Vortex Web project developer badge";
   if (kind === "sponsor") return "Monthly project sponsor badge";
   if (kind === "supporter") return "One-time project supporter badge";
   if (kind === "contributor") return "Code, design, testing, or community contribution badge";

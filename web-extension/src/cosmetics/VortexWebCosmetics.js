@@ -4,10 +4,10 @@
   const STORAGE_KEY = "vortexWebCosmetics";
   const PROFILE_AUTH_KEY = "vortexWebProfileAuth";
   const LAST_LICENSE_LEASE_KEY = "vwebLastLicenseLease";
-  const API_BASE = "https://v22.irongiant.vip";
+  const API_BASE = "https://vweb.irongiant.vip";
   const DEFAULT_RECORDS = {};
-  const CACHE_VERSION = 3;
-  const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
+  const CACHE_VERSION = 4;
+  const PROFILE_CACHE_TTL_MS = 2 * 60 * 1000;
   const OWN_USER_CACHE_TTL_MS = 2 * 60 * 1000;
   const BRIDGE_RESPONSE_TTL_MS = 30 * 1000;
   const REFRESH_RETRY_MS = 30 * 1000;
@@ -19,7 +19,7 @@
   let inflightOwnUserId = null;
 
   const BADGE_META = {
-    developer: { label: "Developer", short: "DEV" },
+    developer: { label: "Vortex Web Developer", short: "VWEB" },
     sponsor: { label: "Sponsor", short: "SP" },
     supporter: { label: "Supporter", short: "SUP" },
     contributor: { label: "Contributor", short: "CON" },
@@ -307,6 +307,7 @@
       [STORAGE_KEY]: {
         ownUserId: normalized.ownUserId,
         ownUserFetchedAt: normalized.ownUserFetchedAt,
+        apiBase: API_BASE,
         version: CACHE_VERSION,
         records: normalized.records,
         fetchedAt: normalized.fetchedAt
@@ -352,9 +353,10 @@
   }
 
   function normalizeCache(saved) {
-    if (Number(saved.version || 0) !== CACHE_VERSION) {
+    if (Number(saved.version || 0) !== CACHE_VERSION || String(saved.apiBase || "") !== API_BASE) {
       return {
         version: CACHE_VERSION,
+        apiBase: API_BASE,
         ownUserId: Number.isFinite(Number(saved.ownUserId)) ? Number(saved.ownUserId) : null,
         ownUserFetchedAt: Number.isFinite(Number(saved.ownUserFetchedAt)) ? Number(saved.ownUserFetchedAt) : 0,
         records: normalizeRecords(DEFAULT_RECORDS),
@@ -367,6 +369,7 @@
     }
     return {
       version: CACHE_VERSION,
+      apiBase: API_BASE,
       ownUserId: Number.isFinite(Number(saved.ownUserId)) ? Number(saved.ownUserId) : null,
       ownUserFetchedAt: Number.isFinite(Number(saved.ownUserFetchedAt)) ? Number(saved.ownUserFetchedAt) : 0,
       records: normalizeRecords(records),
@@ -460,9 +463,13 @@
     return normalizeRecord(data.profile);
   }
 
-  async function profileAuthToken(userId) {
+  async function profileAuthToken(userId, options = {}) {
     const id = Number(userId);
     if (!Number.isFinite(id) || id <= 0) return "";
+    if (options && options.forceRefresh === true) {
+      await clearProfileAuthToken(id);
+      return requestProfileAuthToken(id);
+    }
     const auth = await readProfileAuth();
     const current = auth.records?.[id];
     if (current?.token && Number(current.expiresAt || 0) > Math.floor(Date.now() / 1000) + 60) {
@@ -477,6 +484,7 @@
     const config = await readLicenseConfig();
     if (!config.licenseKey && !config.lease) return "";
     const fingerprintHash = await browserFingerprintHash();
+    const proof = await createInstallProof(config.licenseKey, fingerprintHash).catch(() => null);
     const res = await fetch(`${API_BASE}/community/auth/token`, {
       method: "POST",
       credentials: "omit",
@@ -488,6 +496,9 @@
       body: JSON.stringify({
         license_key: config.licenseKey,
         fingerprint_hash: fingerprintHash,
+        install_id: proof?.installId || "",
+        install_public_jwk: proof?.publicJwk || null,
+        install_signature: proof?.signature || "",
         lease: config.lease || null,
         userId: id
       })
@@ -586,8 +597,100 @@
       }
     }
     const material = `vortex-web-install\n${installId}`;
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+    return sha256Hex(material);
+  }
+
+  async function installId() {
+    const api = globalThis.chrome || globalThis.browser;
+    let id = "";
+    if (api?.storage?.local) {
+      const stored = await api.storage.local.get({ vwebInstallId: "" });
+      id = String(stored.vwebInstallId || "");
+      if (!id) {
+        id = crypto.randomUUID ? crypto.randomUUID() : randomHex(16);
+        await api.storage.local.set({ vwebInstallId: id });
+      }
+    }
+    return id || (crypto.randomUUID ? crypto.randomUUID() : randomHex(16));
+  }
+
+  async function sha256Hex(value) {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
     return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function base64UrlEncode(data) {
+    let binary = "";
+    for (const byte of data) binary += String.fromCharCode(byte);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  function installSigningText(input) {
+    return [
+      "vweb-install-proof-v1",
+      input.licenseScope,
+      input.tier,
+      input.fingerprintHash,
+      input.installIdHash
+    ].join("\n");
+  }
+
+  async function createInstallProof(licenseKey, fingerprintHash) {
+    const id = await installId();
+    const installIdHash = await sha256Hex(`install:${id}`);
+    const licenseScope = licenseKey ? await sha256Hex(licenseKey) : `free:${fingerprintHash}`;
+    const tier = licenseKey ? "paid" : "free";
+    const pair = await getInstallKeyPair();
+    const publicJwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+    const signature = await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" },
+      pair.privateKey,
+      new TextEncoder().encode(installSigningText({ fingerprintHash, installIdHash, licenseScope, tier }))
+    );
+    return { installId: id, publicJwk, signature: base64UrlEncode(new Uint8Array(signature)) };
+  }
+
+  async function getInstallKeyPair() {
+    const db = await openInstallDb();
+    const existing = await idbGet(db, "install-key");
+    if (existing?.privateKey && existing?.publicKey) return existing;
+    const pair = await crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign", "verify"]
+    );
+    await idbSet(db, "install-key", pair);
+    return pair;
+  }
+
+  function openInstallDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open("vweb-install-identity", 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("keys")) db.createObjectStore("keys");
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("install identity database failed"));
+    });
+  }
+
+  function idbGet(db, key) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("keys", "readonly");
+      const request = tx.objectStore("keys").get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error || new Error("install identity read failed"));
+    });
+  }
+
+  function idbSet(db, key, value) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("keys", "readwrite");
+      tx.objectStore("keys").put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error("install identity write failed"));
+    });
   }
 
   function randomHex(bytes) {
@@ -818,6 +921,7 @@
       refreshUser: refreshCosmeticsUser,
       refreshUsers: refreshCosmeticsUsers,
       saveRecord: saveCosmeticsRecord,
+      profileAuthToken,
       unlinkProfileAuth,
       hasProfileAuth,
       normalizeRecord,

@@ -20,6 +20,15 @@ describe("ProtocolService", () => {
     expect(protocol.isServerMessage({ type: "states", players: [{ id: 2 }] })).toBe(true);
     expect(protocol.isServerMessage({ type: "leave", id: 2 })).toBe(true);
     expect(protocol.isServerMessage({ type: "chat", id: 2, msg: "hi" })).toBe(true);
+    expect(protocol.isServerMessage({
+      type: "web_avatar_cosmetics",
+      apiVersion: 1,
+      rigVersion: "vweb-rig-v1",
+      playerId: 2,
+      updatedAt: 1,
+      equipped: {},
+      items: []
+    })).toBe(true);
   });
 
   it("encodes and parses native chat packets", () => {

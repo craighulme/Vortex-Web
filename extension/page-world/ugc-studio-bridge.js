@@ -1,0 +1,1 @@
+window.VortexWebUgcStudio||(window.VortexWebUgcStudio={camera(){try{return JSON.parse(document.documentElement.dataset.vwebUgcCamera||"null")}catch{return null}},async copyCamera(){const t=this.camera();try{await navigator.clipboard?.writeText(JSON.stringify(t,null,2))}catch{}return t}});

@@ -1,14 +1,26 @@
 export const AVATAR_ATTACHMENT_SLOTS = [
   "Head",
   "Face",
+  "Hair",
   "Hat",
   "Mask",
+  "Neck",
+  "Shoulders",
+  "LeftShoulder",
+  "RightShoulder",
   "Torso",
+  "Chest",
   "Shirt",
   "Pants",
+  "Waist",
+  "Front",
   "LeftHand",
   "RightHand",
+  "LeftArm",
+  "RightArm",
   "Back",
+  "LeftLeg",
+  "RightLeg",
   "LeftFoot",
   "RightFoot"
 ] as const;
@@ -73,41 +85,70 @@ export class AvatarEquipmentService {
     ) as AvatarEquipmentState;
   }
 
-  slotMetadata(): Array<{ slot: AvatarAttachmentSlot; defaultBone: string; accepts: AvatarAttachmentKind[] }> {
+  slotMetadata(): Array<{ slot: AvatarAttachmentSlot; defaultBone: string; defaultAnchor: string; accepts: AvatarAttachmentKind[] }> {
     return AVATAR_ATTACHMENT_SLOTS.map((slot) => ({
       slot,
-      defaultBone: DEFAULT_SLOT_BONES[slot],
+      defaultBone: AVATAR_SLOT_BONES[slot],
+      defaultAnchor: AVATAR_SLOT_ANCHORS[slot],
       accepts: SLOT_ACCEPTS[slot]
     }));
   }
 }
 
-const DEFAULT_SLOT_BONES: Record<AvatarAttachmentSlot, string> = {
+export const AVATAR_SLOT_BONES: Record<AvatarAttachmentSlot, string> = {
   Head: "Head",
   Face: "Head",
+  Hair: "Head",
   Hat: "Head",
   Mask: "Head",
+  Neck: "Neck",
+  Shoulders: "Chest",
+  LeftShoulder: "LeftUpperArm",
+  RightShoulder: "RightUpperArm",
   Torso: "Torso",
+  Chest: "Chest",
   Shirt: "Torso",
   Pants: "Torso",
+  Waist: "Hips",
+  Front: "Chest",
   LeftHand: "LeftHand",
   RightHand: "RightHand",
+  LeftArm: "LeftLowerArm",
+  RightArm: "RightLowerArm",
   Back: "Torso",
+  LeftLeg: "LeftLowerLeg",
+  RightLeg: "RightLowerLeg",
   LeftFoot: "LeftFoot",
   RightFoot: "RightFoot"
 };
 
+export const AVATAR_SLOT_ANCHORS: Record<AvatarAttachmentSlot, string> = Object.fromEntries(
+  AVATAR_ATTACHMENT_SLOTS.map((slot) => [slot, `VWEB_Attach_${slot}`])
+) as Record<AvatarAttachmentSlot, string>;
+
 const SLOT_ACCEPTS: Record<AvatarAttachmentSlot, AvatarAttachmentKind[]> = {
   Head: ["body", "accessory"],
   Face: ["clothing", "accessory"],
+  Hair: ["accessory"],
   Hat: ["accessory"],
   Mask: ["accessory"],
+  Neck: ["accessory"],
+  Shoulders: ["accessory"],
+  LeftShoulder: ["accessory"],
+  RightShoulder: ["accessory"],
   Torso: ["body", "accessory"],
+  Chest: ["body", "accessory"],
   Shirt: ["clothing"],
   Pants: ["clothing"],
+  Waist: ["accessory", "tool"],
+  Front: ["accessory"],
   LeftHand: ["tool", "accessory"],
   RightHand: ["tool", "accessory"],
+  LeftArm: ["body", "accessory"],
+  RightArm: ["body", "accessory"],
   Back: ["accessory", "tool"],
+  LeftLeg: ["body", "accessory"],
+  RightLeg: ["body", "accessory"],
   LeftFoot: ["body", "accessory"],
   RightFoot: ["body", "accessory"]
 };

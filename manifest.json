@@ -1,6 +1,6 @@
 {
   "name": "Vortex Web",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "manifest_version": 3,
   "description": "Unofficial Vortex browser client with native multiplayer relay support, WebGPU work, and web-first enhancements.",
   "icons": {
@@ -12,7 +12,7 @@
   "host_permissions": [
     "https://playvortex.io/*",
     "https://vortex.towerstats.com/*",
-    "https://v22.irongiant.vip/*",
+    "https://vweb.irongiant.vip/*",
     "https://raw.githubusercontent.com/craighulme/Vortex-Web/*",
     "https://api.github.com/repos/craighulme/Vortex-Web/*",
     "https://raw.githubusercontent.com/craighulme/Vortex2plus2/*",
@@ -73,8 +73,13 @@
         "runtime/*",
         "runtime/page/*",
         "runtime/vendor/*",
+        "runtime/vendor/TransformControls.js",
         "runtime/assets/*",
         "runtime/assets/avatar/*",
+        "runtime/assets/avatar/animations/*",
+        "runtime/assets/avatar/vweb-rig-v1/*",
+        "runtime/assets/ugc-lab/*",
+        "runtime/assets/ugc-lab/samples/*",
         "runtime/assets/audio/*",
         "img/*",
         "img/textures/*",

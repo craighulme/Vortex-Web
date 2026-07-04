@@ -52,6 +52,7 @@ describe("RuntimeStartupService", () => {
       avatarMaterials: { applyShirtToMesh: () => {} } as any,
       avatarAssets: { prefetchAvatarImages: () => {} } as any,
       localAvatar: { getShirtMesh: () => ({}), applyAvatar: async () => {}, getAvatar: () => ({}) } as any,
+      avatarUgcEquipment: { applyToLocal: async () => {}, applyToRemote: async () => {} } as any,
       remoteAvatarAppearance: {
         applyShirtToMesh: () => {},
         buildShirtOverlay: () => ({}),

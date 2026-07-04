@@ -1,3 +1,13 @@
+import {
+  applyDefaultAnimationPose,
+  DEFAULT_ANIMATION_SLOTS,
+  normalizeAnimationSlot,
+  type AnimationClip,
+  type RigBoneLike,
+  type RigBoneRest,
+  type RuntimeAnimationSlot
+} from "./AnimationPose";
+
 export type FootIkConfig = {
   enabled: boolean;
   maxPelvisOffset: number;
@@ -6,39 +16,26 @@ export type FootIkConfig = {
   smoothing: number;
 };
 
-export type RuntimeRemoteAnimation = "idle" | "walk" | "jump" | "climb" | string;
+export type RuntimeRemoteAnimation = RuntimeAnimationSlot;
 
 export type RuntimeRemoteAnimationTarget = {
   anim?: RuntimeRemoteAnimation;
   animTime?: number;
+  animationClips?: Record<string, AnimationClip> | null;
   meshes?: {
     bones?: Record<string, RigBoneLike | undefined>;
     rest?: Record<string, RigBoneRest | undefined>;
+    animationClips?: Record<string, AnimationClip> | null;
   };
 };
 
-export type RigBoneLike = {
-  rotation: Record<string, number>;
-  position: Record<string, number>;
-  scale?: Record<string, number>;
-};
-
-export type RigBoneRest = {
-  x?: number;
-  y?: number;
-  z?: number;
-  px?: number;
-  py?: number;
-  pz?: number;
-  sx?: number;
-  sy?: number;
-  sz?: number;
-};
+export type { RigBoneLike, RigBoneRest } from "./AnimationPose";
 
 export type LocalAnimationState = {
   time: number;
   bones: Record<string, RigBoneLike | undefined>;
   rest: Record<string, RigBoneRest | undefined>;
+  animationClips?: Record<string, AnimationClip> | null;
 };
 
 export type LocalAnimationOptions = {
@@ -46,6 +43,7 @@ export type LocalAnimationOptions = {
   moving: boolean;
   grounded: boolean;
   climbing: boolean;
+  verticalVelocity?: number;
 };
 
 export type FootIkState = {
@@ -79,6 +77,7 @@ export type LocalFootIkOptions = {
 };
 
 export class AnimationService {
+  private readonly clips = new Map<string, AnimationClip>();
   private footIk: FootIkConfig = {
     enabled: false,
     maxPelvisOffset: 0.45,
@@ -88,9 +87,36 @@ export class AnimationService {
   };
   private readonly localFootIkState: FootIkState = createFootIkState();
 
+  constructor() {
+    for (const slot of DEFAULT_ANIMATION_SLOTS) this.clips.set(slot, applyDefaultAnimationPose);
+  }
+
+  registerClip(slot: string, clip: AnimationClip): void {
+    const key = String(slot || "").trim();
+    if (!key) return;
+    this.clips.set(key, clip);
+  }
+
+  unregisterClip(slot: string): boolean {
+    const key = String(slot || "").trim();
+    if (!key) return false;
+    if (DEFAULT_ANIMATION_SLOTS.includes(key as never)) {
+      this.clips.set(key, applyDefaultAnimationPose);
+      return true;
+    }
+    return this.clips.delete(key);
+  }
+
+  getAnimationSet(): { slots: string[]; defaultSlots: string[] } {
+    return {
+      slots: [...this.clips.keys()],
+      defaultSlots: [...DEFAULT_ANIMATION_SLOTS]
+    };
+  }
+
   setFootIk(config: Partial<FootIkConfig>): void {
     const next = { ...this.footIk, ...config };
-    next.enabled = Boolean(next.enabled && this.experimentalFootIkEnabled());
+    next.enabled = Boolean(next.enabled && !this.footIkDisabled());
     this.footIk = next;
   }
 
@@ -105,14 +131,16 @@ export class AnimationService {
   animateLocal(state: LocalAnimationState, options: LocalAnimationOptions): void {
     const dt = Math.max(0, Number(options.dt) || 0);
     state.time = Number(state.time || 0) + dt;
-    const mode = options.climbing
+    const slot = options.climbing
       ? "climb"
       : !options.grounded
-        ? "jump"
+        ? Number(options.verticalVelocity || 0) < -1
+          ? "fall"
+          : "jump"
         : options.moving
           ? "walk"
           : "idle";
-    animateRuntimePose(state.bones, state.rest, mode, state.time, dt, options.moving);
+    this.applyClip(state.bones, state.rest, slot, state.time, dt, options.moving, state.animationClips);
   }
 
   animateRuntimeRemote(remote: RuntimeRemoteAnimationTarget, dt: number): void {
@@ -120,13 +148,14 @@ export class AnimationService {
     const rest = remote.meshes?.rest;
     if (!bones || !rest) return;
     remote.animTime = Number(remote.animTime || 0) + dt;
-    animateRuntimePose(bones, rest, remote.anim, remote.animTime, dt, true);
+    this.applyClip(bones, rest, remote.anim, remote.animTime, dt, true, remote.meshes?.animationClips || remote.animationClips);
   }
 
   applyLocalFootIk(options: LocalFootIkOptions): FootIkState {
     const config = this.getFootIk();
     const physics = options.physics;
-    const physicsReady = physics?.snapshot?.().status === "ready";
+    const physicsStatus = physics?.snapshot?.().status;
+    const physicsReady = physicsStatus === "ready" || physicsStatus === "static";
     const canRaycast = typeof physics?.castRay === "function";
     if (!options.character || !options.grounded || !config.enabled || !physicsReady || !canRaycast) {
       this.resetFootIk(options.animation, options.dt, config.smoothing);
@@ -169,9 +198,9 @@ export class AnimationService {
     return this.getFootIkState();
   }
 
-  private experimentalFootIkEnabled(): boolean {
+  private footIkDisabled(): boolean {
     try {
-      return globalThis.localStorage?.getItem("vwebExperimentalFootIk") === "1";
+      return globalThis.localStorage?.getItem("vwebFootIkDisabled") === "1";
     } catch {
       return false;
     }
@@ -192,6 +221,20 @@ export class AnimationService {
     state.rightScale = applyLegVerticalOffset(animation, animation.bones.Right_Leg, state.rightY, axis, 5);
     if (animation.bones.Torso) applyBoneVerticalOffset(animation, animation.bones.Torso, state.pelvisY, axis);
   }
+
+  private applyClip(
+    bones: Record<string, RigBoneLike | undefined>,
+    rest: Record<string, RigBoneRest | undefined>,
+    slot: RuntimeAnimationSlot | undefined,
+    time: number,
+    dt: number,
+    moving: boolean,
+    overrides?: Record<string, AnimationClip> | null
+  ): void {
+    const normalized = normalizeAnimationSlot(slot, moving);
+    const clip = overrides?.[String(normalized)] || this.clips.get(String(normalized)) || this.clips.get("idle") || applyDefaultAnimationPose;
+    clip({ bones, rest, slot: normalized, time, dt, moving });
+  }
 }
 
 function createFootIkState(): FootIkState {
@@ -207,96 +250,6 @@ function createFootIkState(): FootIkState {
     rightScale: 1,
     maxLegExtension: 1.35
   };
-}
-
-function animateRuntimePose(
-  bones: Record<string, RigBoneLike | undefined>,
-  rest: Record<string, RigBoneRest | undefined>,
-  animation: RuntimeRemoteAnimation | undefined,
-  time: number,
-  dt: number,
-  climbMoving: boolean
-): void {
-  const sp = 12;
-  const t = Number(time || 0);
-
-  if (animation === "climb") {
-    const grip = climbMoving ? Math.sin(t * 6) * 0.15 : 0;
-    const kick = climbMoving ? Math.sin(t * 6) * 0.3 : 0;
-    setBoneRotation(bones, rest, "Left_Arm", "x", -Math.PI * 0.75 + grip, 10, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "x", -Math.PI * 0.75 - grip, 10, dt);
-    setBoneRotation(bones, rest, "Left_Arm", "z", 0.35, 10, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "z", -0.35, 10, dt);
-    setBoneRotation(bones, rest, "Left_Leg", "x", 0.3 + kick, 10, dt);
-    setBoneRotation(bones, rest, "Right_Leg", "x", 0.3 - kick, 10, dt);
-    setBoneRotation(bones, rest, "Torso", "x", -0.15, 10, dt);
-    setBoneRotation(bones, rest, "Torso", "z", 0, 10, dt);
-    setBonePositionY(bones, rest, "Left_Arm", 0.5, 10, dt);
-    setBonePositionY(bones, rest, "Right_Arm", 0.5, 10, dt);
-  } else if (animation === "jump") {
-    setBoneRotation(bones, rest, "Left_Leg", "x", 0, sp, dt);
-    setBoneRotation(bones, rest, "Right_Leg", "x", 0, sp, dt);
-    setBoneRotation(bones, rest, "Left_Arm", "x", -Math.PI, sp, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "x", -Math.PI, sp, dt);
-    setBoneRotation(bones, rest, "Left_Arm", "z", 0, sp, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "z", 0, sp, dt);
-    setBoneRotation(bones, rest, "Torso", "x", 0, sp, dt);
-    setBonePositionY(bones, rest, "Left_Arm", -0.75, sp, dt);
-    setBonePositionY(bones, rest, "Right_Arm", -0.75, sp, dt);
-  } else if (animation === "walk") {
-    const swing = Math.sin(t * 2.8 * Math.PI);
-    setBoneRotation(bones, rest, "Left_Leg", "x", swing * 1.0, sp, dt);
-    setBoneRotation(bones, rest, "Right_Leg", "x", -swing * 1.0, sp, dt);
-    setBoneRotation(bones, rest, "Left_Arm", "x", -swing * 0.8, sp, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "x", swing * 0.8, sp, dt);
-    setBoneRotation(bones, rest, "Left_Arm", "z", 0.05, sp, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "z", -0.05, sp, dt);
-    setBoneRotation(bones, rest, "Torso", "x", 0.03, sp, dt);
-    setBoneRotation(bones, rest, "Torso", "z", 0, sp, dt);
-    setBonePositionY(bones, rest, "Left_Arm", 0, sp, dt);
-    setBonePositionY(bones, rest, "Right_Arm", 0, sp, dt);
-  } else {
-    const breathe = Math.sin(t * 1.2) * 0.015;
-    setBoneRotation(bones, rest, "Left_Leg", "x", 0, sp, dt);
-    setBoneRotation(bones, rest, "Right_Leg", "x", 0, sp, dt);
-    setBoneRotation(bones, rest, "Left_Arm", "x", 0, sp, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "x", 0, sp, dt);
-    setBoneRotation(bones, rest, "Left_Arm", "z", 0.1 + breathe, sp, dt);
-    setBoneRotation(bones, rest, "Right_Arm", "z", -0.1 - breathe, sp, dt);
-    setBoneRotation(bones, rest, "Torso", "x", breathe, sp, dt);
-    setBoneRotation(bones, rest, "Torso", "z", 0, sp, dt);
-    setBonePositionY(bones, rest, "Left_Arm", 0, sp, dt);
-    setBonePositionY(bones, rest, "Right_Arm", 0, sp, dt);
-  }
-}
-
-function setBoneRotation(
-  bones: Record<string, RigBoneLike | undefined>,
-  rest: Record<string, RigBoneRest | undefined>,
-  name: string,
-  axis: string,
-  target: number,
-  speed: number,
-  dt: number
-): void {
-  const bone = bones[name];
-  if (!bone) return;
-  const restValue = Number(rest[name]?.[axis as keyof RigBoneRest] ?? 0);
-  bone.rotation[axis] = lerp(Number(bone.rotation[axis] || 0), restValue + target, Math.min(1, speed * dt));
-}
-
-function setBonePositionY(
-  bones: Record<string, RigBoneLike | undefined>,
-  rest: Record<string, RigBoneRest | undefined>,
-  name: string,
-  offset: number,
-  speed: number,
-  dt: number
-): void {
-  const bone = bones[name];
-  if (!bone) return;
-  const restY = Number(rest[name]?.py ?? 0);
-  bone.position.y = lerp(Number(bone.position.y || 0), restY + offset, Math.min(1, speed * dt));
 }
 
 function footIkGroundOffset(sample: { hit: boolean; groundY: number }, footY: number, maxOffset: number): number {

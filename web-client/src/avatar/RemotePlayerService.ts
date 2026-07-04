@@ -2,6 +2,7 @@ import type { NativeAvatarState } from "./AvatarService";
 import { RemoteAvatarProxyService } from "./remote/RemoteAvatarProxyService";
 import { RemoteNameLabelService } from "./remote/RemoteNameLabelService";
 import { RemoteRenderBudgetService, syncRemoteProxyTransform } from "./remote/RemoteRenderBudgetService";
+import { runtimeBoneAliases } from "./rig/RigBoneAliases";
 import type {
   RemoteAvatarContext,
   RemotePlayerMeshes,
@@ -91,8 +92,7 @@ export class RemotePlayerService {
     group.traverse((node) => {
       if (!isBone(node)) return;
       const bone = node as RigBone;
-      bones[bone.name || ""] = bone;
-      bones[boneAlias(bone.name)] = bone;
+      for (const alias of runtimeBoneAliases(bone.name)) bones[alias] = bone;
     });
 
     const meshes: RemotePlayerMeshes = {
@@ -257,9 +257,12 @@ export class RemotePlayerService {
     const toRemove: RuntimeObject3D[] = [];
     clone.traverse((object) => {
       if (/Overlay$/.test(object.name || "")) toRemove.push(object);
+      if (isRuntimeUgcObject(object)) toRemove.push(object);
       if (object.userData) delete object.userData.vwebModernAvatarMaterials;
     });
-    for (const object of toRemove) object.parent?.remove?.(object);
+    for (const object of uniqueObjects(toRemove)) {
+      object.parent?.remove?.(object);
+    }
 
     clone.traverse((object) => {
       if (!object.isMesh) return;
@@ -279,14 +282,12 @@ export class RemotePlayerService {
     source.traverse((node) => {
       if (!isBone(node)) return;
       const bone = node as RigBone;
-      sourceBones[bone.name || ""] = bone;
-      sourceBones[boneAlias(bone.name)] = bone;
+      for (const alias of runtimeBoneAliases(bone.name)) sourceBones[alias] = bone;
     });
     clone.traverse((node) => {
       if (!isBone(node)) return;
       const bone = node as RigBone;
-      cloneBones[bone.name || ""] = bone;
-      cloneBones[boneAlias(bone.name)] = bone;
+      for (const alias of runtimeBoneAliases(bone.name)) cloneBones[alias] = bone;
     });
 
     const sourceMeshes: RuntimeObject3D[] = [];
@@ -300,7 +301,7 @@ export class RemotePlayerService {
     sourceMeshes.forEach((sourceMesh, index) => {
       const cloneMesh = cloneMeshes[index];
       if (!cloneMesh?.skeleton || !sourceMesh.skeleton || !sourceMesh.bindMatrix) return;
-      const bones = sourceMesh.skeleton.bones.map((bone) => cloneBones[bone.name || ""] || cloneBones[boneAlias(bone.name)] || bone);
+      const bones = sourceMesh.skeleton.bones.map((bone) => findAliasedBone(cloneBones, bone.name) || bone);
       const skeleton = new THREE.Skeleton(bones, sourceMesh.skeleton.boneInverses.map((matrix) => matrix.clone()));
       (cloneMesh as { skeleton: unknown }).skeleton = skeleton;
       cloneMesh.bind?.(skeleton, sourceMesh.bindMatrix.clone());
@@ -310,7 +311,7 @@ export class RemotePlayerService {
     clone.traverse((node) => {
       if (!isBone(node)) return;
       const bone = node as RigBone;
-      const pose = rest[bone.name || ""] || rest[boneAlias(bone.name)];
+      const pose = findAliasedRest(rest, bone.name);
       if (!pose) return;
       bone.rotation.set?.(Number(pose.x || 0), Number(pose.y || 0), Number(pose.z || 0));
       bone.position.y = Number(pose.py || 0);
@@ -423,13 +424,23 @@ function isBone(node: RuntimeObject3D | null | undefined): boolean {
   return Boolean(node?.isBone || node?.type === "Bone");
 }
 
-function boneAlias(name: unknown): string {
-  return String(name || "").replace(/\s+/g, "_");
+function findAliasedBone(bones: Record<string, RigBone>, name: unknown): RigBone | undefined {
+  for (const alias of runtimeBoneAliases(name)) {
+    if (bones[alias]) return bones[alias];
+  }
+  return undefined;
+}
+
+function findAliasedRest(rest: Record<string, RigBoneRest>, name: unknown): RigBoneRest | undefined {
+  for (const alias of runtimeBoneAliases(name)) {
+    if (rest[alias]) return rest[alias];
+  }
+  return undefined;
 }
 
 function remoteAnimationIntervalMs(anim: string): number {
-  if (anim === "walk" || anim === "jump" || anim === "climb") return 1000 / 30;
-  return 1000 / 12;
+  if (anim === "idle" || anim === "walk" || anim === "jump" || anim === "fall" || anim === "climb" || anim === "climb_idle") return 1000 / 30;
+  return 1000 / 20;
 }
 
 function withRemoteAvatarContext(avatar: NativeAvatarState, id: unknown, username: unknown): RemoteAvatarContext {
@@ -439,4 +450,14 @@ function withRemoteAvatarContext(avatar: NativeAvatarState, id: unknown, usernam
     playerId: id,
     username: String(username || "").trim()
   };
+}
+
+function isRuntimeUgcObject(object: RuntimeObject3D): boolean {
+  const kind = String(object.userData?.vwebRuntimeKind || "");
+  return kind === "avatar-ugc" || kind === "avatar-ugc-item" || kind === "avatar-ugc-particles" || kind === "avatar-ugc-particle"
+    || /^VWEB_UGC_/i.test(String(object.name || ""));
+}
+
+function uniqueObjects(objects: RuntimeObject3D[]): RuntimeObject3D[] {
+  return [...new Set(objects)];
 }

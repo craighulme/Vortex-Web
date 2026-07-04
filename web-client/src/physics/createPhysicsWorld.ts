@@ -67,12 +67,20 @@ class StaticPhysicsWorld implements PhysicsWorld {
     this.lastSyncSource = signatureFor(parsed);
   }
 
-  castRay(): null {
-    return null;
+  castRay(origin: [number, number, number], direction: [number, number, number], maxDistance: number): RayHit | null {
+    const dy = Number(direction[1] || 0);
+    if (dy >= -0.5 || maxDistance <= 0) return null;
+    let best: RayHit | null = null;
+    for (const [handle, collider] of this.colliders) {
+      const hit = raycastStaticBoxTop(handle, collider, origin, maxDistance);
+      if (!hit) continue;
+      if (!best || hit.distance < best.distance) best = hit;
+    }
+    return best;
   }
 
-  raycast(): null {
-    return null;
+  raycast(origin: [number, number, number], direction: [number, number, number], maxDistance: number): RayHit | null {
+    return this.castRay(origin, direction, maxDistance);
   }
 
   debugRender(): null {
@@ -92,6 +100,37 @@ class StaticPhysicsWorld implements PhysicsWorld {
   dispose(): void {
     this.colliders.clear();
   }
+}
+
+function raycastStaticBoxTop(
+  handle: string,
+  collider: StaticBoxCollider,
+  origin: [number, number, number],
+  maxDistance: number
+): RayHit | null {
+  const [cx, cy, cz] = collider.center;
+  const [sx, sy, sz] = collider.size;
+  const halfX = Math.abs(Number(sx) || 0) / 2;
+  const halfY = Math.abs(Number(sy) || 0) / 2;
+  const halfZ = Math.abs(Number(sz) || 0) / 2;
+  if (halfX <= 0 || halfY <= 0 || halfZ <= 0) return null;
+  const minX = Number(cx) - halfX;
+  const maxX = Number(cx) + halfX;
+  const minZ = Number(cz) - halfZ;
+  const maxZ = Number(cz) + halfZ;
+  const x = Number(origin[0]);
+  const y = Number(origin[1]);
+  const z = Number(origin[2]);
+  if (x < minX || x > maxX || z < minZ || z > maxZ) return null;
+  const top = Number(cy) + halfY;
+  const distance = y - top;
+  if (distance < -0.001 || distance > maxDistance) return null;
+  return {
+    collider: handle,
+    point: [x, top, z],
+    normal: [0, 1, 0],
+    distance
+  };
 }
 
 class RapierPhysicsWorld implements PhysicsWorld {
