@@ -79,9 +79,17 @@ export type ScriptScreenPoint = {
 export type ScriptRayHit = {
   hit: boolean;
   point?: ScriptVector3;
+  position?: ScriptVector3;
   normal?: ScriptVector3;
   distance?: number;
   collider?: unknown;
+};
+
+export type ScriptInputEvent = {
+  type: "click";
+  button: "left" | "middle" | "right";
+  x: number;
+  y: number;
 };
 
 export type ScriptRuntimeContext = {
@@ -132,8 +140,10 @@ export class ScriptRuntime {
   private running = false;
   private readonly logEntries: ScriptLogEntry[] = [];
   private readonly ownedWorldParts = new Set<string>();
+  private readonly worldMarkers = new Map<string, ScriptWorldPartInfo>();
   private readonly playerTransformOverrides = new Map<string, ScriptTransform>();
   private readonly sessions = new Map<string, LuaScriptSession>();
+  private inputEventsAttached = false;
 
   constructor(
     private readonly events: EventBus<RuntimeEventMap>,
@@ -144,6 +154,7 @@ export class ScriptRuntime {
     this.context = context;
     this.store = new LocalScriptStore(context.storage);
     this.enabled = context.storage.getItem("vwebLuaToolsEnabled") === "1";
+    this.attachInputEvents(context.documentRef);
     return this;
   }
 
@@ -324,6 +335,16 @@ export class ScriptRuntime {
         context.documentRef.body.classList.toggle("vw-lua-click-to-walk", enabled === true);
         return enabled === true;
       },
+      "cursor.setWorldMarker": (input: unknown) => {
+        const normalized = normalizeWorldPartInput(input);
+        const record = input && typeof input === "object" ? input as Record<string, unknown> : {};
+        const id = String(record.id || "cursor").trim() || "cursor";
+        const marker = context.setWorldMarker(id, normalized);
+        this.ownedWorldParts.add(marker.id);
+        this.worldMarkers.set(id, marker);
+        return marker;
+      },
+      "cursor.worldMarker": (id: unknown) => this.worldMarkers.get(String(id || "cursor").trim() || "cursor") ?? null,
       "camera.screenPointToRay": (x: unknown, y: unknown) => context.screenPointToRay(x, y),
       "camera.worldToScreen": (point: unknown) => context.worldToScreen(point),
       "input.mousePosition": () => context.getMousePosition(),
@@ -342,11 +363,18 @@ export class ScriptRuntime {
         return part;
       },
       "world.setMarker": (id: unknown, input: unknown) => {
-        const part = context.setWorldMarker(id, normalizeWorldPartInput(input));
-        this.ownedWorldParts.add(part.id);
-        return part;
+        const key = String(id || "marker").trim() || "marker";
+        const marker = context.setWorldMarker(key, normalizeWorldPartInput(input));
+        this.ownedWorldParts.add(marker.id);
+        this.worldMarkers.set(key, marker);
+        return marker;
       },
-      "world.clearMarker": (id: unknown) => context.clearWorldMarker(id),
+      "world.marker": (id: unknown) => this.worldMarkers.get(String(id || "marker").trim() || "marker") ?? null,
+      "world.clearMarker": (id: unknown) => {
+        const key = String(id || "marker").trim() || "marker";
+        this.worldMarkers.delete(key);
+        return context.clearWorldMarker(key);
+      },
       "world.remove": (id: unknown) => {
         const value = String(id || "").trim();
         if (!value || !this.ownedWorldParts.has(value)) return false;
@@ -385,6 +413,28 @@ export class ScriptRuntime {
     }
   }
 
+  dispatchInput(event: ScriptInputEvent): void {
+    if (!this.sessions.size || !this.isEnabled()) return;
+    for (const [id, session] of this.sessions) {
+      void session.input(event).catch((error) => {
+        this.log("error", `[${id}] ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
+  }
+
+  private attachInputEvents(documentRef: Document): void {
+    if (this.inputEventsAttached) return;
+    this.inputEventsAttached = true;
+    documentRef.addEventListener("pointerdown", (event) => {
+      this.dispatchInput({
+        type: "click",
+        button: pointerButtonName(event.button),
+        x: event.clientX,
+        y: event.clientY
+      });
+    });
+  }
+
   private playerKey(query: unknown): string {
     const raw = String(query ?? "me").trim().toLowerCase();
     return raw || "me";
@@ -395,6 +445,12 @@ export class ScriptRuntime {
     if (this.logEntries.length > 200) this.logEntries.splice(0, this.logEntries.length - 200);
     this.diagnostics[level === "error" ? "warn" : "info"]?.("script.lua", { level, message });
   }
+}
+
+function pointerButtonName(button: number): ScriptInputEvent["button"] {
+  if (button === 1) return "middle";
+  if (button === 2) return "right";
+  return "left";
 }
 
 function readTransform(root: ScriptPlayerRoot | null): ScriptTransform | null {

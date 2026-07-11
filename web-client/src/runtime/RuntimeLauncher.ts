@@ -294,10 +294,12 @@ VortexRuntime.scripting.configure({
         return [Number(position.x) || 0, Number(position.y) || 0, Number(position.z) || 0];
     },
     screenPointToRay: (x, y) => {
+        const screenX = typeof x === "object" && x !== null ? readScriptProperty(x, "x", 1) : x;
+        const screenY = typeof x === "object" && x !== null ? readScriptProperty(x, "y", 2) : y;
         const width = window.innerWidth || 1;
         const height = window.innerHeight || 1;
-        const nx = (Number(x) / width) * 2 - 1;
-        const ny = -(Number(y) / height) * 2 + 1;
+        const nx = (Number(screenX) / width) * 2 - 1;
+        const ny = -(Number(screenY) / height) * 2 + 1;
         const origin = new THREE.Vector3();
         const far = new THREE.Vector3(nx, ny, 1);
         camera.getWorldPosition?.(origin);
@@ -331,6 +333,7 @@ VortexRuntime.scripting.configure({
         return {
             hit: true,
             point: hit.point,
+            position: hit.point,
             normal: hit.normal,
             distance: hit.distance,
             collider: hit.collider,

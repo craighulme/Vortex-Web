@@ -21,11 +21,26 @@ export type LuaSessionOptions = LuaRunOptions & {
 const LUA_PRELUDE = `
 vweb = vweb or {}
 local raw = __vweb_api
+local frameCallbacks = {}
+local inputCallbacks = {}
+local clickCallbacks = {}
 
 local function call(name, ...)
   local fn = raw[name]
   if fn == nil then error("missing vweb api: " .. name, 2) end
   return fn(...)
+end
+
+local function firstArg(selfOrInput, maybeInput)
+  if maybeInput ~= nil then return maybeInput end
+  return selfOrInput
+end
+
+local function screenArgs(x, y)
+  if type(x) == "table" and y == nil then
+    return x.x or x[1] or 0, x.y or x[2] or 0
+  end
+  return x or 0, y or 0
 end
 
 vweb.players = {
@@ -43,17 +58,33 @@ vweb.cursor = {
   setMode = function(mode) return call("cursor.setMode", mode) end,
   setImage = function(options) return call("cursor.setImage", options or {}) end,
   clear = function() return call("cursor.clear") end,
-  setClickToWalk = function(enabled) return call("cursor.setClickToWalk", enabled == true) end
+  setClickToWalk = function(enabled) return call("cursor.setClickToWalk", enabled == true) end,
+  setWorldMarker = function(marker) return call("cursor.setWorldMarker", marker or {}) end,
+  worldMarker = function(id) return call("cursor.worldMarker", id or "cursor") end,
+  clearWorldMarker = function(id) return call("world.clearMarker", id or "cursor") end
 }
 
 vweb.camera = {
-  screenPointToRay = function(x, y) return call("camera.screenPointToRay", x, y) end,
+  screenPointToRay = function(x, y)
+    local sx, sy = screenArgs(x, y)
+    return call("camera.screenPointToRay", sx, sy)
+  end,
   worldToScreen = function(point) return call("camera.worldToScreen", point or {}) end
 }
 
 vweb.input = {
   mousePosition = function() return call("input.mousePosition") end,
-  isDown = function(code) return call("input.isDown", code) end
+  isDown = function(code) return call("input.isDown", code) end,
+  onClick = function(fn)
+    if type(fn) ~= "function" then error("vweb.input.onClick expects a function", 2) end
+    table.insert(clickCallbacks, fn)
+    return #clickCallbacks
+  end,
+  onInput = function(fn)
+    if type(fn) ~= "function" then error("vweb.input.onInput expects a function", 2) end
+    table.insert(inputCallbacks, fn)
+    return #inputCallbacks
+  end
 }
 
 vweb.physics = {
@@ -64,10 +95,10 @@ local function makeLayer(name)
   return {
     info = function() return call("ui.layer", name) end,
     clear = function() return call("ui.clear", name) end,
-    text = function(input) return call("ui.text", name, input or {}) end,
-    rect = function(input) return call("ui.rect", name, input or {}) end,
-    image = function(input) return call("ui.image", name, input or {}) end,
-    button = function(input) return call("ui.button", name, input or {}) end
+    text = function(selfOrInput, maybeInput) return call("ui.text", name, firstArg(selfOrInput, maybeInput) or {}) end,
+    rect = function(selfOrInput, maybeInput) return call("ui.rect", name, firstArg(selfOrInput, maybeInput) or {}) end,
+    image = function(selfOrInput, maybeInput) return call("ui.image", name, firstArg(selfOrInput, maybeInput) or {}) end,
+    button = function(selfOrInput, maybeInput) return call("ui.button", name, firstArg(selfOrInput, maybeInput) or {}) end
   }
 end
 
@@ -80,6 +111,7 @@ vweb.draw = {
   text = function(input) return call("ui.text", "draw", input or {}) end,
   rect = function(input) return call("ui.rect", "draw", input or {}) end,
   image = function(input) return call("ui.image", "draw", input or {}) end,
+  button = function(input) return call("ui.button", "draw", input or {}) end,
   clear = function() return call("ui.clear", "draw") end
 }
 
@@ -87,14 +119,47 @@ vweb.world = {
   localPosition = function() return call("world.localPosition") end,
   spawnPart = function(part) return call("world.spawnPart", part or {}) end,
   setMarker = function(id, part) return call("world.setMarker", id, part or {}) end,
+  marker = function(id) return call("world.marker", id or "marker") end,
   clearMarker = function(id) return call("world.clearMarker", id) end,
   remove = function(id) return call("world.remove", id) end,
   clearMine = function() return call("world.clearMine") end
 }
 
+vweb.events = {
+  onFrame = function(fn)
+    if type(fn) ~= "function" then error("vweb.events.onFrame expects a function", 2) end
+    table.insert(frameCallbacks, fn)
+    return #frameCallbacks
+  end,
+  onInput = function(fn)
+    if type(fn) ~= "function" then error("vweb.events.onInput expects a function", 2) end
+    table.insert(inputCallbacks, fn)
+    return #inputCallbacks
+  end
+}
+
+vweb.render = {
+  onFrame = vweb.events.onFrame,
+  onRender2D = vweb.events.onFrame
+}
+
 vweb.debug = {
   snapshot = function() return call("debug.snapshot") end
 }
+
+function __vweb_dispatchUpdate(dt)
+  call("ui.clear", "draw")
+  if type(onUpdate) == "function" then onUpdate(dt) end
+  for _, fn in ipairs(frameCallbacks) do fn(dt) end
+end
+
+function __vweb_dispatchInput(event)
+  if type(onInput) == "function" then onInput(event) end
+  for _, fn in ipairs(inputCallbacks) do fn(event) end
+  if event and event.type == "click" then
+    for _, fn in ipairs(clickCallbacks) do fn(event.button or "left", event) end
+  end
+end
 `;
 
 export class LuaAdapter {
@@ -134,10 +199,15 @@ export class LuaScriptSession {
     if (this.disposed || this.updating) return;
     this.updating = true;
     try {
-      await this.call("onUpdate", dt);
+      await this.call("__vweb_dispatchUpdate", dt);
     } finally {
       this.updating = false;
     }
+  }
+
+  async input(event: Record<string, unknown>): Promise<void> {
+    if (this.disposed) return;
+    await this.call("__vweb_dispatchInput", event);
   }
 
   async call(name: string, ...args: unknown[]): Promise<unknown> {

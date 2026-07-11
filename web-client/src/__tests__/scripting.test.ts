@@ -52,6 +52,8 @@ describe("script runtime contracts", () => {
         "cursor.setImage": () => ({ mode: "image" }),
         "cursor.clear": () => ({ mode: "default" }),
         "cursor.setClickToWalk": () => false,
+        "cursor.setWorldMarker": () => ({ id: "cursor", position: [1, 1, 1], size: [4, 0.1, 4] }),
+        "cursor.worldMarker": () => ({ id: "cursor", position: [1, 1, 1], size: [4, 0.1, 4] }),
         "camera.screenPointToRay": () => ({ origin: [0, 0, 0], direction: [0, 0, -1] }),
         "camera.worldToScreen": () => ({ x: 10, y: 20, z: 0.5, visible: true }),
         "input.mousePosition": () => ({ x: 320, y: 240 }),
@@ -66,6 +68,7 @@ describe("script runtime contracts", () => {
         "world.localPosition": () => [0, 0, 0],
         "world.spawnPart": () => ({ id: "lua-part", position: [1, 2, 3], size: [4, 1, 4] }),
         "world.setMarker": () => ({ id: "marker", position: [1, 1, 1], size: [4, 0.1, 4] }),
+        "world.marker": () => ({ id: "marker", position: [1, 1, 1], size: [4, 0.1, 4] }),
         "world.clearMarker": () => true,
         "world.remove": () => true,
         "world.clearMine": () => 0,
@@ -91,18 +94,25 @@ describe("script runtime contracts", () => {
       source: [
         "function onStart() print('started') end",
         "function onUpdate(dt) print('tick', dt) end",
+        "vweb.render.onFrame(function(dt) print('frame', dt) end)",
+        "vweb.input.onClick(function(button) print('click', button) end)",
         "function onDestroy() print('destroyed') end"
       ].join("\n"),
-      api: {},
+      api: {
+        "ui.clear": () => 0
+      },
       log: (_level, message) => messages.push(message),
       timeoutMs: 1000
     });
 
     await session.update(0.016);
+    await session.input({ type: "click", button: "left", x: 100, y: 120 });
     await session.dispose();
 
     expect(messages).toContain("started");
     expect(messages).toContain("tick 0.016");
+    expect(messages).toContain("frame 0.016");
+    expect(messages).toContain("click left");
     expect(messages).toContain("destroyed");
   });
 });

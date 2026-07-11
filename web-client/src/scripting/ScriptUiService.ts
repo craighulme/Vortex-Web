@@ -11,6 +11,7 @@ export type ScriptUiElementInput = {
   size?: unknown;
   opacity?: unknown;
   align?: unknown;
+  onClick?: unknown;
 };
 
 export type ScriptUiElementInfo = {
@@ -84,6 +85,19 @@ export class ScriptUiService {
     this.applyCommonStyle(element, input);
     element.classList.add("vw-script-ui-button");
     element.style.pointerEvents = "auto";
+    const callback = typeof input.onClick === "function" ? input.onClick : null;
+    element.onclick = callback
+      ? (event) => {
+          event.stopPropagation();
+          void Promise.resolve(callback({
+            id: element.dataset.vwebScriptId || "",
+            layer: sanitizeId(layerName || "hud"),
+            x: event.clientX,
+            y: event.clientY,
+            button: pointerButtonName(event.button)
+          })).catch(() => {});
+        }
+      : null;
     return this.describe(layerName, "button", element);
   }
 
@@ -192,4 +206,10 @@ function resolveUiUrl(value: unknown, baseUrl: string): string {
 function cssEscape(value: string): string {
   if (typeof CSS !== "undefined" && typeof CSS.escape === "function") return CSS.escape(value);
   return value.replace(/["\\]/g, "\\$&");
+}
+
+function pointerButtonName(button: number): string {
+  if (button === 1) return "middle";
+  if (button === 2) return "right";
+  return "left";
 }
