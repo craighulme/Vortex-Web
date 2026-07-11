@@ -41,7 +41,9 @@ import type { MultiplayerBridgeService } from "../network/bridge/MultiplayerBrid
 import type { PacketDebugService } from "../network/PacketDebugService";
 import type { SlimService } from "../optimization/SlimService";
 import type { PhysicsWorld } from "../physics/types";
+import type { ScriptExplorerService } from "../scripting/ScriptExplorerService";
 import type { ScriptRuntime } from "../scripting/ScriptRuntime";
+import type { ScriptUiService } from "../scripting/ScriptUiService";
 import type { ClientPhysicsSandbox } from "../sandbox/ClientPhysicsSandbox";
 import type { CoreHudService } from "../ui/CoreHudService";
 import type { HudRuntimeSetupService } from "../ui/HudRuntimeSetupService";
@@ -144,6 +146,8 @@ export type VortexRuntime = {
   remoteSession: RemoteSessionService;
   animation: AnimationService;
   scripting: ScriptRuntime;
+  scriptExplorer: ScriptExplorerService;
+  scriptUi: ScriptUiService;
   sandbox: ClientPhysicsSandbox;
   slim: SlimService;
   multiplayer: MultiplayerService;

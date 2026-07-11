@@ -14,6 +14,7 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.19.3"
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "wasmoon": "^1.16.0"
   }
 }

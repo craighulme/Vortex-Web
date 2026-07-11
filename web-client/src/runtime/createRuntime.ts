@@ -50,6 +50,8 @@ import { SceneSettingsService } from "../renderer/SceneSettingsService";
 import { ShadowRuntimeService } from "../renderer/ShadowRuntimeService";
 import { ClientPhysicsSandbox } from "../sandbox/ClientPhysicsSandbox";
 import { ScriptRuntime } from "../scripting/ScriptRuntime";
+import { ScriptExplorerService } from "../scripting/ScriptExplorerService";
+import { ScriptUiService } from "../scripting/ScriptUiService";
 import { AssetStreamService } from "../streaming/AssetStreamService";
 import { ChatCommandService } from "../ui/ChatCommandService";
 import { ChatService } from "../ui/ChatService";
@@ -102,6 +104,7 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
   const streaming = new AssetStreamService(diagnostics);
   const avatarEquipment = new AvatarEquipmentService();
   const players = new PlayerService();
+  const scripting = new ScriptRuntime(events, diagnostics);
   players.attachRemoteSession(remoteSession);
   animation.setFootIk({
     enabled: true,
@@ -167,7 +170,13 @@ export function createVortexRuntime(options: RuntimeOptions): VortexRuntime {
     remotePlayers: new RemotePlayerService(),
     remoteSession,
     animation,
-    scripting: new ScriptRuntime(events, diagnostics),
+    scripting,
+    scriptExplorer: new ScriptExplorerService({
+      documentRef: options.document,
+      windowRef: options.window,
+      scripting
+    }),
+    scriptUi: new ScriptUiService(options.document, options.window),
     sandbox: new ClientPhysicsSandbox(),
     slim: new SlimService(),
     multiplayer,

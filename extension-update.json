@@ -1,19 +1,16 @@
 {
-  "version": "0.7.0",
-  "date": "2026-07-03",
+  "version": "0.8.0",
+  "date": "2026-07-11",
   "url": "https://github.com/craighulme/Vortex-Web",
-  "title": "Vortex Web is now open to the public",
-  "summary": "Vortex Web is moving from a private experiment into something people can try, break, report issues for, and help improve. Some of the newer systems are still early, especially UGC Labs and theme editing.",
+  "title": "Lua tools arrive in Vortex Web",
+  "summary": "This update adds the first public build of Vortex Web Lua tooling, refreshes the license flow, and ships another round of runtime, UGC, theme, and multiplayer cleanup. Lua is early and license-gated, but this is the first step toward real local scripting and future game APIs.",
   "changelog": [
-    "Vortex Web is now intended for public testing. Expect bugs, but the project is ready for more people to try it and give feedback.",
-    "The old 2+2-style override setup has been reduced heavily. More of the client now runs through the newer Vortex Web runtime.",
-    "The game runtime has continued moving toward WebGPU, cleaner renderer settings, chunk visibility controls, diagnostics, and a less messy architecture.",
-    "The in-game UI has been reworked across chat, player list, settings, keybinds, graphics controls, and dev tools.",
-    "Site and in-game theming are now available in early form. This is still in development, but custom CSS, presets, and live theme experiments are in.",
-    "UGC Labs is now included in an early state, with a browser-based studio/store flow for testing accessories, particles, drafts, review, and local equip.",
-    "Avatar work now includes rig and animation groundwork for future accessories, animation packs, avatar upgrades, and web-user cosmetics.",
-    "Profile cosmetics have been improved, including badges, name gradients, nameplates, profile backgrounds, leaderboard styling, and chat name colouring.",
-    "Multiplayer and remote-player handling have had more cleanup around avatar textures, face overlays, UGC equipment sync, and runtime separation.",
-    "If you hit problems, please open a GitHub issue. Pull requests are welcome too, especially for fixes, UI polish, docs, and performance improvements."
+    "Added early Lua tooling behind the lua license feature. Press F2 in-game to open the Lua Explorer, save local scripts, run one-shot scripts, or start long-lived sessions.",
+    "Lua scripts now have a first version of the Vortex Web API for HUD layers, drawing, cursor helpers, raycasts, player transforms, local world markers, and local parts.",
+    "Updated the extension for the current Vortex Web license flow, including stronger account/session handling for public testing.",
+    "Continued runtime cleanup around WebGPU, chunk visibility, player handling, avatar rendering, and the newer service-based client.",
+    "UGC Labs and avatar equipment testing have had more work around drafts, review, particles, and local/web-user equipment.",
+    "Theme editing, profile cosmetics, chat names, player list styling, and settings UI have had another pass.",
+    "Please report bugs on GitHub, especially Lua issues, UGC publishing/loading problems, UI regressions, and performance drops."
   ]
 }

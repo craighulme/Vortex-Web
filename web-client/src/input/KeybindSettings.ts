@@ -3,6 +3,7 @@ export type KeybindAction =
   | "chatToggle"
   | "chatFocus"
   | "playerList"
+  | "scriptExplorer"
   | "moveForward"
   | "moveBackward"
   | "moveLeft"
@@ -22,6 +23,7 @@ export const DEFAULT_KEYBINDS: KeybindMap = {
   chatToggle: ["KeyH"],
   chatFocus: ["Slash"],
   playerList: ["Tab"],
+  scriptExplorer: ["F2"],
   moveForward: ["KeyW", "ArrowUp"],
   moveBackward: ["KeyS", "ArrowDown"],
   moveLeft: ["KeyA", "ArrowLeft"],

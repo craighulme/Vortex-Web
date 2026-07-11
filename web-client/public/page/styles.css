@@ -70,6 +70,76 @@ body.vw-menu-open {
     transform: rotate(-45deg) translate(3px, -3px);
 }
 
+body.vw-lua-cursor-classic #cursor {
+    width: 28px;
+    height: 28px;
+}
+
+body.vw-lua-cursor-classic #cursor::before {
+    border-width: 0 10px 20px 10px;
+    border-color: transparent transparent #111 transparent;
+    filter: drop-shadow(0 1px 0 rgba(255,255,255,0.75));
+}
+
+body.vw-lua-cursor-classic #cursor::after {
+    border-width: 0 7px 14px 7px;
+    border-color: transparent transparent #f4f4f4 transparent;
+}
+
+body.vw-script-cursor-image #cursor {
+    width: var(--vw-script-cursor-width, 32px);
+    height: var(--vw-script-cursor-height, 32px);
+    margin-left: calc(var(--vw-script-cursor-hotspot-x, 0px) * -1);
+    margin-top: calc(var(--vw-script-cursor-hotspot-y, 0px) * -1);
+    background-image: var(--vw-script-cursor-url);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+}
+
+body.vw-script-cursor-image #cursor::before,
+body.vw-script-cursor-image #cursor::after {
+    display: none;
+}
+
+#vw-script-ui-root {
+    position: fixed;
+    inset: 0;
+    z-index: 8500;
+    pointer-events: none;
+}
+
+.vw-script-ui-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.vw-script-ui-element {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: none;
+    font-family: Inter, Arial, sans-serif;
+    line-height: 1.25;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    white-space: pre-wrap;
+}
+
+.vw-script-ui-rect,
+.vw-script-ui-button {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.vw-script-ui-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(30, 41, 59, 0.78);
+    cursor: pointer;
+}
+
 #hud {
     position: fixed;
     inset: 0;
@@ -1247,6 +1317,167 @@ body.vw-menu-open #cursor {
     color: rgba(226,232,240,0.78);
     font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     white-space: pre-wrap;
+}
+
+.vw-script-explorer {
+    position: fixed;
+    inset: 0;
+    z-index: 22000;
+    background: rgba(2, 8, 16, 0.58);
+    backdrop-filter: blur(10px);
+    color: #f7fbff;
+    cursor: default;
+}
+
+.vw-script-shell {
+    position: absolute;
+    inset: clamp(20px, 4vw, 56px);
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    background: linear-gradient(180deg, rgba(25, 40, 52, 0.94), rgba(12, 22, 32, 0.94));
+    border: 1px solid rgba(205, 232, 255, 0.24);
+    border-radius: 14px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.42);
+    overflow: hidden;
+}
+
+.vw-script-header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(205, 232, 255, 0.14);
+}
+
+.vw-script-header h2 {
+    margin: 0;
+    font-size: 26px;
+}
+
+.vw-script-header p {
+    margin: 4px 0 0;
+    color: rgba(235, 246, 255, 0.72);
+}
+
+.vw-script-actions,
+.vw-script-toolbar,
+.vw-script-sidebar-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vw-script-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(244, 250, 255, 0.86);
+}
+
+.vw-script-sidebar {
+    padding: 16px;
+    border-right: 1px solid rgba(205, 232, 255, 0.14);
+    min-width: 0;
+}
+
+.vw-script-sidebar-head {
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.vw-script-list {
+    display: grid;
+    gap: 8px;
+}
+
+.vw-script-list button,
+.vw-script-actions button,
+.vw-script-toolbar button {
+    border: 1px solid rgba(220, 240, 255, 0.22);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.09);
+    color: inherit;
+    padding: 10px 12px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.vw-script-list button {
+    text-align: left;
+}
+
+.vw-script-list button.active,
+.vw-script-toolbar button.primary {
+    background: rgba(76, 140, 255, 0.3);
+    border-color: rgba(112, 170, 255, 0.62);
+}
+
+.vw-script-main {
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto minmax(100px, 22vh);
+    gap: 12px;
+    padding: 16px;
+}
+
+.vw-script-name {
+    display: grid;
+    gap: 6px;
+    color: rgba(235, 246, 255, 0.78);
+}
+
+.vw-script-name input,
+.vw-script-main textarea,
+.vw-script-output {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(220, 240, 255, 0.18);
+    border-radius: 10px;
+    background: rgba(3, 10, 18, 0.54);
+    color: #f7fbff;
+}
+
+.vw-script-name input {
+    padding: 10px 12px;
+}
+
+.vw-script-main textarea {
+    resize: none;
+    padding: 14px;
+    font: 14px/1.5 Consolas, "SFMono-Regular", monospace;
+}
+
+.vw-script-toolbar {
+    justify-content: flex-start;
+}
+
+.vw-script-toolbar span {
+    margin-left: auto;
+    color: rgba(235, 246, 255, 0.58);
+}
+
+.vw-script-output {
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    font: 12px/1.45 Consolas, "SFMono-Regular", monospace;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 840px) {
+    .vw-script-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .vw-script-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid rgba(205, 232, 255, 0.14);
+    }
 }
 
 .vw-menu-note {

@@ -13,7 +13,8 @@ const REQUESTED_FEATURES = [
     "noclip-command",
     "gravity-command",
     "airwalk-command",
-    "packet-debug"
+    "packet-debug",
+    "lua"
 ];
 const DEV_REQUESTED_FEATURES = [
     "avatar-spoof"
