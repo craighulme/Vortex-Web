@@ -1,0 +1,5 @@
+{
+  "runtime.version": "Lua 5.4",
+  "workspace.library": ["./types"],
+  "diagnostics.globals": ["vweb", "onStart", "onUpdate", "onDestroy", "onInput", "onChatMessage", "onChatSend"]
+}

@@ -125,11 +125,68 @@ body.vw-script-cursor-image #cursor::after {
     white-space: pre-wrap;
 }
 
+.vw-script-ui-line-batch {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
 .vw-script-ui-rect,
-.vw-script-ui-button {
+.vw-script-ui-button,
+.vw-script-ui-panel,
+.vw-script-ui-progress {
     border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.vw-script-ui-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.vw-script-ui-panel-title {
+    margin-bottom: 4px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.vw-script-ui-panel-text {
+    color: rgba(226, 244, 255, 0.82);
+    font-size: 0.9em;
+}
+
+.vw-script-ui-progress-fill {
+    height: 100%;
+    min-width: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 18px currentColor;
+    transition: width 120ms linear;
+}
+
+.vw-script-ui-progress-text {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
+}
+
+.vw-script-ui-chart {
+    color: #e0f2fe;
+}
+
+.vw-script-ui-chart-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .vw-script-ui-button {
@@ -138,6 +195,15 @@ body.vw-script-cursor-image #cursor::after {
     justify-content: center;
     background: rgba(30, 41, 59, 0.78);
     cursor: pointer;
+}
+
+.vw-script-ui-draggable {
+    cursor: grab;
+    user-select: none;
+}
+
+.vw-script-ui-draggable:active {
+    cursor: grabbing;
 }
 
 #hud {
@@ -1323,8 +1389,8 @@ body.vw-menu-open #cursor {
     position: fixed;
     inset: 0;
     z-index: 22000;
-    background: rgba(2, 8, 16, 0.58);
-    backdrop-filter: blur(10px);
+    background: rgba(2, 8, 16, 0.66);
+    backdrop-filter: blur(12px);
     color: #f7fbff;
     cursor: default;
 }
@@ -1333,13 +1399,18 @@ body.vw-menu-open #cursor {
     position: absolute;
     inset: clamp(20px, 4vw, 56px);
     display: grid;
-    grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    background: linear-gradient(180deg, rgba(25, 40, 52, 0.94), rgba(12, 22, 32, 0.94));
+    background: linear-gradient(180deg, rgba(18, 32, 45, 0.96), rgba(7, 17, 28, 0.96));
     border: 1px solid rgba(205, 232, 255, 0.24);
     border-radius: 14px;
     box-shadow: 0 24px 80px rgba(0,0,0,0.42);
     overflow: hidden;
+}
+
+.vw-script-explorer.sidebar-collapsed .vw-script-shell,
+.vw-script-explorer.editor-focused .vw-script-shell {
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .vw-script-header {
@@ -1355,6 +1426,7 @@ body.vw-menu-open #cursor {
 .vw-script-header h2 {
     margin: 0;
     font-size: 26px;
+    letter-spacing: 0;
 }
 
 .vw-script-header p {
@@ -1368,6 +1440,7 @@ body.vw-menu-open #cursor {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .vw-script-toggle {
@@ -1378,9 +1451,19 @@ body.vw-menu-open #cursor {
 }
 
 .vw-script-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     padding: 16px;
     border-right: 1px solid rgba(205, 232, 255, 0.14);
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vw-script-explorer.sidebar-collapsed .vw-script-sidebar,
+.vw-script-explorer.editor-focused .vw-script-sidebar {
+    display: none;
 }
 
 .vw-script-sidebar-head {
@@ -1388,9 +1471,55 @@ body.vw-menu-open #cursor {
     margin-bottom: 12px;
 }
 
+.vw-script-workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+.vw-script-workspace button {
+    border: 1px solid rgba(220, 240, 255, 0.18);
+    border-radius: 9px;
+    background: rgba(255,255,255,0.08);
+    color: inherit;
+    padding: 8px 9px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.vw-script-workspace button:hover {
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(220, 240, 255, 0.32);
+}
+
+.vw-script-workspace span {
+    grid-column: 1 / -1;
+    min-height: 16px;
+    color: rgba(225, 241, 255, 0.62);
+    font-size: 12px;
+}
+
+.vw-script-search {
+    width: 100%;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+    border: 1px solid rgba(220, 240, 255, 0.16);
+    border-radius: 8px;
+    background: rgba(3, 10, 18, 0.54);
+    color: #f7fbff;
+    padding: 10px 12px;
+    font: inherit;
+}
+
 .vw-script-list {
     display: grid;
+    align-content: start;
     gap: 8px;
+    overflow: auto;
+    min-height: 0;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
 }
 
 .vw-script-list button,
@@ -1403,10 +1532,28 @@ body.vw-menu-open #cursor {
     padding: 10px 12px;
     font: inherit;
     cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.vw-script-list button:hover,
+.vw-script-actions button:hover,
+.vw-script-toolbar button:hover {
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(220, 240, 255, 0.36);
 }
 
 .vw-script-list button {
     text-align: left;
+    display: grid;
+    gap: 2px;
+    min-height: 48px;
+}
+
+.vw-script-list button span {
+    color: rgba(191, 219, 254, 0.64);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
 }
 
 .vw-script-list button.active,
@@ -1419,19 +1566,24 @@ body.vw-menu-open #cursor {
     min-width: 0;
     min-height: 0;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto minmax(100px, 22vh);
+    grid-template-rows: auto minmax(0, 1fr) auto minmax(120px, 22vh);
     gap: 12px;
     padding: 16px;
 }
 
-.vw-script-name {
-    display: grid;
-    gap: 6px;
-    color: rgba(235, 246, 255, 0.78);
+.vw-script-explorer.console-collapsed .vw-script-main,
+.vw-script-explorer.editor-focused .vw-script-main {
+    grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-.vw-script-name input,
-.vw-script-main textarea,
+.vw-script-editor-head {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.vw-script-editor-head input,
 .vw-script-output {
     width: 100%;
     box-sizing: border-box;
@@ -1441,23 +1593,63 @@ body.vw-menu-open #cursor {
     color: #f7fbff;
 }
 
-.vw-script-name input {
+.vw-script-editor-head input {
     padding: 10px 12px;
+    font: inherit;
 }
 
-.vw-script-main textarea {
-    resize: none;
-    padding: 14px;
-    font: 14px/1.5 Consolas, "SFMono-Regular", monospace;
+.vw-script-hint {
+    color: rgba(235, 246, 255, 0.58);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.vw-script-editor {
+    min-height: 0;
+    border: 1px solid rgba(220, 240, 255, 0.16);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(6, 16, 26, 0.95);
+}
+
+.vw-script-editor.disabled {
+    filter: grayscale(0.6);
+    opacity: 0.72;
+}
+
+.vw-script-editor .monaco-editor,
+.vw-script-editor .monaco-editor-background,
+.vw-script-editor .monaco-editor .inputarea.ime-input {
+    font-family: Consolas, "SFMono-Regular", ui-monospace, monospace;
+}
+
+.vw-script-editor .monaco-editor .view-line span {
+    font-family: Consolas, "SFMono-Regular", ui-monospace, monospace;
+}
+
+.vw-script-editor .monaco-editor .colorpicker-color-decoration {
+    border-radius: 4px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.36), 0 0 0 2px rgba(0, 0, 0, 0.32);
 }
 
 .vw-script-toolbar {
     justify-content: flex-start;
 }
 
-.vw-script-toolbar span {
+.vw-script-toolbar button.icon {
+    width: 42px;
+    height: 42px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
     margin-left: auto;
-    color: rgba(235, 246, 255, 0.58);
+}
+
+.vw-script-toolbar button.icon svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    opacity: 0.92;
 }
 
 .vw-script-output {
@@ -1466,6 +1658,11 @@ body.vw-menu-open #cursor {
     overflow: auto;
     font: 12px/1.45 Consolas, "SFMono-Regular", monospace;
     white-space: pre-wrap;
+}
+
+.vw-script-explorer.console-collapsed .vw-script-output,
+.vw-script-explorer.editor-focused .vw-script-output {
+    display: none;
 }
 
 @media (max-width: 840px) {
@@ -1477,6 +1674,15 @@ body.vw-menu-open #cursor {
     .vw-script-sidebar {
         border-right: 0;
         border-bottom: 1px solid rgba(205, 232, 255, 0.14);
+        max-height: 34vh;
+    }
+
+    .vw-script-editor-head {
+        grid-template-columns: 1fr;
+    }
+
+    .vw-script-hint {
+        white-space: normal;
     }
 }
 

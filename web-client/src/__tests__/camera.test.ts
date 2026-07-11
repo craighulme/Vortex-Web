@@ -34,6 +34,21 @@ describe("CameraService", () => {
     expect(transform.position[2]).toBeGreaterThan(transform.pivot[2]);
   });
 
+  it("allows scripts to clamp third-person camera distance without forcing first person", () => {
+    const camera = new CameraService();
+    camera.setDistanceOverride(6);
+    const transform = camera.computeTransform(
+      { position: { x: 0, y: 0, z: 0 } },
+      { shiftLock: false, footOffset: 2 }
+    );
+
+    expect(transform.firstPerson).toBe(false);
+    expect(transform.position[2] - transform.pivot[2]).toBeLessThan(7);
+
+    camera.clearDistanceOverride();
+    expect(camera.snapshot().scriptDistanceOverride).toBeNull();
+  });
+
   it("offsets the pivot for shift lock and first person", () => {
     const camera = new CameraService();
 

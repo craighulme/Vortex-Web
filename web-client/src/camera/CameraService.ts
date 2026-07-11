@@ -2,6 +2,8 @@ export type CameraState = {
   yaw: number;
   pitch: number;
   distance: number;
+  targetDistance: number;
+  scriptDistanceOverride: number | null;
   minPitch: number;
   maxPitch: number;
   minDist: number;
@@ -46,6 +48,8 @@ export class CameraService {
     yaw: 0,
     pitch: 0.35,
     distance: 25.6,
+    targetDistance: 25.6,
+    scriptDistanceOverride: null,
     minPitch: -1.55,
     maxPitch: 1.55,
     minDist: 2,
@@ -53,6 +57,7 @@ export class CameraService {
   };
 
   private targetDistance = this.state.distance;
+  private scriptDistanceOverride: number | null = null;
   private horizontalSensitivity = BASE_SENSITIVITY;
   private verticalSensitivity = BASE_SENSITIVITY;
 
@@ -107,6 +112,21 @@ export class CameraService {
 
   smoothDistance(alpha: number): void {
     this.state.distance = this.state.distance * (1 - alpha) + this.targetDistance * alpha;
+    this.state.targetDistance = this.targetDistance;
+    this.state.scriptDistanceOverride = this.scriptDistanceOverride;
+  }
+
+  setDistanceOverride(distance: unknown): CameraState {
+    const value = Number(distance);
+    this.scriptDistanceOverride = Number.isFinite(value)
+      ? clamp(value, 0.75, this.state.maxDist)
+      : null;
+    return this.snapshot();
+  }
+
+  clearDistanceOverride(): CameraState {
+    this.scriptDistanceOverride = null;
+    return this.snapshot();
   }
 
   computeTransform(character: CameraPositionSource, options: CameraTransformOptions): CameraTransform {
@@ -123,8 +143,9 @@ export class CameraService {
       character.position.z
     ];
 
-    let cameraDistance = this.state.distance;
-    const firstPerson = cameraDistance <= 2.001;
+    const desiredDistance = this.state.distance;
+    let cameraDistance = desiredDistance;
+    const firstPerson = desiredDistance <= 2.001;
     if (firstPerson) {
       cameraDistance = 0.5;
       pivot[0] -= sinYaw;
@@ -132,6 +153,9 @@ export class CameraService {
     } else if (options.shiftLock) {
       pivot[0] += cosYaw * shiftLockOffset;
       pivot[2] += -sinYaw * shiftLockOffset;
+    }
+    if (!firstPerson && this.scriptDistanceOverride !== null) {
+      cameraDistance = clamp(this.scriptDistanceOverride, 0.75, desiredDistance);
     }
 
     return {
@@ -146,7 +170,11 @@ export class CameraService {
   }
 
   snapshot(): CameraState {
-    return { ...this.state };
+    return {
+      ...this.state,
+      targetDistance: this.targetDistance,
+      scriptDistanceOverride: this.scriptDistanceOverride
+    };
   }
 
   private enforceFirstPersonTarget(): CameraLockIntent {

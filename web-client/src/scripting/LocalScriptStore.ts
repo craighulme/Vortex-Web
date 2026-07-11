@@ -8,51 +8,14 @@ export type LocalLuaScript = {
 
 const STORAGE_KEY = "vwebLocalLuaScripts.v1";
 
-const DEFAULT_SCRIPT: LocalLuaScript = {
-  id: "welcome",
-  name: "Welcome",
-  enabled: true,
-  updatedAt: 0,
-  source: [
-    "print('Vortex Web Lua ready')",
-    "",
-    "local hud = vweb.ui.layer('hud')",
-    "",
-    "function onStart()",
-    "  local me = vweb.players.localPlayer()",
-    "  if me then print('local player', me.id, me.name) end",
-    "end",
-    "",
-    "function onUpdate(dt)",
-    "  local mouse = vweb.input.mousePosition()",
-    "  local ray = vweb.camera.screenPointToRay(mouse.x, mouse.y)",
-    "  local hit = vweb.physics.raycast(ray.origin, ray.direction, 500)",
-    "  hud:text({ id = 'lua-status', x = 24, y = 24, text = 'Lua running: ' .. string.format('%.2f', dt), size = 18 })",
-    "  if hit.hit then",
-    "    vweb.world.setMarker('lua-cursor', { position = hit.point, size = {4, 0.08, 4}, color = '#22c55e', transparency = 0.3, canCollide = false })",
-    "  end",
-    "end",
-    "",
-    "function onDestroy()",
-    "  vweb.ui.clear('hud')",
-    "  vweb.world.clearMarker('lua-cursor')",
-    "end",
-    "",
-    "-- Try this locally:",
-    "-- vweb.players.setTransform('me', { rotation = {0, math.rad(180), 0} })",
-    "-- vweb.cursor.setImage({ url = 'https://example.com/cursor.png', width = 32, height = 32, hotspot = {0, 0, 0} })",
-    "-- local part = vweb.world.spawnPart({ position = {0, 8, 0}, size = {4, 1, 4}, color = '#22c55e' })",
-    "-- vweb.world.remove(part.id)"
-  ].join("\n")
-};
-
 export class LocalScriptStore {
   constructor(private readonly storage: Pick<Storage, "getItem" | "setItem"> = globalThis.localStorage) {}
 
   list(): LocalLuaScript[] {
     const parsed = this.read();
-    if (parsed.length) return parsed;
-    return [{ ...DEFAULT_SCRIPT, updatedAt: Date.now() }];
+    const migrated = migrateStockScripts(parsed);
+    if (migrated.changed) this.write(migrated.scripts);
+    return migrated.scripts;
   }
 
   get(id: string): LocalLuaScript | null {
@@ -80,7 +43,7 @@ export class LocalScriptStore {
     const scripts = this.list();
     const next = scripts.filter((script) => script.id !== id);
     if (next.length === scripts.length) return false;
-    this.write(next.length ? next : [{ ...DEFAULT_SCRIPT, updatedAt: Date.now() }]);
+    this.write(next);
     return true;
   }
 
@@ -111,6 +74,44 @@ function normalizeScript(value: unknown): LocalLuaScript | null {
     enabled: source.enabled !== false,
     updatedAt: Number(source.updatedAt) || Date.now()
   };
+}
+
+function migrateStockScripts(scripts: LocalLuaScript[]): { scripts: LocalLuaScript[]; changed: boolean } {
+  let changed = false;
+  const next = scripts.filter((script) => {
+    if (script.id === "welcome" && isOldStockWelcome(script.source)) {
+      changed = true;
+      return false;
+    }
+    if (isOldStockPackagedExample(script)) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+  return { scripts: next, changed };
+}
+
+function isOldStockPackagedExample(script: LocalLuaScript): boolean {
+  const id = String(script.id || "");
+  const text = String(script.source || "");
+  if (id === "vortex-interface-playground") {
+    return text.includes("Vortex Web Lua") && text.includes("drawMiniGraph") && text.includes("!luahelp");
+  }
+  if (id === "vortex-camera-collision") {
+    return text.includes("camera") && text.includes("setDistanceOverride") && text.includes("clearDistanceOverride");
+  }
+  return false;
+}
+
+function isOldStockWelcome(source: string): boolean {
+  const text = String(source || "");
+  if (text.includes("Lua running:") || text.includes("Lua running | dt")) return true;
+  if (!text.includes("Vortex Web Lua ready")) return false;
+  if (text.includes("lua-status-panel") || text.includes("vweb.gui.create(\"Frame\"") || text.includes("vweb.gui.create('Frame'")) return true;
+  if (text.includes("panel = vweb.gui.create('Frame'") && text.includes("vweb.surface.SetDrawColor(8, 18, 30, 190)")) return true;
+  if (!text.includes("local hud = vweb.ui.layer('hud')")) return false;
+  return text.includes("lua-status");
 }
 
 function sanitizeId(value: string): string {

@@ -23,6 +23,19 @@ describe("PhysicsWorld", () => {
     expect(hit?.point[1]).toBeCloseTo(1, 4);
   });
 
+  it("raycasts the static backend along the full ray direction", () => {
+    const physics = createPhysicsWorld({ backend: "static", diagnostics });
+    physics.syncStaticColliders?.([
+      { minX: 9, maxX: 11, minY: 0, maxY: 1, minZ: -1, maxZ: 1 }
+    ]);
+
+    const hit = physics.raycast([0, 4, 0], [10, -4, 0], 20);
+
+    expect(hit?.collider).toBe("static-0");
+    expect(hit?.point[0]).toBeCloseTo(9, 4);
+    expect(hit?.point[1]).toBeCloseTo(0.4, 4);
+  });
+
   it("loads Rapier and raycasts against synced static colliders", async () => {
     const physics = createPhysicsWorld({ backend: "rapier", diagnostics });
     physics.syncStaticColliders?.([

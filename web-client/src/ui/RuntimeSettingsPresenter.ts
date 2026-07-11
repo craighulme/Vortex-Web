@@ -409,13 +409,6 @@ export class RuntimeSettingsPresenter {
 
     makeToggle("Frame profiler", Boolean(this.options.perf.enabled), (checked) => this.options.perf.setEnabled(checked), elements.targets.dev);
     makeToggle("Console timing log", Boolean(this.options.perf.log), (checked) => this.options.perf.setLog(checked), elements.targets.dev);
-    const luaAvailable = this.options.runtime.scripting.canUseLua();
-    const luaToggle = makeToggle("Lua tools", this.options.runtime.scripting.isEnabled(), (checked) => {
-      this.options.runtime.scripting.setEnabled(checked);
-    }, elements.targets.dev);
-    luaToggle.title = "Enables local-only Lua scripts. Scripts do not replicate to native Vortex clients.";
-    luaToggle.classList.toggle("disabled", !luaAvailable);
-    luaToggle.querySelector("input")?.toggleAttribute("disabled", !luaAvailable);
 
     const devRow = makeButtons([
       {
@@ -423,7 +416,7 @@ export class RuntimeSettingsPresenter {
         primary: true,
         onclick: async () => this.sampleFps()
       },
-      { label: luaAvailable ? "Open Lua explorer" : "Lua locked", onclick: () => this.options.runtime.scriptExplorer?.open?.() },
+      { label: "Lua Editor", onclick: () => this.options.runtime.scriptExplorer?.open?.() },
       { label: "Show runtime panel", onclick: () => {} },
       { label: "Chunk boxes", onclick: () => {} },
       { label: "Dump chunks", onclick: () => this.dumpChunks() },

@@ -21,7 +21,10 @@ export class RuntimeStartupService {
       setRuntimeApi: config.setRuntimeApi,
       rendererService: config.rendererService,
       worldService: config.worldService,
-      worldHandles: config.worldRuntime.dynamicObjects
+      worldHandles: {
+        ...config.worldRuntime.dynamicObjects,
+        parts: config.worldRuntime.partService
+      }
     });
 
     config.frameLoop.start({

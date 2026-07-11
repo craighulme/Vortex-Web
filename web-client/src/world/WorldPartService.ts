@@ -17,6 +17,15 @@ type MeshLike = {
   updateMatrix(): void;
   updateMatrixWorld(force?: boolean): void;
   stud_id?: number;
+  material?: unknown;
+};
+
+type RuntimeMaterialLike = {
+  color?: { setHex?(value: number): void; set?(value: unknown): void };
+  opacity?: number;
+  transparent?: boolean;
+  needsUpdate?: boolean;
+  clone?(): RuntimeMaterialLike;
 };
 
 type SceneLike = {
@@ -51,6 +60,13 @@ export type WorldPartRecord = {
   shape: string;
   type?: string;
   transparency: number;
+  x: number;
+  y: number;
+  z: number;
+  rx: number;
+  ry: number;
+  rz: number;
+  rotationOrder: string;
 };
 
 export class WorldPartService {
@@ -126,7 +142,7 @@ export class WorldPartService {
     }
 
     const storedMesh = staticMesh ? null : mesh;
-    const record: WorldPartRecord = { m: storedMesh, b: collider, canCollide, sw, sh, sd, color, shape, transparency };
+    const record: WorldPartRecord = { m: storedMesh, b: collider, canCollide, sw, sh, sd, color, shape, transparency, x, y, z, rx, ry, rz, rotationOrder };
     if (type) record.type = type;
     const studId = this.studData.push(record) - 1;
     mesh.stud_id = studId;
@@ -155,19 +171,49 @@ export class WorldPartService {
   rebuildStudCollider(studId: number, canCollide = true): boolean {
     const config = this.assertConfigured();
     const data = this.studData[studId];
-    if (!data || !data.m) return false;
+    if (!data) return false;
     if (data.b) {
       config.colliders.remove(data.b);
       data.b = null;
     }
     data.canCollide = !!canCollide;
     if (!data.canCollide) return true;
-    data.m.updateMatrixWorld(true);
-    const collider = config.colliders.rebuildFromObject(data.m, data.shape, data.type);
+    const collider = data.m
+      ? config.colliders.rebuildFromObject(data.m, data.shape, data.type)
+      : config.colliders.createCollider(data.sw, data.sh, data.sd, data.x, data.y, data.z, data.rx, data.ry, data.rz, data.rotationOrder, data.shape, data.type);
     data.b = collider;
     config.colliders.add(collider);
-    if (!this.objects.includes(data.m)) this.objects.push(data.m);
+    if (data.m && !this.objects.includes(data.m)) this.objects.push(data.m);
     return true;
+  }
+
+  setPartColor(studId: number, color: number): boolean {
+    const config = this.assertConfigured();
+    const data = this.studData[studId];
+    if (!data) return false;
+    data.color = color;
+    const mesh = data.m;
+    if (!mesh) return false;
+    mesh.material = config.materials.getCachedMaterials(data.sw, data.sh, data.sd, color, data.shape, data.transparency) as RuntimeMaterialLike | RuntimeMaterialLike[];
+    mesh.userData.vwebPartColor = color;
+    mesh.updateMatrix?.();
+    return true;
+  }
+
+  setPartTransparency(studId: number, transparency: number): boolean {
+    const config = this.assertConfigured();
+    const data = this.studData[studId];
+    if (!data) return false;
+    data.transparency = Math.max(0, Math.min(1, Number(transparency) || 0));
+    const mesh = data.m;
+    if (!mesh) return false;
+    mesh.material = config.materials.getCachedMaterials(data.sw, data.sh, data.sd, data.color, data.shape, data.transparency) as RuntimeMaterialLike | RuntimeMaterialLike[];
+    mesh.updateMatrix?.();
+    return true;
+  }
+
+  hasDirectMesh(studId: number): boolean {
+    return Boolean(this.studData[studId]?.m);
   }
 
   removeMatching<T>(items: T[], value: T): void {

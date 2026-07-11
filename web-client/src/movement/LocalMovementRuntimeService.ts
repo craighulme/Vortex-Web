@@ -70,6 +70,12 @@ export type LocalMovementRuntimeSnapshot = {
   climbState: string;
   shiftLock: boolean;
   movementMods: MovementMods;
+  walkTarget: { x: number; y: number; z: number } | null;
+};
+
+export type LocalWalkTargetOptions = {
+  speed?: unknown;
+  stopDistance?: unknown;
 };
 
 const COYOTE_TIME = 0.12;
@@ -93,6 +99,7 @@ export class LocalMovementRuntimeService {
   private extraVelX = 0;
   private extraVelZ = 0;
   private movementMods: MovementMods | null = null;
+  private walkTarget: { x: number; y: number; z: number; speed: number; stopDistance: number } | null = null;
 
   configure(config: LocalMovementRuntimeConfig): this {
     this.config = config;
@@ -158,13 +165,35 @@ export class LocalMovementRuntimeService {
     return config.movement.snapshotMods();
   }
 
+  setWalkTarget(position: { x: number; y: number; z: number }, options: LocalWalkTargetOptions = {}): { ok: boolean; reason?: string } {
+    const target = {
+      x: Number(position.x),
+      y: Number(position.y),
+      z: Number(position.z),
+      speed: clampNumber(Number(options.speed ?? this.requireConfig().movement.constants.walkSpeed), 2, 80),
+      stopDistance: clampNumber(Number(options.stopDistance ?? 1.75), 0.05, 12)
+    };
+    if (!Number.isFinite(target.x) || !Number.isFinite(target.y) || !Number.isFinite(target.z)) {
+      return { ok: false, reason: "bad-position" };
+    }
+    this.walkTarget = target;
+    return { ok: true };
+  }
+
+  clearWalkTarget(): boolean {
+    const hadTarget = Boolean(this.walkTarget);
+    this.walkTarget = null;
+    return hadTarget;
+  }
+
   snapshot(): LocalMovementRuntimeSnapshot {
     return {
       velY: this.velY,
       grounded: this.grounded,
       climbState: this.climbState,
       shiftLock: this.shiftLock,
-      movementMods: this.getMovementMods()
+      movementMods: this.getMovementMods(),
+      walkTarget: this.walkTarget ? { x: this.walkTarget.x, y: this.walkTarget.y, z: this.walkTarget.z } : null
     };
   }
 
@@ -203,7 +232,10 @@ export class LocalMovementRuntimeService {
     }
 
     const movementSpeed = (movementMods.fly || movementMods.noclip) ? movementMods.flySpeed : constants.walkSpeed;
-    const intent = config.movement.computePlanarIntent({
+    const manualIntent = this.hasManualPlanarIntent(config.keys);
+    if (manualIntent) this.walkTarget = null;
+    const walkIntent = !manualIntent ? this.computeWalkTargetIntent(character, movementSpeed) : null;
+    const intent = walkIntent ?? config.movement.computePlanarIntent({
       forward: Boolean(config.keys.KeyW || config.keys.ArrowUp),
       backward: Boolean(config.keys.KeyS || config.keys.ArrowDown),
       left: Boolean(config.keys.KeyA),
@@ -473,6 +505,29 @@ export class LocalMovementRuntimeService {
     };
   }
 
+  private hasManualPlanarIntent(keys: Record<string, boolean>): boolean {
+    return Boolean(keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD || keys.ArrowUp || keys.ArrowDown);
+  }
+
+  private computeWalkTargetIntent(character: CharacterLike, fallbackSpeed: number): { moving: boolean; velocityX: number; velocityZ: number; targetAngle: number } | null {
+    const target = this.walkTarget;
+    if (!target) return null;
+    const dx = target.x - character.position.x;
+    const dz = target.z - character.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance <= target.stopDistance) {
+      this.walkTarget = null;
+      return { moving: false, velocityX: 0, velocityZ: 0, targetAngle: character.rotation.y };
+    }
+    const speed = Number.isFinite(target.speed) ? target.speed : fallbackSpeed;
+    return {
+      moving: true,
+      velocityX: (dx / distance) * speed,
+      velocityZ: (dz / distance) * speed,
+      targetAngle: Math.atan2(dx, dz)
+    };
+  }
+
   private applyCollisionState(state: {
     velY: number;
     grounded: boolean;
@@ -555,4 +610,9 @@ function lerpAngle(current: number, target: number, t: number): number {
   let diff = target - current;
   diff = ((diff % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
   return current + diff * t;
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
 }

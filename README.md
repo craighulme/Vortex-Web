@@ -39,6 +39,7 @@ Some of the bigger things that are in right now:
 - Extension settings page with local runtime/site options
 - Theme editing for site/runtime styling experiments
 - Early UGC Labs pages for trying avatar accessories, particles, draft publishing, and store previews
+- Early Lua Editor with local scripts, built-in examples, Roblox-style service aliases, HUD drawing, input, camera, raycasts, chat hooks, and runtime world/player overrides
 - Map loading, chunk visibility work, runtime diagnostics, and performance tools
 - Modern GLB avatar path as the main direction
 - Vortex Web rig and animation groundwork for future avatar/equipment work
@@ -50,7 +51,7 @@ Some things are still rough or unfinished:
 - Foot IK is disabled until the avatar rig is good enough
 - UGC/accessory support is early and still needs polish before it should be treated as stable
 - Some compatibility bridge code still exists while the runtime is being cleaned up
-- The scripting/game API work is only preparation right now
+- The scripting/game API is early and license-gated while it is being tested
 - WebGPU shadows and renderer settings are still being tuned
 - Animation packs and the new rig are experimental while I work out what feels right in-game
 
@@ -71,6 +72,10 @@ For access, contact `quackduck.` on Discord.
 Some browser/dev tools are feature-gated. See [COMMANDS_README.md](COMMANDS_README.md) if you are testing those.
 
 Vortex Web also has community profile cosmetics and early UGC support. Those are separate from normal Vortex accounts and are handled by the Vortex Web backend
+
+Lua scripting docs:
+- [Lua Docs](LUA_DOCS.md) for examples and workflow.
+- [Lua API Reference](LUA_API.md) for the raw API table.
 
 ## Installing
 

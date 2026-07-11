@@ -84,6 +84,14 @@ export class LocalAvatarService {
     return this.shirtMesh;
   }
 
+  getPantsMesh(): any {
+    return this.pantsMesh;
+  }
+
+  getFaceMesh(): any {
+    return this.faceMesh;
+  }
+
   setFirstPersonMode(firstPerson: boolean, options: { hideBody?: boolean } = {}): void {
     if (!this.character) return;
     this.requireOptions().avatarMaterials.setLocalFirstPersonHidden?.(this.character, firstPerson, options);

@@ -49,7 +49,15 @@ export type RuntimeApiExportOptions = {
   worldService: {
     attachRuntimeAdapter(handles: Record<string, unknown>): void;
   };
-  worldHandles: WorldDynamicAdapter;
+  worldHandles: WorldDynamicAdapter & {
+    parts?: {
+      snapshot(): unknown;
+      setPartColor?(id: number, color: number): boolean;
+      setPartTransparency?(id: number, transparency: number): boolean;
+      rebuildStudCollider?(id: number, canCollide: boolean): boolean;
+      hasDirectMesh?(id: number): boolean;
+    };
+  };
 };
 
 export class RuntimeApiExportService {

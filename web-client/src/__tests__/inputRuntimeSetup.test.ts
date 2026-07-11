@@ -48,6 +48,7 @@ describe("InputRuntimeSetupService", () => {
       setMouseLook(value: boolean) {
         this.mouseLook = value;
       },
+      setPosition: () => {},
       syncPointerLock: () => {},
       setRightMouseDown: () => {},
       beginSliderDrag: () => {},

@@ -1,0 +1,1 @@
+-- Lua Language Server stub is maintained in examples/lua/types/vweb.lua.

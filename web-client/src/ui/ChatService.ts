@@ -16,6 +16,24 @@ type ChatApi = {
   send(): void;
 };
 
+export type ChatIncomingEvent = {
+  username: string;
+  text: string;
+  isSelf: boolean;
+  isStaff: boolean;
+  isOwner: boolean;
+  isBooster: boolean;
+  playerId?: number;
+};
+
+export type ChatOutgoingDecision =
+  | boolean
+  | string
+  | {
+      cancel?: boolean;
+      text?: string;
+    };
+
 type ChatWindow = Window & {
   Chat?: ChatApi;
   _chatFocused?: boolean;
@@ -23,6 +41,8 @@ type ChatWindow = Window & {
 
 export type ChatOutboundHandlers = {
   handleCommand?: (text: string) => boolean;
+  beforeSend?: (text: string) => ChatOutgoingDecision | Promise<ChatOutgoingDecision>;
+  onIncoming?: (event: ChatIncomingEvent) => void;
   sendMessage?: (text: string) => void;
 };
 
@@ -146,8 +166,27 @@ export class ChatService {
     };
 
     const send = () => {
-      const text = this.value.trim();
+      void sendAsync();
+    };
+
+    const sendAsync = async () => {
+      let text = this.value.trim();
       if (!text) {
+        deactivate();
+        return;
+      }
+      const decision = this.outbound.beforeSend ? await Promise.resolve(this.outbound.beforeSend(text)).catch(() => true) : true;
+      const resolved = resolveOutgoingDecision(decision, text);
+      if (resolved.cancel) {
+        this.value = "";
+        this.selectionAnchor = this.selectionFocus = 0;
+        deactivate();
+        return;
+      }
+      text = resolved.text;
+      if (!text) {
+        this.value = "";
+        this.selectionAnchor = this.selectionFocus = 0;
         deactivate();
         return;
       }
@@ -242,6 +281,20 @@ export class ChatService {
 
     this.apiObject = {
       message: (username, text, isSelf, isStaff, isOwner, _isBooster, playerId) => {
+        const incoming: ChatIncomingEvent = {
+          username,
+          text,
+          isSelf: Boolean(isSelf),
+          isStaff: Boolean(isStaff),
+          isOwner: Boolean(isOwner),
+          isBooster: Boolean(_isBooster)
+        };
+        if (playerId !== undefined) incoming.playerId = playerId;
+        try {
+          this.outbound.onIncoming?.(incoming);
+        } catch {
+          // Script hooks are advisory; chat rendering must keep working.
+        }
         const safeName = escapeHtml(username);
         const gradient = this.readNameGradient(playerId, !!isSelf, username);
         let nameHtml: string;
@@ -282,6 +335,8 @@ export class ChatService {
   configureOutbound(handlers: ChatOutboundHandlers): void {
     const next: ChatOutboundHandlers = {};
     if (handlers.handleCommand) next.handleCommand = handlers.handleCommand;
+    if (handlers.beforeSend) next.beforeSend = handlers.beforeSend;
+    if (handlers.onIncoming) next.onIncoming = handlers.onIncoming;
     if (handlers.sendMessage) next.sendMessage = handlers.sendMessage;
     this.outbound = next;
   }
@@ -327,6 +382,18 @@ export class ChatService {
     const to = normalizeCssColor(gradient[1]);
     return from && to ? [from, to] : null;
   }
+}
+
+function resolveOutgoingDecision(decision: ChatOutgoingDecision | undefined, fallbackText: string): { cancel: boolean; text: string } {
+  if (decision === false) return { cancel: true, text: fallbackText };
+  if (typeof decision === "string") return { cancel: false, text: decision.trim() };
+  if (decision && typeof decision === "object") {
+    return {
+      cancel: decision.cancel === true,
+      text: typeof decision.text === "string" ? decision.text.trim() : fallbackText
+    };
+  }
+  return { cancel: false, text: fallbackText };
 }
 
 function readBootOwnUserId(documentRef: Document): number | null {

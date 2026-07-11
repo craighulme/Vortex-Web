@@ -21,7 +21,13 @@ export type WorldRuntimeLike = {
   textureService: { snapshot(): { textures: number }; setStudTextures(value: boolean): void };
   geometryService: { snapshot(): { geometries: number } };
   materialService: { snapshot(): { materials: number } };
-  partService: { snapshot(): unknown };
+  partService: {
+    snapshot(): unknown;
+    setPartColor?(id: number, color: number): boolean;
+    setPartTransparency?(id: number, transparency: number): boolean;
+    rebuildStudCollider?(id: number, canCollide: boolean): boolean;
+    hasDirectMesh?(id: number): boolean;
+  };
   objects: unknown[];
   colliders: unknown[];
   dynamicObjects: WorldDynamicAdapter;

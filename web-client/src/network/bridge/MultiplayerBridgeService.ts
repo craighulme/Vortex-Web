@@ -404,6 +404,17 @@ export class MultiplayerBridgeService {
         setLaunchInfoAvatar: launchState.updateLaunchAvatar
     });
     runtimeServices.chat?.configureOutbound?.({
+        beforeSend: (text: string) => runtimeServices.scripting?.dispatchOutgoingChat?.(text),
+        onIncoming: (event: any) => runtimeServices.scripting?.dispatchIncomingChat?.({
+            type: "incoming",
+            username: event.username,
+            playerId: event.playerId,
+            text: event.text,
+            self: event.isSelf,
+            staff: event.isStaff,
+            owner: event.isOwner,
+            booster: event.isBooster
+        }),
         handleCommand: consoleBridge.handleChatCommand,
         sendMessage: (msg: unknown) => bridgeSend({ type: "chat", msg })
     });

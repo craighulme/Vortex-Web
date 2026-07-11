@@ -68,11 +68,11 @@ class StaticPhysicsWorld implements PhysicsWorld {
   }
 
   castRay(origin: [number, number, number], direction: [number, number, number], maxDistance: number): RayHit | null {
-    const dy = Number(direction[1] || 0);
-    if (dy >= -0.5 || maxDistance <= 0) return null;
+    const dir = normalize3(direction);
+    if (!dir || maxDistance <= 0) return null;
     let best: RayHit | null = null;
     for (const [handle, collider] of this.colliders) {
-      const hit = raycastStaticBoxTop(handle, collider, origin, maxDistance);
+      const hit = raycastStaticBox(handle, collider, origin, dir, maxDistance);
       if (!hit) continue;
       if (!best || hit.distance < best.distance) best = hit;
     }
@@ -102,10 +102,11 @@ class StaticPhysicsWorld implements PhysicsWorld {
   }
 }
 
-function raycastStaticBoxTop(
+function raycastStaticBox(
   handle: string,
   collider: StaticBoxCollider,
   origin: [number, number, number],
+  direction: [number, number, number],
   maxDistance: number
 ): RayHit | null {
   const [cx, cy, cz] = collider.center;
@@ -118,19 +119,77 @@ function raycastStaticBoxTop(
   const maxX = Number(cx) + halfX;
   const minZ = Number(cz) - halfZ;
   const maxZ = Number(cz) + halfZ;
-  const x = Number(origin[0]);
-  const y = Number(origin[1]);
-  const z = Number(origin[2]);
-  if (x < minX || x > maxX || z < minZ || z > maxZ) return null;
-  const top = Number(cy) + halfY;
-  const distance = y - top;
-  if (distance < -0.001 || distance > maxDistance) return null;
+  const slab = raycastAabbSlabs(
+    origin,
+    direction,
+    [minX, Number(cy) - halfY, minZ],
+    [maxX, Number(cy) + halfY, maxZ],
+    maxDistance
+  );
+  if (!slab) return null;
   return {
     collider: handle,
-    point: [x, top, z],
-    normal: [0, 1, 0],
-    distance
+    point: [
+      origin[0] + direction[0] * slab.distance,
+      origin[1] + direction[1] * slab.distance,
+      origin[2] + direction[2] * slab.distance
+    ],
+    normal: slab.normal,
+    distance: slab.distance
   };
+}
+
+function raycastAabbSlabs(
+  origin: [number, number, number],
+  direction: [number, number, number],
+  min: [number, number, number],
+  max: [number, number, number],
+  maxDistance: number
+): { distance: number; normal: [number, number, number] } | null {
+  let tEnter = -Infinity;
+  let tExit = Infinity;
+  let enterNormal: [number, number, number] = [0, 0, 0];
+  let exitNormal: [number, number, number] = [0, 0, 0];
+
+  for (const axis of [0, 1, 2] as const) {
+    const originValue = origin[axis];
+    const directionValue = direction[axis];
+    if (Math.abs(directionValue) < 0.000001) {
+      if (originValue < min[axis] || originValue > max[axis]) return null;
+      continue;
+    }
+
+    let near = (min[axis] - originValue) / directionValue;
+    let far = (max[axis] - originValue) / directionValue;
+    let nearNormal = axisNormal(axis, -1);
+    let farNormal = axisNormal(axis, 1);
+
+    if (near > far) {
+      [near, far] = [far, near];
+      [nearNormal, farNormal] = [farNormal, nearNormal];
+    }
+
+    if (near > tEnter) {
+      tEnter = near;
+      enterNormal = nearNormal;
+    }
+    if (far < tExit) {
+      tExit = far;
+      exitNormal = farNormal;
+    }
+    if (tEnter > tExit) return null;
+  }
+
+  if (tExit < 0) return null;
+  const distance = tEnter >= 0 ? tEnter : tExit;
+  if (distance < 0 || distance > maxDistance) return null;
+  return { distance, normal: tEnter >= 0 ? enterNormal : exitNormal };
+}
+
+function axisNormal(axis: number, sign: -1 | 1): [number, number, number] {
+  if (axis === 0) return [sign, 0, 0];
+  if (axis === 1) return [0, sign, 0];
+  return [0, 0, sign];
 }
 
 class RapierPhysicsWorld implements PhysicsWorld {

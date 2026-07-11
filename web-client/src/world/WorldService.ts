@@ -21,6 +21,26 @@ export type WorldPart = {
   runtimePartId?: unknown;
 };
 
+export type WorldPartSnapshot = {
+  id: string;
+  type: string;
+  position: [number, number, number];
+  size: [number, number, number];
+  rotation?: [number, number, number];
+  color?: number;
+  transparency: number;
+  canCollide: boolean;
+  shape: string;
+  batched: boolean;
+};
+
+export type WorldPartMutationResult = {
+  ok: boolean;
+  reason?: string;
+  part?: WorldPartSnapshot;
+  visualApplied?: boolean;
+};
+
 export type RawMapPart = {
   T?: string;
   Type?: string;
@@ -78,6 +98,7 @@ export type WorldSceneHandles = {
   pick?: unknown;
   getObjects?: unknown;
   getColliders?: unknown;
+  parts?: unknown;
 };
 
 export type FetchMap = (input: string, init?: Record<string, unknown>) => Promise<{
@@ -201,6 +222,62 @@ export class WorldService {
     return [...this.maps.values()];
   }
 
+  listParts(): WorldPartSnapshot[] {
+    return this.entities
+      .byKind<WorldPart>("part")
+      .map((entity) => this.partSnapshot(entity.id, entity.data))
+      .filter((part): part is WorldPartSnapshot => Boolean(part));
+  }
+
+  getPart(id: unknown): WorldPartSnapshot | null {
+    const key = String(id || "").trim();
+    if (!key) return null;
+    const entity = this.entities.get<WorldPart>(key);
+    return entity ? this.partSnapshot(entity.id, entity.data) : null;
+  }
+
+  setPartColor(id: unknown, color: number): WorldPartMutationResult {
+    const entity = this.entities.get<WorldPart>(String(id || "").trim());
+    if (!entity) return { ok: false, reason: "part-not-found" };
+    entity.data.color = color;
+    const parts = this.sceneHandlesPartService();
+    const visualApplied = entity.data.runtimePartId !== undefined && typeof parts?.setPartColor === "function"
+      ? parts.setPartColor(Number(entity.data.runtimePartId), color) === true
+      : false;
+    const part = this.partSnapshot(entity.id, entity.data);
+    return part
+      ? mutationResult({ ok: true, part, visualApplied }, visualApplied ? undefined : "visual-is-batched")
+      : { ok: false, reason: "part-not-found" };
+  }
+
+  setPartTransparency(id: unknown, transparency: number): WorldPartMutationResult {
+    const entity = this.entities.get<WorldPart>(String(id || "").trim());
+    if (!entity) return { ok: false, reason: "part-not-found" };
+    entity.data.transparency = Math.max(0, Math.min(1, Number(transparency) || 0));
+    const parts = this.sceneHandlesPartService();
+    const visualApplied = entity.data.runtimePartId !== undefined && typeof parts?.setPartTransparency === "function"
+      ? parts.setPartTransparency(Number(entity.data.runtimePartId), entity.data.transparency) === true
+      : false;
+    const part = this.partSnapshot(entity.id, entity.data);
+    return part
+      ? mutationResult({ ok: true, part, visualApplied }, visualApplied ? undefined : "visual-is-batched")
+      : { ok: false, reason: "part-not-found" };
+  }
+
+  setPartCollision(id: unknown, canCollide: boolean): WorldPartMutationResult {
+    const entity = this.entities.get<WorldPart>(String(id || "").trim());
+    if (!entity) return { ok: false, reason: "part-not-found" };
+    entity.data.canCollide = !!canCollide;
+    const parts = this.sceneHandlesPartService();
+    const applied = entity.data.runtimePartId !== undefined && typeof parts?.rebuildStudCollider === "function"
+      ? parts.rebuildStudCollider(Number(entity.data.runtimePartId), entity.data.canCollide) === true
+      : false;
+    const part = this.partSnapshot(entity.id, entity.data);
+    return part
+      ? mutationResult({ ok: applied, part }, applied ? undefined : "collider-not-ready")
+      : { ok: false, reason: "part-not-found" };
+  }
+
   updateRenderChunks(camera: WorldRenderChunkCamera | null | undefined): WorldRenderChunkSnapshot {
     return this.renderChunks.update(camera);
   }
@@ -255,6 +332,28 @@ export class WorldService {
     if (typeof removeObject === "function") {
       removeObject(Number(runtimePartId));
     }
+  }
+
+  private sceneHandlesPartService(): { setPartColor?(id: number, color: number): boolean; setPartTransparency?(id: number, transparency: number): boolean; rebuildStudCollider?(id: number, canCollide: boolean): boolean; hasDirectMesh?(id: number): boolean } | null {
+    const parts = (this.sceneHandles as WorldSceneHandles & { parts?: unknown }).parts;
+    return parts && typeof parts === "object" ? parts as { setPartColor?(id: number, color: number): boolean; setPartTransparency?(id: number, transparency: number): boolean; rebuildStudCollider?(id: number, canCollide: boolean): boolean; hasDirectMesh?(id: number): boolean } : null;
+  }
+
+  private partSnapshot(id: string, part: WorldPart | undefined): WorldPartSnapshot | null {
+    if (!part) return null;
+    const snapshot: WorldPartSnapshot = {
+      id,
+      type: part.type || "Part",
+      position: [...part.position],
+      size: [...part.size],
+      ...(part.rotation ? { rotation: [...part.rotation] as [number, number, number] } : {}),
+      transparency: part.transparency ?? 0,
+      canCollide: part.canCollide !== false,
+      shape: part.shape || "Block",
+      batched: part.runtimePartId !== undefined && this.sceneHandlesPartService()?.hasDirectMesh?.(Number(part.runtimePartId)) === false
+    };
+    if (part.color !== undefined) snapshot.color = part.color;
+    return snapshot;
   }
 
   private toSpawnPartOptions(part: WorldPart, staticMesh: boolean): SpawnPartOptions {
@@ -518,6 +617,10 @@ function readFunction(target: unknown, key: string): ((...args: unknown[]) => un
   if (!target || typeof target !== "object") return null;
   const value = (target as Record<string, unknown>)[key];
   return typeof value === "function" ? value as (...args: unknown[]) => unknown : null;
+}
+
+function mutationResult(result: Omit<WorldPartMutationResult, "reason">, reason?: string): WorldPartMutationResult {
+  return reason ? { ...result, reason } : result;
 }
 
 function applyBoxFaceGroups(merged: RuntimeGeometryLike, sourceGeometries: RuntimeGeometryLike[]): void {

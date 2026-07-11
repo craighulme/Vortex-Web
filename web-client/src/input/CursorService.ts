@@ -35,6 +35,12 @@ export class CursorService {
     return { x: this.cursorX, y: this.cursorY };
   }
 
+  setPosition(x: number, y: number): void {
+    this.cursorX = clamp(Number(x) || 0, 0, this.windowRef.innerWidth);
+    this.cursorY = clamp(Number(y) || 0, 0, this.windowRef.innerHeight);
+    this.renderCursor();
+  }
+
   mouseLookEnabled(): boolean {
     return this.mouseLook;
   }
@@ -113,9 +119,10 @@ export class CursorService {
 
   private renderCursor(): void {
     if (!this.options) return;
-    this.options.crosshairElement.style.display = this.mouseLook ? "block" : "none";
-    this.options.cursorElement.style.display = this.mouseLook ? "none" : "block";
-    if (!this.mouseLook) this.options.cursorElement.style.transform = `translate(${this.cursorX}px, ${this.cursorY}px)`;
+    const look = this.mouseLookEnabled();
+    this.options.crosshairElement.style.display = look ? "block" : "none";
+    this.options.cursorElement.style.display = look ? "none" : "block";
+    if (!look) this.options.cursorElement.style.transform = `translate(${this.cursorX}px, ${this.cursorY}px)`;
   }
 
   private updateSlider(movementX: number): void {

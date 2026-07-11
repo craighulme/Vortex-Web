@@ -1,16 +1,15 @@
 {
-  "version": "0.8.0",
+  "version": "0.8.1",
   "date": "2026-07-11",
   "url": "https://github.com/craighulme/Vortex-Web",
-  "title": "Lua tools arrive in Vortex Web",
-  "summary": "This update adds the first public build of Vortex Web Lua tooling, refreshes the license flow, and ships another round of runtime, UGC, theme, and multiplayer cleanup. Lua is early and license-gated, but this is the first step toward real local scripting and future game APIs.",
+  "title": "Lua Editor arrives in Vortex Web",
+  "summary": "This patch improves the Lua Editor API shape, adds Roblox-style scripting aliases, documents the current Lua surface, and keeps the 0.8 runtime cleanup moving.",
   "changelog": [
-    "Added early Lua tooling behind the lua license feature. Press F2 in-game to open the Lua Explorer, save local scripts, run one-shot scripts, or start long-lived sessions.",
-    "Lua scripts now have a first version of the Vortex Web API for HUD layers, drawing, cursor helpers, raycasts, player transforms, local world markers, and local parts.",
-    "Updated the extension for the current Vortex Web license flow, including stronger account/session handling for public testing.",
-    "Continued runtime cleanup around WebGPU, chunk visibility, player handling, avatar rendering, and the newer service-based client.",
-    "UGC Labs and avatar equipment testing have had more work around drafts, review, particles, and local/web-user equipment.",
-    "Theme editing, profile cosmetics, chat names, player list styling, and settings UI have had another pass.",
-    "Please report bugs on GitHub, especially Lua issues, UGC publishing/loading problems, UI regressions, and performance drops."
+    "Expanded Lua with Roblox-style aliases such as game:GetService, Players, Workspace, RunService, UserInputService, Instance.new, Vector3, Color3, and UDim2.",
+    "Kept the existing Vortex Web API for HUD layers, surface drawing, chat hooks, camera tools, raycasts, player overrides, world markers, and local runtime parts.",
+    "Added built-in Lua examples for the interface playground and smooth camera collision.",
+    "Added Lua API documentation in the repo README.",
+    "Fixed packaged Lua script exposure for extension builds.",
+    "Please report Lua, UGC, UI, and performance issues on GitHub."
   ]
 }

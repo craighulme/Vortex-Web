@@ -23,6 +23,10 @@ describe("CursorService", () => {
 
     expect(service.position()).toEqual({ x: 50, y: 50 });
     expect(service.cursorOver(element({ left: 40, right: 60, top: 40, bottom: 60 }))).toBe(true);
+
+    service.setPosition(780, 590);
+
+    expect(service.position()).toEqual({ x: 780, y: 590 });
   });
 
   it("routes movement to look handling when mouse look is enabled", () => {
@@ -34,6 +38,18 @@ describe("CursorService", () => {
 
     expect(result).toBe("look");
     expect(onLook).toHaveBeenCalledWith(5, -2);
+  });
+
+  it("keeps right mouse drag as camera look while normal cursor mode is active", () => {
+    const service = new CursorService(windowLike()).configure({ cursorElement: element(), crosshairElement: element() });
+    const onLook = vi.fn();
+
+    service.setMouseLook(false);
+    service.setRightMouseDown(true);
+    const result = service.handleMouseMove({ movementX: 20, movementY: 10 }, onLook);
+
+    expect(result).toBe("look");
+    expect(onLook).toHaveBeenCalledWith(20, 10);
   });
 
   it("updates slider drags without duplicating runtime math", () => {

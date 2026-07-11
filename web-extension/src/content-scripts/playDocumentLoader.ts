@@ -337,6 +337,7 @@ async function rewritePlayDocument(html: string, url: URL, documentRef: Document
     for (const link of parsed.querySelectorAll<HTMLLinkElement>("link[href]")) {
         const file = link.getAttribute("href")?.split("/").pop();
         if (file === "styles.css") link.href = runtimeUrl("runtime/page/styles.css");
+        if (file === "web-client.css") link.href = runtimeUrl("runtime/web-client.css");
         if (file === "favicon.ico") link.href = "/favicon.ico";
     }
 

@@ -26,6 +26,11 @@ export type ScriptLogEntry = {
   message: string;
 };
 
+export type ScriptSessionInfo = {
+  id: string;
+  name: string;
+};
+
 export type ScriptPlayerInfo = {
   id: unknown;
   name: string;
@@ -64,6 +69,19 @@ export type ScriptWorldPartInfo = {
   size: [number, number, number];
 };
 
+export type ScriptWorldPartSnapshot = {
+  id: string;
+  type: string;
+  position: [number, number, number];
+  size: [number, number, number];
+  rotation?: [number, number, number];
+  color?: number;
+  transparency: number;
+  canCollide: boolean;
+  shape: string;
+  batched: boolean;
+};
+
 export type ScriptRay = {
   origin: ScriptVector3;
   direction: ScriptVector3;
@@ -83,13 +101,39 @@ export type ScriptRayHit = {
   normal?: ScriptVector3;
   distance?: number;
   collider?: unknown;
+  partId?: string | null;
+  part?: ScriptWorldPartSnapshot | null;
 };
 
-export type ScriptInputEvent = {
-  type: "click";
-  button: "left" | "middle" | "right";
-  x: number;
-  y: number;
+export type ScriptMouseButton = "left" | "middle" | "right";
+
+export type ScriptInputEvent =
+  | {
+      type: "click";
+      button: ScriptMouseButton;
+      x: number;
+      y: number;
+    }
+  | {
+      type: "keydown" | "keyup";
+      code: string;
+      repeat: boolean;
+      altKey: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      shiftKey: boolean;
+    };
+
+export type ScriptChatMessageEvent = {
+  type: "incoming" | "outgoing";
+  username?: string;
+  playerId?: number;
+  text: string;
+  self?: boolean;
+  staff?: boolean;
+  owner?: boolean;
+  booster?: boolean;
+  cancel?: boolean;
 };
 
 export type ScriptRuntimeContext = {
@@ -99,7 +143,12 @@ export type ScriptRuntimeContext = {
   getLocalPlayer(): ScriptPlayerInfo | null;
   getPlayers(): ScriptPlayerInfo[];
   getPlayerRoot(query?: unknown): ScriptPlayerRoot | null;
+  setPlayerBodyColors(query: unknown, colors: unknown): boolean;
+  setPlayerTexture(query: unknown, slot: unknown, url: unknown): boolean;
   getLocalPosition(): [number, number, number] | null;
+  getCameraState(): Record<string, unknown>;
+  setCameraDistanceOverride(distance: unknown): Record<string, unknown>;
+  clearCameraDistanceOverride(): Record<string, unknown>;
   screenPointToRay(x: unknown, y: unknown): ScriptRay;
   worldToScreen(point: unknown): ScriptScreenPoint;
   raycast(origin: unknown, direction: unknown, maxDistance?: unknown): ScriptRayHit;
@@ -107,11 +156,22 @@ export type ScriptRuntimeContext = {
   isKeyDown(code: unknown): boolean;
   spawnWorldPart(input: ScriptWorldPartInput): ScriptWorldPartInfo;
   removeWorldPart(id: string): boolean;
+  listWorldParts(): ScriptWorldPartSnapshot[];
+  getWorldPart(id: unknown): ScriptWorldPartSnapshot | null;
+  setWorldPartColor(id: unknown, color: unknown): unknown;
+  setWorldPartTransparency(id: unknown, transparency: unknown): unknown;
+  setWorldPartCollision(id: unknown, canCollide: unknown): unknown;
   setWorldMarker(id: unknown, input: ScriptWorldPartInput): ScriptWorldPartInfo;
   clearWorldMarker(id: unknown): boolean;
+  walkLocalTo(position: unknown, options?: unknown): { ok: boolean; reason?: string; target?: ScriptVector3 };
+  stopLocalWalk(): boolean;
+  setMouseLook(enabled: boolean): void;
   setCursorImage(options: ScriptCursorOptions): ScriptCursorState;
   clearCursor(): ScriptCursorState;
+  resolveAssetUrl(path: unknown): string | null;
   ui: ScriptUiService;
+  sendChatMessage(text: string): void;
+  systemChatMessage(text: string): void;
   snapshot(): Record<string, unknown>;
   hasLuaAccess(): boolean;
 };
@@ -143,6 +203,7 @@ export class ScriptRuntime {
   private readonly worldMarkers = new Map<string, ScriptWorldPartInfo>();
   private readonly playerTransformOverrides = new Map<string, ScriptTransform>();
   private readonly sessions = new Map<string, LuaScriptSession>();
+  private readonly sessionNames = new Map<string, string>();
   private inputEventsAttached = false;
 
   constructor(
@@ -192,7 +253,7 @@ export class ScriptRuntime {
   }
 
   saveLocalScript(input: Partial<LocalLuaScript> & Pick<LocalLuaScript, "name" | "source">): LocalLuaScript {
-    if (!this.store) throw new Error("Lua tools are not configured yet.");
+    if (!this.store) throw new Error("Lua Editor is not configured yet.");
     return this.store.upsert(input);
   }
 
@@ -200,13 +261,13 @@ export class ScriptRuntime {
     return this.store?.remove(id) ?? false;
   }
 
-  async runLocalScript(idOrSource: string, maybeSource?: string): Promise<void> {
+  async runLocalScript(idOrSource: string, maybeSource?: string, displayName?: string): Promise<void> {
     this.assertRunnable();
     const script = maybeSource == null ? this.store?.get(idOrSource) : null;
     const source = maybeSource ?? script?.source ?? idOrSource;
     if (!source.trim()) throw new Error("Script is empty.");
     this.running = true;
-    this.log("info", `running ${script?.name || "Lua script"}`);
+    this.log("info", `running ${script?.name || displayName || "Lua script"}`);
     try {
       await this.lua.run(source, {
         api: this.createLuaApi(),
@@ -222,14 +283,15 @@ export class ScriptRuntime {
     }
   }
 
-  async startLocalScript(idOrSource: string, maybeSource?: string): Promise<void> {
+  async startLocalScript(idOrSource: string, maybeSource?: string, displayName?: string): Promise<void> {
     this.assertRunnable();
     const script = maybeSource == null ? this.store?.get(idOrSource) : null;
     const source = maybeSource ?? script?.source ?? idOrSource;
-    const id = script?.id ?? `inline-${hashString(source)}`;
+    const id = script?.id ?? sanitizeSessionId(idOrSource || `inline-${hashString(source)}`);
+    const name = script?.name || displayName || id;
     if (!source.trim()) throw new Error("Script is empty.");
     await this.stopLocalScript(id);
-    this.log("info", `starting ${script?.name || id}`);
+    this.log("info", `starting ${name}`);
     try {
       const session = await this.lua.createSession({
         id,
@@ -239,7 +301,8 @@ export class ScriptRuntime {
         timeoutMs: 1000
       });
       this.sessions.set(id, session);
-      this.log("info", `started ${script?.name || id}`);
+      this.sessionNames.set(id, name);
+      this.log("info", `started ${name}`);
     } catch (error) {
       this.log("error", error instanceof Error ? error.message : String(error));
       throw error;
@@ -248,40 +311,59 @@ export class ScriptRuntime {
 
   async stopLocalScript(id?: string): Promise<boolean> {
     if (id) {
-      const session = this.sessions.get(id);
+      const sessionId = this.resolveSessionId(id);
+      if (!sessionId) return false;
+      const session = this.sessions.get(sessionId);
       if (!session) return false;
-      this.sessions.delete(id);
+      this.sessions.delete(sessionId);
+      const name = this.sessionNames.get(sessionId) || sessionId;
+      this.sessionNames.delete(sessionId);
+      this.context?.stopLocalWalk();
       await session.dispose();
-      this.log("info", `stopped ${id}`);
+      this.log("info", `stopped ${name}`);
       return true;
     }
     const sessions = [...this.sessions.entries()];
     this.sessions.clear();
+    this.sessionNames.clear();
+    this.context?.stopLocalWalk();
     for (const [, session] of sessions) await session.dispose();
     if (sessions.length) this.log("info", `stopped ${sessions.length} script session(s)`);
     return sessions.length > 0;
+  }
+
+  private resolveSessionId(id: string): string | null {
+    const raw = String(id || "").trim();
+    if (!raw) return null;
+    if (this.sessions.has(raw)) return raw;
+    const normalized = sanitizeSessionId(raw);
+    if (this.sessions.has(normalized)) return normalized;
+    for (const [sessionId, name] of this.sessionNames) {
+      if (sanitizeSessionId(name) === normalized) return sessionId;
+    }
+    return null;
   }
 
   clearLog(): void {
     this.logEntries.length = 0;
   }
 
-  snapshot(): { configured: boolean; available: boolean; enabled: boolean; running: boolean; sessions: string[]; scripts: LocalLuaScript[]; log: ScriptLogEntry[] } {
+  snapshot(): { configured: boolean; available: boolean; enabled: boolean; running: boolean; sessions: ScriptSessionInfo[]; scripts: LocalLuaScript[]; log: ScriptLogEntry[] } {
     return {
       configured: Boolean(this.context),
       available: this.canUseLua(),
       enabled: this.isEnabled(),
       running: this.running,
-      sessions: [...this.sessions.keys()],
+      sessions: [...this.sessions.keys()].map((id) => ({ id, name: this.sessionNames.get(id) || id })),
       scripts: this.listLocalScripts(),
       log: [...this.logEntries]
     };
   }
 
   private assertRunnable(): void {
-    if (!this.context) throw new Error("Lua tools are not configured yet.");
-    if (!this.canUseLua()) throw new Error("Lua tools require the lua license feature.");
-    if (!this.isEnabled()) throw new Error("Lua tools are disabled.");
+    if (!this.context) throw new Error("Lua Editor is not configured yet.");
+    if (!this.canUseLua()) throw new Error("Lua Editor requires the lua license feature.");
+    if (!this.isEnabled()) throw new Error("Lua Editor is disabled.");
   }
 
   private createLuaApi(): Record<string, unknown> {
@@ -311,6 +393,33 @@ export class ScriptRuntime {
         this.playerTransformOverrides.delete(this.playerKey(query));
         return true;
       },
+      "players.setBodyColors": (query: unknown, colors: unknown) => context.setPlayerBodyColors(query, colors),
+      "players.setBodyColor": (query: unknown, slot: unknown, color: unknown) => {
+        const current = readBodyColorPatch(slot, color);
+        return context.setPlayerBodyColors(query, current);
+      },
+      "players.setTexture": (query: unknown, slot: unknown, url: unknown) => context.setPlayerTexture(query, slot, url),
+      "players.setOutfit": (query: unknown, outfit: unknown) => {
+        if (!outfit || typeof outfit !== "object") return false;
+        const record = outfit as Record<string, unknown>;
+        let changed = false;
+        for (const slot of ["shirt", "pants", "face"]) {
+          if (record[slot] !== undefined) changed = context.setPlayerTexture(query, slot, record[slot]) || changed;
+        }
+        return changed;
+      },
+      "players.walkTo": (query: unknown, position: unknown, options: unknown) => {
+        const key = this.playerKey(query);
+        if (key !== "me" && key !== "local" && key !== "self") {
+          return { ok: false, reason: "walkTo-currently-local-only" };
+        }
+        return context.walkLocalTo(position, options);
+      },
+      "players.stopWalking": (query: unknown) => {
+        const key = this.playerKey(query);
+        if (key !== "me" && key !== "local" && key !== "self") return false;
+        return context.stopLocalWalk();
+      },
       "players.flip": (query: unknown, enabled: unknown) => {
         const active = enabled !== false;
         const root = context.getPlayerRoot(query);
@@ -332,8 +441,10 @@ export class ScriptRuntime {
       "cursor.setImage": (options: unknown) => context.setCursorImage(normalizeCursorOptions(options)),
       "cursor.clear": () => context.clearCursor(),
       "cursor.setClickToWalk": (enabled: unknown) => {
-        context.documentRef.body.classList.toggle("vw-lua-click-to-walk", enabled === true);
-        return enabled === true;
+        const active = enabled === true;
+        context.documentRef.body.classList.toggle("vw-lua-click-to-walk", active);
+        if (active) context.setMouseLook(false);
+        return active;
       },
       "cursor.setWorldMarker": (input: unknown) => {
         const normalized = normalizeWorldPartInput(input);
@@ -345,23 +456,55 @@ export class ScriptRuntime {
         return marker;
       },
       "cursor.worldMarker": (id: unknown) => this.worldMarkers.get(String(id || "cursor").trim() || "cursor") ?? null,
+      "camera.state": () => context.getCameraState(),
+      "camera.setDistanceOverride": (distance: unknown) => context.setCameraDistanceOverride(distance),
+      "camera.clearDistanceOverride": () => context.clearCameraDistanceOverride(),
       "camera.screenPointToRay": (x: unknown, y: unknown) => context.screenPointToRay(x, y),
       "camera.worldToScreen": (point: unknown) => context.worldToScreen(point),
       "input.mousePosition": () => context.getMousePosition(),
       "input.isDown": (code: unknown) => context.isKeyDown(code),
+      "input.viewport": () => context.ui.viewport(),
+      "assets.url": (path: unknown) => context.resolveAssetUrl(path),
+      "assets.image": (path: unknown) => context.resolveAssetUrl(path),
       "physics.raycast": (origin: unknown, direction: unknown, maxDistance: unknown) => context.raycast(origin, direction, maxDistance),
       "ui.layer": (layer: unknown) => context.ui.layer(layer),
       "ui.clear": (layer: unknown) => context.ui.clear(layer),
+      "ui.viewport": () => context.ui.viewport(),
+      "ui.measureText": (text: unknown, options: unknown) => context.ui.measureText(text, normalizeUiInput(options)),
       "ui.text": (layer: unknown, input: unknown) => context.ui.text(layer, normalizeUiInput(input)),
       "ui.rect": (layer: unknown, input: unknown) => context.ui.rect(layer, normalizeUiInput(input)),
       "ui.image": (layer: unknown, input: unknown) => context.ui.image(layer, normalizeUiInput(input)),
       "ui.button": (layer: unknown, input: unknown) => context.ui.button(layer, normalizeUiInput(input)),
+      "ui.panel": (layer: unknown, input: unknown) => context.ui.panel(layer, normalizeUiInput(input)),
+      "ui.line": (layer: unknown, input: unknown) => context.ui.line(layer, normalizeUiInput(input)),
+      "ui.polyline": (layer: unknown, input: unknown) => context.ui.polyline(layer, normalizeUiInput(input)),
+      "ui.circle": (layer: unknown, input: unknown) => context.ui.circle(layer, normalizeUiInput(input)),
+      "ui.progress": (layer: unknown, input: unknown) => context.ui.progress(layer, normalizeUiInput(input)),
+      "ui.chart": (layer: unknown, input: unknown) => context.ui.chart(layer, normalizeUiInput(input)),
+      "ui.update": (layer: unknown, id: unknown, input: unknown) => context.ui.update(layer, id, normalizeUiInput(input)),
+      "ui.remove": (layer: unknown, id: unknown) => context.ui.remove(layer, id),
+      "chat.send": (text: unknown) => {
+        const value = String(text ?? "").trim();
+        if (!value) return false;
+        context.sendChatMessage(value);
+        return true;
+      },
+      "chat.system": (text: unknown) => {
+        context.systemChatMessage(String(text ?? ""));
+        return true;
+      },
       "world.localPosition": () => context.getLocalPosition(),
+      "world.parts": () => context.listWorldParts(),
+      "world.getPart": (id: unknown) => context.getWorldPart(id),
       "world.spawnPart": (input: unknown) => {
         const part = context.spawnWorldPart(normalizeWorldPartInput(input));
         this.ownedWorldParts.add(part.id);
         return part;
       },
+      "world.setColor": (id: unknown, color: unknown) => context.setWorldPartColor(id, color),
+      "world.setTransparency": (id: unknown, transparency: unknown) => context.setWorldPartTransparency(id, transparency),
+      "world.setCollision": (id: unknown, canCollide: unknown) => context.setWorldPartCollision(id, canCollide),
+      "world.setCanCollide": (id: unknown, canCollide: unknown) => context.setWorldPartCollision(id, canCollide),
       "world.setMarker": (id: unknown, input: unknown) => {
         const key = String(id || "marker").trim() || "marker";
         const marker = context.setWorldMarker(key, normalizeWorldPartInput(input));
@@ -422,15 +565,64 @@ export class ScriptRuntime {
     }
   }
 
+  dispatchIncomingChat(event: ScriptChatMessageEvent): void {
+    if (!this.sessions.size || !this.isEnabled()) return;
+    const normalized = normalizeChatEvent(event);
+    for (const [id, session] of this.sessions) {
+      void session.chatIncoming(normalized).catch((error) => {
+        this.log("error", `[${id}] ${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
+  }
+
+  async dispatchOutgoingChat(text: string): Promise<{ cancel: boolean; text: string }> {
+    if (!this.sessions.size || !this.isEnabled()) return { cancel: false, text };
+    let event: ScriptChatMessageEvent = { type: "outgoing", text };
+    for (const [id, session] of this.sessions) {
+      try {
+        event = normalizeChatEvent(await session.chatOutgoing(event), event);
+        if (event.cancel) return { cancel: true, text: event.text };
+      } catch (error) {
+        this.log("error", `[${id}] ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return { cancel: Boolean(event.cancel), text: event.text };
+  }
+
   private attachInputEvents(documentRef: Document): void {
     if (this.inputEventsAttached) return;
     this.inputEventsAttached = true;
-    documentRef.addEventListener("pointerdown", (event) => {
+    documentRef.addEventListener("mousedown", (event) => {
+      if (shouldIgnoreScriptInput(event, documentRef, this.context?.windowRef)) return;
       this.dispatchInput({
         type: "click",
         button: pointerButtonName(event.button),
         x: event.clientX,
         y: event.clientY
+      });
+    });
+    documentRef.addEventListener("vortex-input-keydown", (event) => {
+      const detail = (event as CustomEvent<Record<string, unknown>>).detail || {};
+      this.dispatchInput({
+        type: "keydown",
+        code: String(detail.code || ""),
+        repeat: detail.repeat === true,
+        altKey: detail.altKey === true,
+        ctrlKey: detail.ctrlKey === true,
+        metaKey: detail.metaKey === true,
+        shiftKey: detail.shiftKey === true
+      });
+    });
+    documentRef.addEventListener("vortex-input-keyup", (event) => {
+      const detail = (event as CustomEvent<Record<string, unknown>>).detail || {};
+      this.dispatchInput({
+        type: "keyup",
+        code: String(detail.code || ""),
+        repeat: detail.repeat === true,
+        altKey: detail.altKey === true,
+        ctrlKey: detail.ctrlKey === true,
+        metaKey: detail.metaKey === true,
+        shiftKey: detail.shiftKey === true
       });
     });
   }
@@ -447,10 +639,52 @@ export class ScriptRuntime {
   }
 }
 
-function pointerButtonName(button: number): ScriptInputEvent["button"] {
+function pointerButtonName(button: number): ScriptMouseButton {
   if (button === 1) return "middle";
   if (button === 2) return "right";
   return "left";
+}
+
+function normalizeChatEvent(value: unknown, fallback?: ScriptChatMessageEvent): ScriptChatMessageEvent {
+  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const text = String(record.text ?? fallback?.text ?? "");
+  const event: ScriptChatMessageEvent = {
+    type: record.type === "incoming" ? "incoming" : "outgoing",
+    text: text.slice(0, 500),
+  };
+  const username = record.username === undefined ? fallback?.username : String(record.username);
+  const playerId = readOptionalPositiveNumber(record.playerId ?? record.id ?? fallback?.playerId);
+  const self = record.self === undefined ? fallback?.self : record.self === true;
+  const staff = record.staff === undefined ? fallback?.staff : record.staff === true;
+  const owner = record.owner === undefined ? fallback?.owner : record.owner === true;
+  const booster = record.booster === undefined ? fallback?.booster : record.booster === true;
+  const cancel = record.cancel === undefined ? fallback?.cancel : record.cancel === true;
+  if (username !== undefined) event.username = username;
+  if (playerId !== undefined) event.playerId = playerId;
+  if (self !== undefined) event.self = self;
+  if (staff !== undefined) event.staff = staff;
+  if (owner !== undefined) event.owner = owner;
+  if (booster !== undefined) event.booster = booster;
+  if (cancel !== undefined) event.cancel = cancel;
+  return event;
+}
+
+function readOptionalPositiveNumber(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function shouldIgnoreScriptInput(event: MouseEvent, documentRef: Document, windowRef: Window | undefined): boolean {
+  if (documentRef.body.classList.contains("vw-menu-open")) return true;
+  const chatActive = (windowRef as Window & { _chatFocused?: unknown; Chat?: { isActive?: () => boolean } } | undefined)?.Chat?.isActive;
+  if (typeof chatActive === "function" && chatActive.call((windowRef as Window & { Chat?: unknown }).Chat)) return true;
+  if ((windowRef as Window & { _chatFocused?: unknown } | undefined)?._chatFocused) return true;
+
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) return false;
+  if (target.closest("#settings-panel, #chat-window, #chat-input-row, .vw-script-explorer, #vw-script-ui-root")) return true;
+  if (target.closest("button, input, select, textarea, a, [contenteditable='true'], [role='button']")) return true;
+  return false;
 }
 
 function readTransform(root: ScriptPlayerRoot | null): ScriptTransform | null {
@@ -495,6 +729,10 @@ function normalizeTransform(input: unknown): ScriptTransform {
   if (rotation) transform.rotation = rotation;
   if (scale) transform.scale = scale;
   return transform;
+}
+
+function readBodyColorPatch(slot: unknown, color: unknown): Record<string, unknown> {
+  return { slot, color };
 }
 
 function maybeVector(value: unknown): ScriptVector3 | undefined {
@@ -564,6 +802,15 @@ function hashString(value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(36);
+}
+
+function sanitizeSessionId(value: string): string {
+  const cleaned = String(value || "")
+    .replace(/^workspace:/, "workspace-")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return cleaned || `inline-${hashString(value)}`;
 }
 
 export function validateScriptPackage(pkg: ScriptPackage): string | null {

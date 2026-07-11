@@ -1,6 +1,6 @@
 {
   "name": "Vortex Web",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "manifest_version": 3,
   "description": "Unofficial Vortex browser client with native multiplayer relay support, WebGPU work, and web-first enhancements.",
   "icons": {
@@ -71,6 +71,8 @@
       "resources": [
         "extension/page-world/*",
         "runtime/*",
+        "runtime/lua/*",
+        "runtime/lua/scripts/*",
         "runtime/page/*",
         "runtime/vendor/*",
         "runtime/vendor/TransformControls.js",

@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "check": "tsc --noEmit",
+    "docs:lua-api": "node scripts/generate-lua-api-docs.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
+    "monaco-editor": "^0.55.1",
     "wasmoon": "^1.16.0"
   }
 }

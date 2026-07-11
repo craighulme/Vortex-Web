@@ -162,7 +162,10 @@ export class InputRuntimeSetupService {
     });
 
     this.on(document, "mousemove", (event) => {
-      if (!input.isLocked()) return;
+      if (!input.isLocked()) {
+        cursor.setPosition(event.clientX, event.clientY);
+        return;
+      }
       cursor.handleMouseMove(event, (movementX, movementY) => camera.pointerLook(movementX, movementY));
     });
 

@@ -265,6 +265,48 @@ const spawnScriptWorldPart = (input: any, fallbackPosition?: [number, number, nu
     const entity = VortexRuntime.world.spawnPart(part);
     return { id: entity.id, position, size };
 };
+const resolveLuaAssetUrl = (value: unknown) => {
+    const localOrPackaged = VortexRuntime.scriptExplorer.assetUrl(value);
+    if (localOrPackaged) return localOrPackaged;
+    return resolveScriptAssetUrl(value, window.location.href);
+};
+const resolveScriptRaycastPart = (collider: unknown, point?: [number, number, number]) => {
+    const world = VortexRuntime.world;
+    const colliderId = String(collider ?? "");
+    if (colliderId) {
+        const exact = world.getPart?.(colliderId);
+        if (exact) return exact;
+        const staticIndex = /^static-(\d+)$/i.exec(colliderId);
+        if (staticIndex) {
+            const byIndex = world.listParts?.()[Number(staticIndex[1])];
+            if (byIndex) return byIndex;
+        }
+    }
+    if (!point) return null;
+    const parts = world.listParts?.() ?? [];
+    if (parts.length > 5000) return null;
+    const epsilon = 0.08;
+    let best: any = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const part of parts) {
+        const position = part?.position;
+        const size = part?.size;
+        if (!Array.isArray(position) || !Array.isArray(size)) continue;
+        const halfX = Math.max(0.01, Number(size[0]) / 2) + epsilon;
+        const halfY = Math.max(0.01, Number(size[1]) / 2) + epsilon;
+        const halfZ = Math.max(0.01, Number(size[2]) / 2) + epsilon;
+        const dx = Math.abs(point[0] - Number(position[0]));
+        const dy = Math.abs(point[1] - Number(position[1]));
+        const dz = Math.abs(point[2] - Number(position[2]));
+        if (dx > halfX || dy > halfY || dz > halfZ) continue;
+        const score = dx / halfX + dy / halfY + dz / halfZ;
+        if (score < bestScore) {
+            best = part;
+            bestScore = score;
+        }
+    }
+    return best;
+};
 VortexRuntime.scripting.configure({
     documentRef: document,
     windowRef: runtimeWindow as Window,
@@ -288,18 +330,66 @@ VortexRuntime.scripting.configure({
         }
         return null;
     },
+    setPlayerBodyColors: (query, colors) => {
+        const root = (() => {
+            const raw = String(query ?? "me").trim().toLowerCase();
+            if (!raw || raw === "me" || raw === "local" || raw === "self") return getCharacter() as any;
+            for (const [id, remote] of VortexRuntime.remoteSession.remotes) {
+                const name = String((remote as any)?.username || "").toLowerCase();
+                if (String(id).toLowerCase() === raw || (name && name.includes(raw))) return ((remote as any)?.meshes?.grp || null) as any;
+            }
+            return null;
+        })();
+        if (!root) return false;
+        const nextColors = normalizeScriptBodyColors(colors, root.userData?.vwebScriptBodyColors);
+        root.userData = { ...(root.userData || {}), vwebScriptBodyColors: nextColors };
+        VortexRuntime.avatarMaterials.applyBodyColors(root, nextColors);
+        return true;
+    },
+    setPlayerTexture: (query, slot, url) => {
+        const normalizedSlot = normalizePlayerTextureSlot(slot);
+        if (!normalizedSlot) return false;
+        const textureUrl = resolveLuaAssetUrl(url);
+        const raw = String(query ?? "me").trim().toLowerCase();
+        if (!raw || raw === "me" || raw === "local" || raw === "self") {
+            const mesh =
+                normalizedSlot === "shirt" ? localAvatar.getShirtMesh?.() :
+                normalizedSlot === "pants" ? localAvatar.getPantsMesh?.() :
+                localAvatar.getFaceMesh?.();
+            if (!mesh) return false;
+            VortexRuntime.avatarMaterials.applyShirtToMesh(mesh, textureUrl, { slot: normalizedSlot, source: "lua" });
+            return true;
+        }
+        for (const [id, remote] of VortexRuntime.remoteSession.remotes) {
+            const name = String((remote as any)?.username || "").toLowerCase();
+            if (String(id).toLowerCase() !== raw && (!name || !name.includes(raw))) continue;
+            const meshes = (remote as any)?.meshes || {};
+            const mesh =
+                normalizedSlot === "shirt" ? meshes.shirtMesh :
+                normalizedSlot === "pants" ? meshes.pantsMesh :
+                meshes.faceMesh;
+            if (!mesh) return false;
+            VortexRuntime.avatarMaterials.applyShirtToMesh(mesh, textureUrl, { slot: normalizedSlot, source: "lua" });
+            return true;
+        }
+        return false;
+    },
     getLocalPosition: () => {
         const position = getCharacter()?.position as any;
         if (!position) return null;
         return [Number(position.x) || 0, Number(position.y) || 0, Number(position.z) || 0];
     },
+    getCameraState: () => cameraService.snapshot() as any,
+    setCameraDistanceOverride: (distance) => cameraService.setDistanceOverride(distance) as any,
+    clearCameraDistanceOverride: () => cameraService.clearDistanceOverride() as any,
     screenPointToRay: (x, y) => {
         const screenX = typeof x === "object" && x !== null ? readScriptProperty(x, "x", 1) : x;
         const screenY = typeof x === "object" && x !== null ? readScriptProperty(x, "y", 2) : y;
-        const width = window.innerWidth || 1;
-        const height = window.innerHeight || 1;
-        const nx = (Number(screenX) / width) * 2 - 1;
-        const ny = -(Number(screenY) / height) * 2 + 1;
+        const rect = renderer.domElement?.getBoundingClientRect?.() || { left: 0, top: 0, width: window.innerWidth || 1, height: window.innerHeight || 1 };
+        const width = rect.width || window.innerWidth || 1;
+        const height = rect.height || window.innerHeight || 1;
+        const nx = ((Number(screenX) - rect.left) / width) * 2 - 1;
+        const ny = -(((Number(screenY) - rect.top) / height) * 2 - 1);
         const origin = new THREE.Vector3();
         const far = new THREE.Vector3(nx, ny, 1);
         camera.getWorldPosition?.(origin);
@@ -314,13 +404,14 @@ VortexRuntime.scripting.configure({
         const position = readScriptVector(point, [0, 0, 0]);
         const projected = new THREE.Vector3(position[0], position[1], position[2]);
         projected.project(camera);
-        const x = (projected.x + 1) * 0.5 * window.innerWidth;
-        const y = (1 - projected.y) * 0.5 * window.innerHeight;
+        const rect = renderer.domElement?.getBoundingClientRect?.() || { left: 0, top: 0, width: window.innerWidth || 1, height: window.innerHeight || 1 };
+        const x = rect.left + (projected.x + 1) * 0.5 * rect.width;
+        const y = rect.top + (1 - projected.y) * 0.5 * rect.height;
         return {
             x,
             y,
             z: projected.z,
-            visible: projected.z >= -1 && projected.z <= 1 && x >= 0 && y >= 0 && x <= window.innerWidth && y <= window.innerHeight,
+            visible: projected.z >= -1 && projected.z <= 1 && x >= rect.left && y >= rect.top && x <= rect.left + rect.width && y <= rect.top + rect.height,
         };
     },
     raycast: (origin, direction, maxDistance) => {
@@ -330,6 +421,7 @@ VortexRuntime.scripting.configure({
             clampNumber(Number(maxDistance ?? 500), 0.1, 10000)
         );
         if (!hit) return { hit: false };
+        const part = resolveScriptRaycastPart(hit.collider, hit.point);
         return {
             hit: true,
             point: hit.point,
@@ -337,6 +429,8 @@ VortexRuntime.scripting.configure({
             normal: hit.normal,
             distance: hit.distance,
             collider: hit.collider,
+            partId: part?.id ?? null,
+            part,
         };
     },
     getMousePosition: () => cursorService.position(),
@@ -345,6 +439,11 @@ VortexRuntime.scripting.configure({
         return spawnScriptWorldPart(input);
     },
     removeWorldPart: (id) => VortexRuntime.world.removeObject(id),
+    listWorldParts: () => VortexRuntime.world.listParts(),
+    getWorldPart: (id) => VortexRuntime.world.getPart(id),
+    setWorldPartColor: (id, color) => VortexRuntime.world.setPartColor(id, readScriptColor(color, 0x808080)),
+    setWorldPartTransparency: (id, transparency) => VortexRuntime.world.setPartTransparency(id, clampNumber(Number(transparency ?? 0), 0, 1)),
+    setWorldPartCollision: (id, canCollide) => VortexRuntime.world.setPartCollision(id, canCollide !== false),
     setWorldMarker: (id, input) => {
         const key = String(id || "marker").trim() || "marker";
         const existing = scriptWorldMarkers.get(key);
@@ -366,10 +465,26 @@ VortexRuntime.scripting.configure({
         scriptWorldMarkers.delete(key);
         return VortexRuntime.world.removeObject(existing);
     },
+    walkLocalTo: (position, options) => {
+        const target = readScriptVector(position, [NaN, NaN, NaN]);
+        if (!target.every(Number.isFinite)) return { ok: false, reason: "bad-position" };
+        const hit = VortexRuntime.physics.raycast([target[0], target[1] + 64, target[2]], [0, -1, 0], 180);
+        if (!hit?.point) return { ok: false, reason: "no-ground" };
+        const result = localMovement.setWalkTarget(
+            { x: hit.point[0], y: hit.point[1], z: hit.point[2] },
+            {
+                speed: readScriptProperty(options || {}, "speed", 1),
+                stopDistance: readScriptProperty(options || {}, "stopDistance", 2),
+            }
+        );
+        return result.ok ? { ok: true, target: hit.point } : result;
+    },
+    stopLocalWalk: () => localMovement.clearWalkTarget(),
+    setMouseLook: (enabled) => setMouseLock(!!enabled),
     setCursorImage: (options) => {
         const cursorElement = document.getElementById("cursor") as HTMLElement | null;
         if (!cursorElement) return { mode: "default" as const };
-        const url = resolveScriptAssetUrl(options.url, window.location.href);
+        const url = resolveLuaAssetUrl(options.url);
         const width = clampNumber(Number(options.width ?? 32), 8, 256);
         const height = clampNumber(Number(options.height ?? width), 8, 256);
         const hotspot = readScriptVector(options.hotspot, [0, 0, 0], { min: -256, max: 256 });
@@ -393,7 +508,18 @@ VortexRuntime.scripting.configure({
         delete document.body.dataset.vwebLuaCursor;
         return { mode: "default" as const };
     },
+    resolveAssetUrl: (path) => resolveLuaAssetUrl(path),
     ui: VortexRuntime.scriptUi,
+    sendChatMessage: (text) => {
+        VortexRuntime.multiplayerSession.sendPayload(
+            { type: "chat", msg: text },
+            {
+                encodeMovement: (state: any) => VortexRuntime.multiplayerSession.encodeMovementPacket(VortexRuntime.protocol, state),
+                encodeChat: (message: unknown) => VortexRuntime.multiplayerSession.encodeChatPacket(VortexRuntime.protocol, message),
+            }
+        );
+    },
+    systemChatMessage: (text) => VortexRuntime.chat.api()?.system(String(text || "")),
     hasLuaAccess: () => VortexRuntime.access.hasLicenseFeature("lua", {
         launchInfo: VortexRuntime.multiplayerSession.launchInfo || VortexRuntime.platform.bridgeConfig.identity || null,
         isLocalDevRelay: Boolean(
@@ -519,11 +645,65 @@ function readScriptColor(value: unknown, fallback: number): number {
     return fallback;
 }
 
+function normalizeScriptBodyColors(value: unknown, previous: unknown): string[] {
+    const fallback = Array.isArray(previous) && previous.length >= 6
+        ? previous.map((item) => normalizeScriptColorString(item, "#ffffff"))
+        : ["#d7d7d7", "#512a95", "#ffffff", "#ffffff", "#111b59", "#111b59"];
+    if (Array.isArray(value)) {
+        const next = [...fallback];
+        for (let index = 0; index < Math.min(6, value.length); index += 1) {
+            next[index] = normalizeScriptColorString(value[index], next[index] || "#ffffff");
+        }
+        return next;
+    }
+    if (!value || typeof value !== "object") return fallback;
+    const record = value as Record<string, unknown>;
+    if (record.slot !== undefined && record.color !== undefined) {
+        const next = [...fallback];
+        const index = bodyColorSlotIndex(record.slot);
+        if (index >= 0) next[index] = normalizeScriptColorString(record.color, next[index] || "#ffffff");
+        return next;
+    }
+    const next = [...fallback];
+    for (const [key, raw] of Object.entries(record)) {
+        const index = bodyColorSlotIndex(key);
+        if (index >= 0) next[index] = normalizeScriptColorString(raw, next[index] || "#ffffff");
+    }
+    return next;
+}
+
+function bodyColorSlotIndex(value: unknown): number {
+    const text = String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+    if (text === "0" || text === "head") return 0;
+    if (text === "1" || text === "torso" || text === "body" || text === "chest") return 1;
+    if (text === "2" || text === "leftarm" || text === "larm") return 2;
+    if (text === "3" || text === "rightarm" || text === "rarm") return 3;
+    if (text === "4" || text === "leftleg" || text === "lleg") return 4;
+    if (text === "5" || text === "rightleg" || text === "rleg") return 5;
+    return -1;
+}
+
+function normalizeScriptColorString(value: unknown, fallback: string): string {
+    if (typeof value === "number" && Number.isFinite(value)) return `#${Math.round(value).toString(16).padStart(6, "0").slice(-6)}`;
+    const text = String(value ?? "").trim();
+    if (/^#[0-9a-f]{6}$/i.test(text)) return text;
+    if (/^[0-9a-f]{6}$/i.test(text)) return `#${text}`;
+    return fallback;
+}
+
+function normalizePlayerTextureSlot(value: unknown): "shirt" | "pants" | "face" | null {
+    const text = String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+    if (text === "shirt" || text === "top" || text === "torso") return "shirt";
+    if (text === "pants" || text === "pant" || text === "legs" || text === "bottom") return "pants";
+    if (text === "face" || text === "head") return "face";
+    return null;
+}
+
 function resolveScriptAssetUrl(value: unknown, baseUrl: string): string {
     const raw = String(value || "").trim();
     if (!raw) throw new Error("cursor image url is required");
     const url = new URL(raw, baseUrl);
-    if (url.protocol !== "https:" && url.protocol !== "http:" && url.protocol !== "chrome-extension:") {
+    if (url.protocol !== "https:" && url.protocol !== "http:" && url.protocol !== "chrome-extension:" && url.protocol !== "blob:") {
         throw new Error(`unsupported cursor image protocol: ${url.protocol}`);
     }
     if (url.protocol === "http:" && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
