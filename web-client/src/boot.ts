@@ -58,28 +58,52 @@ declare global {
 function hydrateRemoteAssetManifest(runtime: ReturnType<typeof createVortexRuntime>): void {
   const apiBase = readMetaContent("_vortexCommunityApi");
   if (!apiBase) return;
-  try {
-    const manifestUrl = new URL("/assets/manifest", apiBase).toString();
-    void runtime.streaming.hydrateRemoteManifest(manifestUrl, {
-      fetcher: window.fetch.bind(window)
-    }).then((records) => {
-      const animationPacks = runtime.avatarAnimations.registerStreamRecords(records);
-      if (records.length) {
-        runtime.diagnostics.info("stream.manifest.ready", {
-          url: manifestUrl,
-          assets: records.length,
-          animationPacks: animationPacks.length
-        });
-      }
+  const manifestUrl = safeRemoteManifestUrl(apiBase);
+  if (!manifestUrl) {
+    runtime.diagnostics.warn("stream.manifest.bootstrap.failed", {
+      reason: "invalid community api url",
+      apiBase
     });
-  } catch {
-    runtime.diagnostics.warn("stream.manifest.bootstrap.failed");
+    return;
   }
+
+  void runtime.streaming.hydrateRemoteManifest(manifestUrl, {
+    fetcher: window.fetch.bind(window)
+  }).then((records) => {
+    const animationPacks = runtime.avatarAnimations.registerStreamRecords(records);
+    if (records.length) {
+      runtime.diagnostics.info("stream.manifest.ready", {
+        url: manifestUrl,
+        assets: records.length,
+        animationPacks: animationPacks.length
+      });
+    }
+  }).catch((error) => {
+    runtime.diagnostics.warn("stream.manifest.bootstrap.failed", {
+      url: manifestUrl,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
 }
 
 function readMetaContent(id: string): string {
   const meta = document.getElementById(id) as HTMLMetaElement | null;
-  return String(meta?.content || "").trim();
+  const raw = String(meta?.content || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "string" ? parsed.trim() : raw;
+  } catch {
+    return raw;
+  }
+}
+
+function safeRemoteManifestUrl(apiBase: string): string {
+  try {
+    return new URL("/assets/manifest", apiBase).toString();
+  } catch {
+    return "";
+  }
 }
 
 function applyRuntimeThemeCss(): void {

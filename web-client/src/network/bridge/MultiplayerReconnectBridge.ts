@@ -10,12 +10,15 @@ type MultiplayerReconnectBridgeOptions = {
 export function createMultiplayerReconnectBridge(options: MultiplayerReconnectBridgeOptions) {
   const scheduleReconnect = (label = "relay") => {
     options.stopBroadcast();
-    const closedWs = options.runtimeSession().resetForReconnect();
+    const session = options.runtimeSession();
+    const closedWs = session.resetForReconnect();
     const plan = options.runtimeMultiplayer().planReconnect(label, Boolean(closedWs?._kicked));
     if (plan.kicked) return;
     if (plan.exhausted) {
       try {
-        options.Chat.warn(plan.message);
+        if (session.shouldEmitRelayNotice?.(`reconnect-exhausted:${label}`, 30000) !== false) {
+          options.Chat.warn(plan.message);
+        }
       } catch {
         // Chat may not be fully mounted during failed startup recovery.
       }
@@ -23,7 +26,9 @@ export function createMultiplayerReconnectBridge(options: MultiplayerReconnectBr
     }
 
     try {
-      options.Chat.system(plan.message);
+      if (session.shouldEmitRelayNotice?.(`reconnect:${label}`, 15000) !== false) {
+        options.Chat.warn(plan.message);
+      }
     } catch {
       // Chat may not be fully mounted during failed startup recovery.
     }

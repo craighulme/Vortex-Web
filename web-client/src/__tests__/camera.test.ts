@@ -68,4 +68,18 @@ describe("CameraService", () => {
     expect(firstPerson.firstPerson).toBe(true);
     expect(firstPerson.pivot[2]).toBeCloseTo(-1);
   });
+
+  it("can disable first-person transforms for script camera subjects", () => {
+    const camera = new CameraService();
+
+    camera.zoomWheel(-100000);
+    camera.smoothDistance(1);
+    const transform = camera.computeTransform(
+      { position: { x: 5, y: 10, z: 15 } },
+      { shiftLock: true, footOffset: 2, allowFirstPerson: false }
+    );
+
+    expect(transform.firstPerson).toBe(false);
+    expect(transform.pivot[0]).toBeCloseTo(6.75);
+  });
 });

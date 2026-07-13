@@ -405,7 +405,7 @@ describe("MultiplayerService", () => {
       exhausted: false,
       attempt: 1,
       delayMs: 1200,
-      message: "Vortex Web relay disconnected. Reconnecting in 1.2s..."
+      message: "Disconnected from Vortex Web servers. Rejoin the game if this does not recover."
     });
     expect(multiplayer.planReconnect("relay")).toMatchObject({
       shouldReconnect: true,
@@ -419,14 +419,14 @@ describe("MultiplayerService", () => {
     multiplayer.resetReconnect();
     expect(multiplayer.planReconnect("socket")).toMatchObject({
       attempt: 1,
-      message: "Vortex Web socket disconnected. Reconnecting in 1.2s..."
+      message: "Disconnected from Vortex Web servers. Rejoin the game if this does not recover."
     });
 
     for (let i = 0; i < 20; i += 1) multiplayer.planReconnect("relay");
     expect(multiplayer.planReconnect("relay")).toMatchObject({
       exhausted: true,
       shouldReconnect: false,
-      message: "Vortex Web relay disconnected. Reload the page to retry."
+      message: "Disconnected from Vortex Web servers. Rejoin the game to reconnect."
     });
   });
 

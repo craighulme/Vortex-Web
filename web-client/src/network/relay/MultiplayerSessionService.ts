@@ -35,6 +35,7 @@ export class MultiplayerSessionService {
   private relayUrlValue = "";
   private relayErrorValue = "";
   private relayCloseValue: { code?: number; reason?: string; wasClean?: boolean } | null = null;
+  private relayNoticeTimes = new Map<string, number>();
 
   get socket(): SocketLike | null {
     return this.socketValue;
@@ -155,6 +156,14 @@ export class MultiplayerSessionService {
     this.relayUrlValue = String(url || "");
     this.relayErrorValue = "";
     this.relayCloseValue = null;
+  }
+
+  shouldEmitRelayNotice(key: string, minIntervalMs = 10000, now = Date.now()): boolean {
+    const noticeKey = String(key || "relay");
+    const last = this.relayNoticeTimes.get(noticeKey) || 0;
+    if (last > 0 && now - last < minIntervalMs) return false;
+    this.relayNoticeTimes.set(noticeKey, now);
+    return true;
   }
 
   markRelayOpen(): void {
@@ -352,6 +361,7 @@ export class MultiplayerSessionService {
     this.relayUrlValue = "";
     this.relayErrorValue = "";
     this.relayCloseValue = null;
+    this.relayNoticeTimes.clear();
   }
 }
 

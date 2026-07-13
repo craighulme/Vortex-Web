@@ -41,6 +41,10 @@ For examples and explanation, read [LUA_DOCS.md](LUA_DOCS.md).
 | `vweb.camera.state` | `()` | Returns camera yaw, pitch, distance, and zoom limits. |
 | `vweb.camera.setDistanceOverride` | `(distance)` | Temporarily clamps third-person camera distance. |
 | `vweb.camera.clearDistanceOverride` | `()` | Clears a script camera distance override. |
+| `vweb.camera.setSubject` | `(player)` | Follows a local or remote player by id, name, or me/local. |
+| `vweb.camera.setTarget` | `(player)` | Alias for setSubject. |
+| `vweb.camera.clearSubject` | `()` | Returns the camera to the local player. |
+| `vweb.camera.getSubject` | `()` | Returns the current script camera subject. |
 
 ## Physics
 

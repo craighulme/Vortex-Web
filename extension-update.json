@@ -1,15 +1,15 @@
 {
-  "version": "0.8.1",
-  "date": "2026-07-11",
+  "version": "0.8.2",
+  "date": "2026-07-14",
   "url": "https://github.com/craighulme/Vortex-Web",
-  "title": "Lua Editor arrives in Vortex Web",
-  "summary": "This patch improves the Lua Editor API shape, adds Roblox-style scripting aliases, documents the current Lua surface, and keeps the 0.8 runtime cleanup moving.",
+  "title": "Lua API, animation, and relay fixes",
+  "summary": "Patch update for Lua scripting, avatar animation, and relay stability.",
   "changelog": [
-    "Expanded Lua with Roblox-style aliases such as game:GetService, Players, Workspace, RunService, UserInputService, Instance.new, Vector3, Color3, and UDim2.",
-    "Kept the existing Vortex Web API for HUD layers, surface drawing, chat hooks, camera tools, raycasts, player overrides, world markers, and local runtime parts.",
-    "Added built-in Lua examples for the interface playground and smooth camera collision.",
-    "Added Lua API documentation in the repo README.",
-    "Fixed packaged Lua script exposure for extension builds.",
-    "Please report Lua, UGC, UI, and performance issues on GitHub."
+    "Added more Lua API methods for camera control, input, raycasts, HUD/surface drawing, chat hooks, local world markers, and player visual overrides.",
+    "Added Lua examples for click-to-walk, interface scripting, and smooth camera collision.",
+    "Changed the default avatar animation pack to use more Vortex-like idle, walk, jump, and fall motion.",
+    "Fixed relay sessions disconnecting too quickly when the browser was AFK or in the background.",
+    "Fixed repeated reconnect messages flooding the in-game chat box.",
+    "Improved early UGC animation pack preview/equip support. Please report issues on GitHub."
   ]
 }

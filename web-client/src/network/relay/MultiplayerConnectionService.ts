@@ -115,7 +115,9 @@ export class MultiplayerConnectionService {
   ): void {
     const hubUrl = this.multiplayer.buildHubUrl(context.config, launchInfo, localRelay, context.fallbackGameId || 0);
     try {
-      context.chat.system(`Vortex Web connecting to relay`);
+      if (this.session.shouldEmitRelayNotice(`connecting:${hubUrl}`, 15000)) {
+        context.chat.system(`Vortex Web connecting to relay`);
+      }
     } catch {
       // Keep connection setup resilient if URL parsing fails in older browser contexts.
     }
@@ -129,7 +131,9 @@ export class MultiplayerConnectionService {
       onOpen: () => {
         this.session.markRelayOpen();
         try {
-          context.chat.system("Vortex Web relay connected.");
+          if (this.session.shouldEmitRelayNotice("connected:relay", 15000)) {
+            context.chat.system("Vortex Web relay connected.");
+          }
         } catch {
           // Chat is not critical to establishing multiplayer.
         }
@@ -152,7 +156,9 @@ export class MultiplayerConnectionService {
       onClose: () => context.scheduleReconnect("relay"),
       onError: () => {
         try {
-          context.chat.system("Vortex Web hub connection failed.");
+          if (this.session.shouldEmitRelayNotice("failed:relay", 15000)) {
+            context.chat.system("Vortex Web hub connection failed.");
+          }
         } catch {
           // Chat is not critical to error handling.
         }
@@ -198,7 +204,9 @@ export class MultiplayerConnectionService {
       onClose: () => context.scheduleReconnect("multiplayer websocket"),
       onError: () => {
         try {
-          context.chat.system("Vortex Web multiplayer websocket connection failed.");
+          if (this.session.shouldEmitRelayNotice("failed:multiplayer-websocket", 15000)) {
+            context.chat.system("Vortex Web multiplayer websocket connection failed.");
+          }
         } catch {
           // Chat is not critical to error handling.
         }

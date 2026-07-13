@@ -33,6 +33,9 @@ export type { RigBoneLike, RigBoneRest } from "./AnimationPose";
 
 export type LocalAnimationState = {
   time: number;
+  slotTime?: number;
+  activeSlot?: RuntimeAnimationSlot;
+  airborneTime?: number;
   bones: Record<string, RigBoneLike | undefined>;
   rest: Record<string, RigBoneRest | undefined>;
   animationClips?: Record<string, AnimationClip> | null;
@@ -131,16 +134,10 @@ export class AnimationService {
   animateLocal(state: LocalAnimationState, options: LocalAnimationOptions): void {
     const dt = Math.max(0, Number(options.dt) || 0);
     state.time = Number(state.time || 0) + dt;
-    const slot = options.climbing
-      ? "climb"
-      : !options.grounded
-        ? Number(options.verticalVelocity || 0) < -1
-          ? "fall"
-          : "jump"
-        : options.moving
-          ? "walk"
-          : "idle";
-    this.applyClip(state.bones, state.rest, slot, state.time, dt, options.moving, state.animationClips);
+    const slot = this.localSlot(state, options, dt);
+    state.slotTime = state.activeSlot === slot ? Number(state.slotTime || 0) + dt : dt;
+    state.activeSlot = slot;
+    this.applyClip(state.bones, state.rest, slot, state.slotTime, dt, options.moving, state.animationClips);
   }
 
   animateRuntimeRemote(remote: RuntimeRemoteAnimationTarget, dt: number): void {
@@ -220,6 +217,24 @@ export class AnimationService {
     state.leftScale = applyLegVerticalOffset(animation, animation.bones.Left_Leg, state.leftY, axis, 5);
     state.rightScale = applyLegVerticalOffset(animation, animation.bones.Right_Leg, state.rightY, axis, 5);
     if (animation.bones.Torso) applyBoneVerticalOffset(animation, animation.bones.Torso, state.pelvisY, axis);
+  }
+
+  private localSlot(state: LocalAnimationState, options: LocalAnimationOptions, dt: number): RuntimeAnimationSlot {
+    if (options.climbing) {
+      state.airborneTime = 0;
+      return "climb";
+    }
+    if (options.grounded) {
+      state.airborneTime = 0;
+      return options.moving ? "walk" : "idle";
+    }
+
+    const verticalVelocity = Number(options.verticalVelocity || 0);
+    state.airborneTime = Number(state.airborneTime || 0) + dt;
+    if (state.airborneTime < 0.08 && Math.abs(verticalVelocity) < 8) {
+      return options.moving ? "walk" : "idle";
+    }
+    return verticalVelocity < -1 ? "fall" : "jump";
   }
 
   private applyClip(

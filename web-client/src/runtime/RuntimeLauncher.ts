@@ -2,6 +2,7 @@ import * as THRE from "../../public/vendor/three.webgpu.js";
 import * as BufferGeometryUtils from "../../public/vendor/BufferGeometryUtils.js";
 import { GLTFLoader } from "../../public/vendor/GLTFLoader.js";
 import { CSMShadowNode } from "../../public/vendor/CSMShadowNode.js";
+import { registerGltfAnimationPack } from "../animation/GltfAnimationClipAdapter";
 import { attachRuntimeApi } from "./createRuntime";
 import type { VortexRuntime } from "./types";
 
@@ -115,6 +116,13 @@ runtimeWindow.locked = false;
 const anim = { time: 0, bones: {}, rest: {} };
 
 const gltfLoader = new THREE.GLTFLoader();
+void registerGltfAnimationPack({
+    animation: VortexRuntime.animation,
+    loader: gltfLoader,
+    url: runtimeAsset("meshes.vwebDefaultAnimationsGlb", "vwebDefaultAnimationsGlb"),
+    THREE,
+    diagnostics: VortexRuntime.diagnostics,
+});
 const storedAvatarRigVersion = localStorage.getItem("vwebAvatarRigVersion");
 const avatarRigVersion = storedAvatarRigVersion === "legacy-vortex-r7" ? "legacy-vortex-r7" : "vweb-rig-v1";
 runtimeWindow.VortexAvatarRig = createAvatarRigDebugController(localStorage, avatarRigVersion);
@@ -176,6 +184,42 @@ function setMouseLock(sl: unknown) {
     hudRuntime?.setMouseLock(!!sl);
 }
 
+let scriptCameraSubject: { query: string; root: any; id: string; name: string; local: boolean } | null = null;
+
+function resolveScriptPlayerRoot(query: unknown = "me"): { root: any; id: string; name: string; local: boolean } | null {
+    const raw = String(query ?? "me").trim().toLowerCase();
+    if (!raw || raw === "me" || raw === "local" || raw === "self") {
+        const local = getCharacter() as any;
+        const player = getScriptLocalPlayer();
+        return local ? { root: local, id: String(player.id || "me"), name: String(player.name || "me"), local: true } : null;
+    }
+    for (const [id, remote] of VortexRuntime.remoteSession.remotes) {
+        const name = String((remote as any)?.username || "").toLowerCase();
+        if (String(id).toLowerCase() === raw || (name && name.includes(raw))) {
+            const root = ((remote as any)?.meshes?.grp || null) as any;
+            if (!root) return null;
+            return {
+                root,
+                id: String(id),
+                name: String((remote as any)?.username || `#${id}`),
+                local: false
+            };
+        }
+    }
+    return null;
+}
+
+function getScriptCameraSubjectRoot(): any {
+    if (!scriptCameraSubject) return null;
+    const resolved = resolveScriptPlayerRoot(scriptCameraSubject.query);
+    if (!resolved) {
+        scriptCameraSubject = null;
+        return null;
+    }
+    scriptCameraSubject = { ...resolved, query: scriptCameraSubject.query };
+    return resolved.root;
+}
+
 const localPlayerRuntime = VortexRuntime.localPlayerSetup.configure({
     THREE,
     runtime: VortexRuntime,
@@ -185,6 +229,7 @@ const localPlayerRuntime = VortexRuntime.localPlayerSetup.configure({
     localAvatar,
     windowRef: runtimeWindow as Window & Record<string, unknown>,
     getCharacter,
+    getCameraSubject: getScriptCameraSubjectRoot,
     getNearbyColliders: worldRuntime.getNearbyColliders,
     getMetrics: characterMetrics,
     setMouseLock,
@@ -319,27 +364,9 @@ VortexRuntime.scripting.configure({
         }
         return players;
     },
-    getPlayerRoot: (query) => {
-        const raw = String(query ?? "me").trim().toLowerCase();
-        if (!raw || raw === "me" || raw === "local" || raw === "self") return getCharacter() as any;
-        for (const [id, remote] of VortexRuntime.remoteSession.remotes) {
-            const name = String((remote as any)?.username || "").toLowerCase();
-            if (String(id).toLowerCase() === raw || (name && name.includes(raw))) {
-                return ((remote as any)?.meshes?.grp || null) as any;
-            }
-        }
-        return null;
-    },
+    getPlayerRoot: (query) => resolveScriptPlayerRoot(query)?.root ?? null,
     setPlayerBodyColors: (query, colors) => {
-        const root = (() => {
-            const raw = String(query ?? "me").trim().toLowerCase();
-            if (!raw || raw === "me" || raw === "local" || raw === "self") return getCharacter() as any;
-            for (const [id, remote] of VortexRuntime.remoteSession.remotes) {
-                const name = String((remote as any)?.username || "").toLowerCase();
-                if (String(id).toLowerCase() === raw || (name && name.includes(raw))) return ((remote as any)?.meshes?.grp || null) as any;
-            }
-            return null;
-        })();
+        const root = resolveScriptPlayerRoot(query)?.root ?? null;
         if (!root) return false;
         const nextColors = normalizeScriptBodyColors(colors, root.userData?.vwebScriptBodyColors);
         root.userData = { ...(root.userData || {}), vwebScriptBodyColors: nextColors };
@@ -382,6 +409,27 @@ VortexRuntime.scripting.configure({
     getCameraState: () => cameraService.snapshot() as any,
     setCameraDistanceOverride: (distance) => cameraService.setDistanceOverride(distance) as any,
     clearCameraDistanceOverride: () => cameraService.clearDistanceOverride() as any,
+    setCameraSubject: (query) => {
+        const resolved = resolveScriptPlayerRoot(query);
+        if (!resolved) return { ok: false, reason: "player-not-found", subject: null };
+        scriptCameraSubject = { ...resolved, query: String(query ?? "me") };
+        return {
+            ok: true,
+            id: resolved.id,
+            name: resolved.name,
+            local: resolved.local,
+        };
+    },
+    clearCameraSubject: () => {
+        const hadSubject = !!scriptCameraSubject;
+        scriptCameraSubject = null;
+        return { ok: true, cleared: hadSubject };
+    },
+    getCameraSubject: () => scriptCameraSubject ? {
+        id: scriptCameraSubject.id,
+        name: scriptCameraSubject.name,
+        local: scriptCameraSubject.local,
+    } : null,
     screenPointToRay: (x, y) => {
         const screenX = typeof x === "object" && x !== null ? readScriptProperty(x, "x", 1) : x;
         const screenY = typeof x === "object" && x !== null ? readScriptProperty(x, "y", 2) : y;

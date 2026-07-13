@@ -140,7 +140,7 @@ function toRuntimeGltfTrack(track: GltfTrackLike): RuntimeGltfTrack | null {
 function createRuntimeAnimationClip(clip: RuntimeGltfClip, THREE: ThreeLike): AnimationClip {
   const scratchQuaternion = THREE.Quaternion ? new THREE.Quaternion() : null;
   return (context: AnimationPoseContext) => {
-    const time = wrapTime(Number(context.time || 0), clip.sampleDuration);
+    const time = sampleClipTime(Number(context.time || 0), clip);
     const alpha = Math.min(1, Math.max(0.35, Number(context.dt || 0) * 22));
     for (const track of clip.tracks) {
       const bone = findBone(context.bones, track.boneAliases);
@@ -155,6 +155,12 @@ function createRuntimeAnimationClip(clip: RuntimeGltfClip, THREE: ThreeLike): An
       }
     }
   };
+}
+
+function sampleClipTime(time: number, clip: RuntimeGltfClip): number {
+  const safeTime = Math.max(0, Number(time) || 0);
+  if (clip.slot === "jump" || clip.slot === "fall") return Math.min(safeTime, clip.sampleDuration);
+  return wrapTime(safeTime, clip.sampleDuration);
 }
 
 function loopSampleDuration(tracks: RuntimeGltfTrack[], fallback: number): number {

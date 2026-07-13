@@ -114,6 +114,10 @@ vweb.camera = {
   state = function() return call("camera.state") end,
   setDistanceOverride = function(distance) return call("camera.setDistanceOverride", distance) end,
   clearDistanceOverride = function() return call("camera.clearDistanceOverride") end,
+  setSubject = function(query) return call("camera.setSubject", query or "me") end,
+  setTarget = function(query) return call("camera.setTarget", query or "me") end,
+  clearSubject = function() return call("camera.clearSubject") end,
+  getSubject = function() return call("camera.getSubject") end,
   screenPointToRay = function(x, y)
     local sx, sy = screenArgs(x, y)
     return call("camera.screenPointToRay", sx, sy)
@@ -740,7 +744,11 @@ local RobloxCamera = {
   WorldToScreenPoint = function(self, point) return vweb.camera.worldToScreen(point) end,
   ScreenPointToRay = function(self, x, y) return vweb.camera.screenPointToRay(x, y) end,
   SetDistanceOverride = function(self, distance) return vweb.camera.setDistanceOverride(distance) end,
-  ClearDistanceOverride = function(self) return vweb.camera.clearDistanceOverride() end
+  ClearDistanceOverride = function(self) return vweb.camera.clearDistanceOverride() end,
+  SetSubject = function(self, subject) return vweb.camera.setSubject(subject) end,
+  SetTarget = function(self, subject) return vweb.camera.setTarget(subject) end,
+  ClearSubject = function(self) return vweb.camera.clearSubject() end,
+  GetSubject = function(self) return vweb.camera.getSubject() end
 }
 
 local RobloxWorkspace = {

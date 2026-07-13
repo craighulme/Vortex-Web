@@ -11,6 +11,7 @@ export type LocalPlayerRuntimeSetupOptions = {
   localAvatar: unknown;
   windowRef: Window;
   getCharacter(): unknown;
+  getCameraSubject?(): unknown;
   getNearbyColliders(px: number, py: number, pz: number): Set<unknown>;
   getMetrics(): unknown;
   setMouseLock(value: boolean): void;
@@ -41,6 +42,7 @@ export class LocalPlayerRuntimeSetupService {
       characterSpawn: options.characterSpawn,
       windowRef: options.windowRef,
       getCharacter: options.getCharacter,
+      getCameraSubject: options.getCameraSubject,
       getNearbyColliders: options.getNearbyColliders,
       getMetrics: options.getMetrics,
       setMouseLock: options.setMouseLock,

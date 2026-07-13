@@ -365,6 +365,7 @@ function renderStudioEditor(container: HTMLElement, drafts: UgcDraftStore, api: 
     syncKind();
     syncSlot();
     syncTransform();
+    writeClipMap(form, manifest.clips || {});
     refreshParticleControls(true);
     writeActiveEmitterToForm();
     state.viewer?.setParticleEmitters(state.particles, state.activeParticleId);
@@ -377,7 +378,14 @@ function renderStudioEditor(container: HTMLElement, drafts: UgcDraftStore, api: 
       state.file = file;
       if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
       state.objectUrl = URL.createObjectURL(file);
-      await state.viewer?.loadAccessory(file);
+      if (kindInput.value === "animation-pack") {
+        state.viewer?.clearAccessory();
+        const clipNames = await state.viewer?.loadAnimationPack(file, clipMapFromManifest(manifest.clips));
+        autoFillClipMap(form, clipNames || []);
+        writeClipMap(form, manifest.clips || {});
+      } else {
+        await state.viewer?.loadAccessory(file);
+      }
       status.textContent = "Draft loaded. You can keep editing or publish it for review.";
       status.className = "vweb-ugc-status ok";
     } catch {
@@ -451,7 +459,15 @@ function renderStudioEditor(container: HTMLElement, drafts: UgcDraftStore, api: 
     state.file = fileInput.files?.[0] ?? null;
     state.objectUrl = state.file ? URL.createObjectURL(state.file) : "";
     modelFile.textContent = state.file ? state.file.name : "No GLB selected";
-    if (state.file) await state.viewer?.loadAccessory(state.file);
+    if (state.file) {
+      if (kindInput.value === "animation-pack") {
+        state.viewer?.clearAccessory();
+        const clipNames = await state.viewer?.loadAnimationPack(state.file);
+        autoFillClipMap(form, clipNames || []);
+      } else {
+        await state.viewer?.loadAccessory(state.file);
+      }
+    }
   });
 
   particleFileInput.addEventListener("change", () => {
@@ -751,6 +767,20 @@ async function renderStore(container: HTMLElement, api: UgcStoreApi, state: Stud
           <p>Try approved Vortex Web items against the standard avatar rig.</p>
         </div>
         <div class="vweb-ugc-store-stage" data-vweb-store-viewport></div>
+        <div class="vweb-ugc-store-animation" data-vweb-store-animation hidden>
+          <div class="vweb-ugc-store-animation-head">
+            <strong>Animation preview</strong>
+            <span data-vweb-store-animation-count>No clips</span>
+          </div>
+          <div class="vweb-ugc-animation-controls">
+            <select data-vweb-store-animation-select disabled>
+              <option value="none">No playable clips</option>
+            </select>
+            <button type="button" data-vweb-store-animation-play disabled>Play</button>
+            <input type="range" min="0" max="1000" value="0" data-vweb-store-animation-time disabled aria-label="Animation frame">
+            <span data-vweb-store-animation-label>0.00s</span>
+          </div>
+        </div>
         <div class="vweb-ugc-store-selected" data-vweb-store-selected>
           <h3>Select an item</h3>
           <p>Choose a published item from the catalog to preview it here.</p>
@@ -781,18 +811,47 @@ async function renderStore(container: HTMLElement, api: UgcStoreApi, state: Stud
   const selectedPanel = container.querySelector("[data-vweb-store-selected]") as HTMLElement;
   const equippedPanel = container.querySelector("[data-vweb-equipped]") as HTMLElement;
   const viewport = container.querySelector("[data-vweb-store-viewport]") as HTMLElement;
+  const animationPanel = container.querySelector("[data-vweb-store-animation]") as HTMLElement;
+  const animationCount = container.querySelector("[data-vweb-store-animation-count]") as HTMLElement;
+  const animationSelect = container.querySelector("[data-vweb-store-animation-select]") as HTMLSelectElement;
+  const animationPlay = container.querySelector("[data-vweb-store-animation-play]") as HTMLButtonElement;
+  const animationTime = container.querySelector("[data-vweb-store-animation-time]") as HTMLInputElement;
+  const animationLabel = container.querySelector("[data-vweb-store-animation-label]") as HTMLElement;
+  let animationDragging = false;
   const equipment = new UgcEquipmentStore();
   const viewer = new UgcStudioViewer({
     stage: viewport,
     status: null,
     runtimeUrl,
-    editable: false
+    editable: false,
+    onAnimationUpdate: (snapshot) => {
+      animationPlay.disabled = snapshot.name === "none" || snapshot.duration <= 0;
+      animationTime.disabled = snapshot.name === "none" || snapshot.duration <= 0;
+      animationPlay.textContent = snapshot.playing ? "Pause" : "Play";
+      animationLabel.textContent = snapshot.duration ? `${snapshot.time.toFixed(2)}s / ${snapshot.duration.toFixed(2)}s` : "0.00s";
+      if (!animationDragging) animationTime.value = String(Math.round(snapshot.normalized * 1000));
+    }
   });
   state.viewer = viewer;
   let selected: UgcStoreItem | null = null;
   let items: UgcStoreItem[] = [];
   let equipmentToken = "";
   let equipmentSync: "cloud" | "local" = "local";
+  let previewToken = 0;
+  const setAnimationControls = (slots: string[], visible: boolean) => {
+    animationPanel.hidden = !visible;
+    const playable = slots.filter((slot) => ANIMATION_SLOTS.includes(slot));
+    animationCount.textContent = playable.length ? `${playable.length} clip${playable.length === 1 ? "" : "s"}` : "No clips";
+    animationSelect.innerHTML = playable.length
+      ? playable.map((slot) => `<option value="${escapeAttribute(slot)}">${escapeHtml(slot.replace("_", " "))}</option>`).join("")
+      : `<option value="none">No playable clips</option>`;
+    animationSelect.disabled = !playable.length;
+    animationPlay.disabled = !playable.length;
+    animationTime.disabled = !playable.length;
+    animationTime.value = "0";
+    animationLabel.textContent = "0.00s";
+    if (playable.length) animationSelect.value = playable[0] || "none";
+  };
   try {
     await viewer.mount();
     viewer.applyAvatarAppearance(await loadCatalogAppearance());
@@ -818,7 +877,12 @@ async function renderStore(container: HTMLElement, api: UgcStoreApi, state: Stud
   const selectItem = (item: UgcStoreItem) => {
     selected = item;
     renderStoreSelection(selectedPanel, item, equipment.isEquipped(item));
-    void previewStoreItem(viewer, item, selectedPanel);
+    const token = ++previewToken;
+    setAnimationControls([], item.kind === "animation-pack");
+    void previewStoreItem(viewer, item, selectedPanel).then((slots) => {
+      if (token !== previewToken) return;
+      setAnimationControls(slots, item.kind === "animation-pack");
+    });
     render();
   };
   const equipSelected = async () => {
@@ -853,6 +917,22 @@ async function renderStore(container: HTMLElement, api: UgcStoreApi, state: Stud
     const action = (event.target as Element | null)?.closest?.("[data-vweb-store-action]") as HTMLElement | null;
     if (!action) return;
     void equipSelected();
+  });
+  animationSelect.addEventListener("change", () => {
+    viewer.playAnimation(animationSelect.value);
+  });
+  animationPlay.addEventListener("click", () => {
+    const snapshot = viewer.snapshotAnimation();
+    viewer.setAnimationPlaying(!snapshot.playing);
+  });
+  animationTime.addEventListener("pointerdown", () => {
+    animationDragging = true;
+  });
+  animationTime.addEventListener("pointerup", () => {
+    animationDragging = false;
+  });
+  animationTime.addEventListener("input", () => {
+    viewer.setAnimationTime(Number(animationTime.value) / 1000);
   });
   kind.addEventListener("change", render);
   query.addEventListener("input", render);
@@ -1065,7 +1145,7 @@ function renderEquippedItems(target: HTMLElement, items: UgcEquippedStoreItem[],
   `;
 }
 
-async function previewStoreItem(viewer: UgcStudioViewer, item: UgcStoreItem, panel: HTMLElement): Promise<void> {
+async function previewStoreItem(viewer: UgcStudioViewer, item: UgcStoreItem, panel: HTMLElement): Promise<string[]> {
   const status = panel.querySelector("[data-vweb-store-status]") as HTMLElement | null;
   if (status) {
     status.className = "vweb-ugc-status";
@@ -1076,8 +1156,22 @@ async function previewStoreItem(viewer: UgcStudioViewer, item: UgcStoreItem, pan
     viewer.applySlot(manifest?.slot || item.slot || "Hat");
     viewer.applyTransform(manifest?.transform || defaultTransform());
     const file = await storeItemFile(item);
-    await viewer.loadAccessory(file);
-    viewer.applyTransform(manifest?.transform || defaultTransform());
+    if (item.kind === "animation-pack") {
+      viewer.clearAccessory();
+      const clipNames = await viewer.loadAnimationPack(file, clipMapFromManifest(manifest?.clips));
+      const playableSlots = animationSlotsForPreview(clipNames, manifest?.clips);
+      const firstClip = playableSlots[0] || null;
+      if (firstClip) viewer.playAnimation(firstClip);
+      viewer.setParticleEmitters([defaultParticleEmitter()]);
+      if (status) {
+        status.className = "vweb-ugc-status ok";
+        status.textContent = playableSlots.length ? `Preview loaded with ${playableSlots.length} playable clip${playableSlots.length === 1 ? "" : "s"}.` : "Preview loaded, but no playable clips were mapped.";
+      }
+      return playableSlots;
+    } else {
+      await viewer.loadAccessory(file);
+      viewer.applyTransform(manifest?.transform || defaultTransform());
+    }
     if (manifest?.particles?.length) {
       const particleFiles = await loadStoreParticleFiles(manifest.particles);
       viewer.setParticleEmitters(emittersFromParticleSpecs(manifest.particles, particleFiles));
@@ -1088,11 +1182,13 @@ async function previewStoreItem(viewer: UgcStudioViewer, item: UgcStoreItem, pan
       status.className = "vweb-ugc-status ok";
       status.textContent = "Preview loaded.";
     }
+    return [];
   } catch (error) {
     if (status) {
       status.className = "vweb-ugc-status error";
       status.textContent = `Preview failed: ${error instanceof Error ? error.message : "asset could not load"}`;
     }
+    return [];
   }
 }
 
@@ -1395,10 +1491,63 @@ function writeTransform(form: HTMLFormElement, transform: UgcTransform): void {
   });
 }
 
+function writeClipMap(form: HTMLFormElement, clips: unknown): void {
+  const record = clips && typeof clips === "object" ? clips as Record<string, unknown> : {};
+  for (const slot of ANIMATION_SLOTS) {
+    const input = form.elements.namedItem(`clip-${slot}`) as HTMLInputElement | null;
+    if (!input) continue;
+    const raw = String(record[slot] || "");
+    input.value = raw.includes("#") ? raw.split("#").pop() || "" : raw;
+  }
+}
+
+function clipMapFromManifest(clips: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  const record = clips && typeof clips === "object" ? clips as Record<string, unknown> : {};
+  for (const slot of ANIMATION_SLOTS) {
+    const raw = String(record[slot] || "");
+    const clipName = raw.includes("#") ? raw.split("#").pop() || "" : raw;
+    if (clipName) out[slot] = clipName;
+  }
+  return out;
+}
+
+function animationSlotsForPreview(clipNames: string[], clips: unknown): string[] {
+  const normalizedNames = new Set(clipNames.map(normalizeClipSlot).filter(Boolean));
+  const mapped = clipMapFromManifest(clips);
+  const slots: string[] = [];
+  for (const slot of ANIMATION_SLOTS) {
+    const mappedName = normalizeClipSlot(mapped[slot]);
+    const directName = normalizeClipSlot(slot);
+    if ((mappedName && normalizedNames.has(mappedName)) || normalizedNames.has(directName)) slots.push(slot);
+  }
+  return slots;
+}
+
+function autoFillClipMap(form: HTMLFormElement, clipNames: string[]): void {
+  const bySlot = new Map<string, string>();
+  for (const name of clipNames) {
+    const normalized = normalizeClipSlot(name);
+    if (ANIMATION_SLOTS.includes(normalized as typeof ANIMATION_SLOTS[number]) && !bySlot.has(normalized)) {
+      bySlot.set(normalized, name);
+    }
+  }
+  for (const slot of ANIMATION_SLOTS) {
+    const input = form.elements.namedItem(`clip-${slot}`) as HTMLInputElement | null;
+    if (!input) continue;
+    input.value = bySlot.get(slot) || "";
+  }
+}
+
+function normalizeClipSlot(value: unknown): string {
+  return String(value || "").trim().replace(/[\s-]+/g, "_").toLowerCase();
+}
+
 function readClipMap(form: HTMLFormElement, modelUrl: string): Partial<Record<typeof ANIMATION_SLOTS[number], string>> {
   const clips: Partial<Record<typeof ANIMATION_SLOTS[number], string>> = {};
   for (const slot of ANIMATION_SLOTS) {
-    const value = cleanText((form.elements.namedItem(`clip-${slot}`) as HTMLInputElement | null)?.value, 80) || slot;
+    const value = cleanText((form.elements.namedItem(`clip-${slot}`) as HTMLInputElement | null)?.value, 80);
+    if (!value) continue;
     clips[slot] = `${modelUrl}#${value}`;
   }
   return clips;
@@ -1974,6 +2123,31 @@ function injectStyle(): void {
     .vweb-ugc-store { display: grid; grid-template-columns: minmax(560px, 1fr) minmax(360px, 500px); gap: 14px; align-items: start; }
     .vweb-ugc-store-preview { position: sticky; top: 12px; display: grid; grid-template-rows: auto minmax(420px, calc(100vh - 360px)) auto; gap: 12px; }
     .vweb-ugc-store-stage { min-height: 420px; border: 1px solid rgba(59, 130, 246, .2); border-radius: 10px; overflow: hidden; background: #07111d; }
+    .vweb-ugc-store-animation {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(96, 165, 250, .2);
+      border-radius: 10px;
+      background: rgba(8, 13, 20, .36);
+    }
+    .vweb-ugc-store-animation[hidden] { display: none; }
+    .vweb-ugc-store-animation-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--vweb-ugc-heading);
+    }
+    .vweb-ugc-store-animation-head strong {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .vweb-ugc-store-animation-head span {
+      color: var(--vweb-ugc-muted);
+      font-size: 12px;
+    }
     .vweb-ugc-store-selected { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(100, 116, 139, .22); border-radius: 10px; background: rgba(15, 23, 42, .38); }
     .vweb-ugc-store-selected h3 { margin: 0; color: var(--vweb-ugc-heading); }
     .vweb-ugc-store-selected p { margin: 0; }

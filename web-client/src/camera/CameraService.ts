@@ -19,6 +19,7 @@ export type CameraTransform = {
 export type CameraTransformOptions = {
   shiftLock: boolean;
   footOffset: number;
+  allowFirstPerson?: boolean;
   pivotY?: number;
   referenceFootOffset?: number;
   shiftLockOffset?: number;
@@ -145,7 +146,7 @@ export class CameraService {
 
     const desiredDistance = this.state.distance;
     let cameraDistance = desiredDistance;
-    const firstPerson = desiredDistance <= 2.001;
+    const firstPerson = options.allowFirstPerson !== false && desiredDistance <= 2.001;
     if (firstPerson) {
       cameraDistance = 0.5;
       pivot[0] -= sinYaw;

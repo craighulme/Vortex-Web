@@ -223,6 +223,16 @@ function vweb.camera.state() end
 ---@param distance number
 function vweb.camera.setDistanceOverride(distance) end
 function vweb.camera.clearDistanceOverride() end
+---@param player string|number|table
+---@return table
+function vweb.camera.setSubject(player) end
+---@param player string|number|table
+---@return table
+function vweb.camera.setTarget(player) end
+---@return table
+function vweb.camera.clearSubject() end
+---@return table?
+function vweb.camera.getSubject() end
 ---@param x number|table
 ---@param y? number
 ---@return VWebRay

@@ -286,7 +286,7 @@ export class MultiplayerService {
         shouldReconnect: false,
         attempt: this.reconnectAttempts,
         delayMs: 0,
-        message: `Vortex Web ${label} disconnected. Reload the page to retry.`
+        message: "Disconnected from Vortex Web servers. Rejoin the game to reconnect."
       };
     }
     this.reconnectAttempts += 1;
@@ -297,7 +297,7 @@ export class MultiplayerService {
       shouldReconnect: true,
       attempt: this.reconnectAttempts,
       delayMs,
-      message: `Vortex Web ${label} disconnected. Reconnecting in ${(delayMs / 1000).toFixed(1)}s...`
+      message: "Disconnected from Vortex Web servers. Rejoin the game if this does not recover."
     };
   }
 

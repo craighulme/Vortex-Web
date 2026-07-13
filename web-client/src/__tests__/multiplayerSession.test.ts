@@ -62,6 +62,18 @@ describe("MultiplayerSessionService", () => {
     });
   });
 
+  it("dedupes relay notices without blocking later status updates", () => {
+    const session = new MultiplayerSessionService();
+
+    expect(session.shouldEmitRelayNotice("reconnect:relay", 15000, 1000)).toBe(true);
+    expect(session.shouldEmitRelayNotice("reconnect:relay", 15000, 2000)).toBe(false);
+    expect(session.shouldEmitRelayNotice("connected:relay", 15000, 2000)).toBe(true);
+    expect(session.shouldEmitRelayNotice("reconnect:relay", 15000, 17001)).toBe(true);
+
+    session.reset();
+    expect(session.shouldEmitRelayNotice("reconnect:relay", 15000, 18000)).toBe(true);
+  });
+
   it("owns broadcast timers and temporary override state", () => {
     const session = new MultiplayerSessionService();
     const ticks: Array<() => void> = [];

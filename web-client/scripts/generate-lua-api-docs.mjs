@@ -3,8 +3,15 @@ import path from "node:path";
 import ts from "typescript";
 
 const root = process.cwd();
+const repoRoot = path.join(root, "..");
 const sourcePath = path.join(root, "src", "scripting", "LuaApiReference.ts");
-const outPath = path.join(root, "..", "LUA_API.md");
+const outPath = path.join(repoRoot, "LUA_API.md");
+const canonicalTypesPath = path.join(repoRoot, "examples", "lua", "types", "vweb.lua");
+const typeOutPaths = [
+  canonicalTypesPath,
+  path.join(repoRoot, "runtime", "lua", "types", "vweb.lua"),
+  path.join(root, "public", "lua", "types", "vweb.lua")
+];
 const source = fs.readFileSync(sourcePath, "utf8");
 const ast = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 const entries = [];
@@ -77,5 +84,16 @@ if (process.argv.includes("--stdout")) {
 } else {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, output);
+  syncLuaTypes();
   console.log(outPath);
+}
+
+function syncLuaTypes() {
+  if (!fs.existsSync(canonicalTypesPath)) return;
+  const source = fs.readFileSync(canonicalTypesPath, "utf8");
+  for (const target of typeOutPaths) {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    if (target === canonicalTypesPath) continue;
+    fs.writeFileSync(target, source);
+  }
 }

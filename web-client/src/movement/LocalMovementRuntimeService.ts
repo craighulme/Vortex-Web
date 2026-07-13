@@ -52,6 +52,7 @@ type LocalMovementRuntimeConfig = {
   characterSpawn: CharacterSpawnLike;
   windowRef: Window & { chooseSpawnPoint?: (map: unknown) => unknown; map?: unknown };
   getCharacter(): CharacterLike | null;
+  getCameraSubject?(): CharacterLike | null;
   getNearbyColliders(x: number, y: number, z: number): Iterable<ClimbCollider>;
   getMetrics(): {
     halfWidth: number;
@@ -406,16 +407,20 @@ export class LocalMovementRuntimeService {
     if (!character) return;
 
     const metrics = config.getMetrics();
+    const subject = config.getCameraSubject?.() || character;
+    const spectating = subject !== character;
     config.camera.updateYawKeys(dt, config.keys);
-    const transform = config.camera.computeTransform(character, {
-      shiftLock: this.shiftLock,
-      footOffset: metrics.footOffset
+    const transform = config.camera.computeTransform(subject, {
+      shiftLock: spectating ? false : this.shiftLock,
+      footOffset: metrics.footOffset,
+      allowFirstPerson: !spectating
     });
-    config.setFirstPerson(transform.firstPerson);
-    config.localAvatar.setFirstPersonMode?.(transform.firstPerson, {
+    const localFirstPerson = !spectating && transform.firstPerson;
+    config.setFirstPerson(localFirstPerson);
+    config.localAvatar.setFirstPersonMode?.(localFirstPerson, {
       hideBody: config.settingsStore.readFlag("vwebHideFirstPersonBody", true)
     });
-    if (transform.firstPerson) config.setMouseLock(true);
+    if (localFirstPerson) config.setMouseLock(true);
 
     config.cameraPivot.set?.(transform.pivot[0], transform.pivot[1], transform.pivot[2]);
     config.cameraObject.position.set?.(transform.position[0], transform.position[1], transform.position[2]);

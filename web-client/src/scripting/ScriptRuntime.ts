@@ -149,6 +149,9 @@ export type ScriptRuntimeContext = {
   getCameraState(): Record<string, unknown>;
   setCameraDistanceOverride(distance: unknown): Record<string, unknown>;
   clearCameraDistanceOverride(): Record<string, unknown>;
+  setCameraSubject(query: unknown): Record<string, unknown>;
+  clearCameraSubject(): Record<string, unknown>;
+  getCameraSubject(): Record<string, unknown> | null;
   screenPointToRay(x: unknown, y: unknown): ScriptRay;
   worldToScreen(point: unknown): ScriptScreenPoint;
   raycast(origin: unknown, direction: unknown, maxDistance?: unknown): ScriptRayHit;
@@ -459,6 +462,10 @@ export class ScriptRuntime {
       "camera.state": () => context.getCameraState(),
       "camera.setDistanceOverride": (distance: unknown) => context.setCameraDistanceOverride(distance),
       "camera.clearDistanceOverride": () => context.clearCameraDistanceOverride(),
+      "camera.setSubject": (query: unknown) => context.setCameraSubject(query),
+      "camera.setTarget": (query: unknown) => context.setCameraSubject(query),
+      "camera.clearSubject": () => context.clearCameraSubject(),
+      "camera.getSubject": () => context.getCameraSubject(),
       "camera.screenPointToRay": (x: unknown, y: unknown) => context.screenPointToRay(x, y),
       "camera.worldToScreen": (point: unknown) => context.worldToScreen(point),
       "input.mousePosition": () => context.getMousePosition(),

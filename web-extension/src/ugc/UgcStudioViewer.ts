@@ -212,15 +212,43 @@ export class UgcStudioViewer {
     this.renderer.setSize(width, height, false);
   }
 
-  async loadAccessory(file: File): Promise<void> {
+  async loadAccessory(file: File): Promise<string[]> {
     const modules = this.modules;
-    if (!modules || !this.anchorGroup) return;
+    if (!modules || !this.anchorGroup) return [];
     const url = URL.createObjectURL(file);
     try {
       const gltf = await new modules.GLTFLoader().loadAsync(url);
       this.replaceAccessory(gltf.scene);
       this.fitObject(this.accessoryRoot);
       this.report(`Loaded ${file.name}`);
+      return (gltf.animations || []).map((clip: { name?: unknown }) => String(clip.name || "").trim()).filter(Boolean);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  clearAccessory(): void {
+    if (!this.anchorGroup || !this.accessoryRoot) return;
+    this.anchorGroup.remove(this.accessoryRoot);
+    this.accessoryRoot = null;
+    if (this.transformTarget === "model") this.transformControls?.detach?.();
+  }
+
+  async loadAnimationPack(file: File, slots: Record<string, string> = {}): Promise<string[]> {
+    const modules = this.modules;
+    if (!modules || !this.mixer || !this.avatarScene) return [];
+    const url = URL.createObjectURL(file);
+    try {
+      const gltf = await new modules.GLTFLoader().loadAsync(url);
+      const clipNames = (gltf.animations || []).map((clip: { name?: unknown }) => String(clip.name || "").trim()).filter(Boolean);
+      for (const clip of gltf.animations || []) {
+        const key = animationSlotForClip(clip.name, slots);
+        if (!key) continue;
+        this.animationActions.get(key)?.stop?.();
+        this.animationActions.set(key, this.mixer.clipAction(clip, this.avatarScene));
+      }
+      this.report(`Loaded animation pack: ${file.name}`);
+      return clipNames;
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -1185,6 +1213,16 @@ function normalizeClipName(value: string): string {
     .toLowerCase()
     .replace(/[\s-]+/g, "_")
     .replace(/^vweb_/, "");
+}
+
+const ANIMATION_PREVIEW_SLOTS = new Set(["idle", "walk", "run", "jump", "fall", "climb", "climb_idle"]);
+
+function animationSlotForClip(name: unknown, slots: Record<string, string> = {}): string | null {
+  const normalized = normalizeClipName(String(name || ""));
+  for (const [slot, clipName] of Object.entries(slots)) {
+    if (normalizeClipName(clipName) === normalized && ANIMATION_PREVIEW_SLOTS.has(slot)) return slot;
+  }
+  return ANIMATION_PREVIEW_SLOTS.has(normalized) ? normalized : null;
 }
 
 function findBone(root: any, name: string): any {
