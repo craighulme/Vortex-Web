@@ -1,17 +1,17 @@
 {
-  "version": "0.8.4",
+  "version": "0.8.5",
   "date": "2026-07-15",
   "url": "https://github.com/craighulme/Vortex-Web",
-  "title": "Lua API, animation, and site fixes",
-  "summary": "Patch update for Lua scripting, avatar animation, connection stability, and UGC Labs routing.",
+  "title": "Site navigation, discovery, and themes",
+  "summary": "A site-focused patch with better navigation, search, game discovery, social tools, profiles, themes, and extension access recovery.",
   "changelog": [
-    "Added more Lua API methods for camera control, input, raycasts, HUD/surface drawing, chat hooks, local world markers, and player visual overrides.",
-    "Added Lua examples for click-to-walk, interface scripting, and smooth camera collision.",
-    "Changed the default avatar animation pack to use more Vortex-like idle, walk, jump, and fall motion.",
-    "Fixed access state sometimes resetting after extension updates or reloads.",
-    "Fixed connection sessions disconnecting too quickly when the browser was AFK or in the background.",
-    "Fixed repeated reconnect messages flooding the in-game chat box.",
-    "Improved early UGC animation pack preview/equip support. Please report issues on GitHub.",
-    "Fixed UGC Labs rendering over the signed-out sign in / signup page."
+    "Reworked the site navigation with a responsive layout, a single account menu, configurable link order, and cleaner UGC Labs integration.",
+    "Added fuzzy player and game search with keyboard focus using /, richer results, and account role indicators.",
+    "Added home-page game discovery with continue playing, trending games, sorting controls, player counts, and direct Play in Browser actions.",
+    "Added a social side panel with friends, incoming requests, sent requests, and request actions without leaving the page.",
+    "Improved profile, social, settings, and game-page layouts across normal and high-resolution displays.",
+    "Expanded site theme controls and presets, including Dark Clear, Light Clear, Roblox 2007, and Metro starting points.",
+    "Improved custom profile background and nameplate readability by adapting text and controls to the media behind them.",
+    "Fixed free access recovery after extension reloads or updates, along with several signed-out routing and session-state issues."
   ]
 }

@@ -99,6 +99,8 @@ function injectNav(): void {
   if (document.getElementById(NAV_ID)) return;
   const nav = findSiteNav();
   if (!nav) return;
+  const catalog = Array.from(nav.querySelectorAll<HTMLAnchorElement>("a"))
+    .find((link) => (link.textContent || "").trim().toLowerCase() === "catalog");
   const item = document.createElement("div");
   item.id = NAV_ID;
   item.className = "vweb-ugc-nav";
@@ -109,6 +111,10 @@ function injectNav(): void {
       <a href="/vweb/ugc/store" data-vweb-ugc-link role="menuitem">UGC Store</a>
     </div>
   `;
+  const mainLink = item.querySelector<HTMLElement>(".vweb-ugc-nav-main");
+  if (catalog && mainLink) {
+    for (const className of catalog.classList) mainLink.classList.add(className);
+  }
   insertAfterCatalog(nav, item);
 }
 
@@ -1897,8 +1903,6 @@ function injectStyle(): void {
       cursor: pointer;
       color: var(--vweb-ugc-nav-text, inherit) !important;
       text-decoration: none !important;
-      background: transparent !important;
-      box-shadow: none !important;
       font: inherit !important;
       line-height: inherit !important;
     }

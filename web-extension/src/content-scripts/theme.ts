@@ -1,12 +1,18 @@
+import { DEFAULT_SITE_THEME_CONFIG, dispatchSiteThemeConfig, normalizeSiteThemeConfig } from "../site/SiteThemeConfig";
+
 export function installCustomSiteTheme(documentRef: Document = document): void {
   if (isPlayRuntimePage(documentRef)) return;
 
   const extensionApi = (globalThis as typeof globalThis & { chrome?: any; browser?: any }).chrome
     || (globalThis as typeof globalThis & { chrome?: any; browser?: any }).browser;
-  const defaults = { vwebThemeSiteCss: "", siteThemeEnabled: true };
+  const defaults = {
+    vwebThemeSiteCss: "",
+    vwebThemeSiteConfig: DEFAULT_SITE_THEME_CONFIG,
+    siteThemeEnabled: true
+  };
   let pendingCss = "";
   let pendingEnabled: unknown = true;
-  let enforcing = false;
+  let pendingConfig = DEFAULT_SITE_THEME_CONFIG;
 
   const host = () => documentRef.head || documentRef.documentElement;
   const keepLast = (style: HTMLStyleElement) => {
@@ -14,9 +20,11 @@ export function installCustomSiteTheme(documentRef: Document = document): void {
     if (style.parentElement !== target || target.lastElementChild !== style) target.appendChild(style);
   };
 
-  const apply = (css: unknown, enabled: unknown = true) => {
+  const apply = (css: unknown, enabled: unknown = true, config: unknown = pendingConfig) => {
     pendingCss = String(css || "");
     pendingEnabled = enabled;
+    pendingConfig = normalizeSiteThemeConfig(config);
+    dispatchSiteThemeConfig(documentRef, pendingConfig);
     let style = documentRef.getElementById("vweb-custom-site-theme") as HTMLStyleElement | null;
     const text = pendingEnabled === false ? "" : pendingCss;
     if (!text) {
@@ -30,43 +38,33 @@ export function installCustomSiteTheme(documentRef: Document = document): void {
     style.textContent = text;
     keepLast(style);
   };
-  const reapplyAfterPageStyles = () => apply(pendingCss, pendingEnabled);
+  const reapplyAfterPageStyles = () => apply(pendingCss, pendingEnabled, pendingConfig);
+
+  const applyStored = (stored: Record<string, unknown>) => {
+    apply(stored.vwebThemeSiteCss, stored.siteThemeEnabled, stored.vwebThemeSiteConfig);
+  };
+
+  dispatchSiteThemeConfig(documentRef, DEFAULT_SITE_THEME_CONFIG);
 
   try {
     const result = extensionApi?.storage?.local?.get?.(defaults);
     if (result && typeof result.then === "function") {
-      void result.then((stored: Record<string, unknown>) => apply(stored.vwebThemeSiteCss, stored.siteThemeEnabled));
+      void result.then(applyStored);
     } else if (extensionApi?.storage?.local?.get) {
-      extensionApi.storage.local.get(defaults, (stored: Record<string, unknown>) => apply(stored.vwebThemeSiteCss, stored.siteThemeEnabled));
+      extensionApi.storage.local.get(defaults, applyStored);
     }
     extensionApi?.storage?.onChanged?.addListener?.((changes: Record<string, { newValue?: unknown }>, areaName: string) => {
       if (areaName !== "local") return;
-      if (!changes.vwebThemeSiteCss && !changes.siteThemeEnabled) return;
-      const css = changes.vwebThemeSiteCss?.newValue;
-      if (typeof css === "undefined") {
-        const next = extensionApi.storage.local.get(defaults);
-        if (next && typeof next.then === "function") void next.then((stored: Record<string, unknown>) => apply(stored.vwebThemeSiteCss, stored.siteThemeEnabled));
-        else extensionApi.storage.local.get(defaults, (stored: Record<string, unknown>) => apply(stored.vwebThemeSiteCss, stored.siteThemeEnabled));
-      } else {
-        apply(css, changes.siteThemeEnabled?.newValue ?? true);
-      }
+      if (!changes.vwebThemeSiteCss && !changes.siteThemeEnabled && !changes.vwebThemeSiteConfig) return;
+      const next = extensionApi.storage.local.get(defaults);
+      if (next && typeof next.then === "function") void next.then(applyStored);
+      else extensionApi.storage.local.get(defaults, applyStored);
     });
     documentRef.addEventListener("DOMContentLoaded", reapplyAfterPageStyles, { once: true });
     globalThis.setTimeout?.(reapplyAfterPageStyles, 0);
     globalThis.setTimeout?.(reapplyAfterPageStyles, 500);
-    if (typeof MutationObserver !== "undefined") {
-      const observer = new MutationObserver(() => {
-        if (enforcing) return;
-        enforcing = true;
-        globalThis.setTimeout?.(() => {
-          enforcing = false;
-          reapplyAfterPageStyles();
-        }, 0);
-      });
-      observer.observe(documentRef.documentElement, { childList: true, subtree: true });
-    }
   } catch {
-    apply("");
+    apply("", true, DEFAULT_SITE_THEME_CONFIG);
   }
 }
 

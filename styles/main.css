@@ -33,6 +33,8 @@ html[theme='light'] {
     --vortex-secondary: #000000a2;
 }
 
+@scope (html[data-vweb-site-layout='modern']) {
+
 /* main */
 body {
     background: var(--bgcol1) !important;
@@ -224,6 +226,8 @@ li, a, h2, h1, .fa-brands{
     color: var(--textcol2) !important;
 }
 
+}
+
 /* Vortex Web profile cosmetics */
 .vw-profile-style {
     margin: 16px 0;
@@ -317,9 +321,7 @@ html.vw-profile-cosmetics-ready .profile-header {
     position: absolute;
     inset: 0;
     z-index: -2;
-    background-image:
-        linear-gradient(90deg, rgba(8,12,20,0.98) 0%, rgba(8,12,20,0.86) 42%, rgba(8,12,20,0.42) 72%, rgba(8,12,20,0.08) 100%),
-        var(--vw-profile-nameplate-image);
+    background-image: var(--vw-profile-nameplate-image);
     background-size: cover;
     background-position: center right;
 }
@@ -335,9 +337,7 @@ html.vw-profile-cosmetics-ready .profile-header {
 }
 
 .profile-header.vw-profile-header-nameplate.vw-nameplate-tone-light::before {
-    background-image:
-        linear-gradient(90deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.82) 42%, rgba(255,255,255,0.34) 72%, rgba(255,255,255,0.08) 100%),
-        var(--vw-profile-nameplate-image);
+    background-image: var(--vw-profile-nameplate-image);
 }
 
 .profile-header.vw-profile-header-nameplate .profile-username,
@@ -366,14 +366,7 @@ html.vw-profile-cosmetics-ready .profile-header {
 }
 
 .profile-header.vw-profile-header-nameplate::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background:
-        radial-gradient(circle at 86% 42%, rgba(255,255,255,0.16), transparent 30%),
-        linear-gradient(180deg, rgba(255,255,255,0.08), transparent 55%);
-    pointer-events: none;
+    display: none;
 }
 
 .profile-header.vw-profile-header-nameplate.vw-has-video-nameplate.vw-nameplate-tone-dark::after {
@@ -395,6 +388,16 @@ html.vw-profile-cosmetics-ready .profile-header {
 .vw-profile-has-bg footer {
     position: relative;
     z-index: 1;
+}
+
+.vw-profile-bg-tone-dark .page {
+    --textcol1: #f8fafc;
+    --textcol2: rgba(226,232,240,0.82);
+}
+
+.vw-profile-bg-tone-light .page {
+    --textcol1: #111827;
+    --textcol2: rgba(15,23,42,0.76);
 }
 
 body.vw-profile-has-bg,

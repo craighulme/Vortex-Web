@@ -12,7 +12,9 @@
     "vite": "^6.4.3"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
     "@tweakpane/core": "^2.0.5",
+    "minisearch": "^7.2.0",
     "tweakpane": "^4.0.5"
   }
 }

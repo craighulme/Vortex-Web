@@ -539,7 +539,7 @@ function launchLocalRelay(documentRef: Document, gameId: number): void {
         });
     }
 
-    async function onClick(btn: HTMLButtonElement, gameId: number, documentRef: Document, windowRef: Window, fetcher: typeof fetch): Promise<void> {
+    export async function launchGameInBrowser(btn: HTMLButtonElement, gameId: number, documentRef: Document = document, windowRef: Window = window, fetcher: typeof fetch = fetch): Promise<void> {
         const oldText = btn.textContent;
         btn.disabled = true;
         btn.textContent = "Preparing...";
@@ -618,7 +618,7 @@ function launchLocalRelay(documentRef: Document, gameId: number): void {
         btn.className = "vweb-play-browser-btn";
         btn.type = "button";
         btn.textContent = "Play in Browser";
-        btn.addEventListener("click", () => void onClick(btn, gameId, documentRef, windowRef, fetcher));
+        btn.addEventListener("click", () => void launchGameInBrowser(btn, gameId, documentRef, windowRef, fetcher));
         row.appendChild(btn);
     }
 

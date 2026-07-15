@@ -121,14 +121,12 @@
                 </div>
               </div>
               <div>
-                <h3>Presets</h3>
-                <button class="preset-btn" type="button" data-theme-preset="dark">Dark</button>
-                <button class="preset-btn" type="button" data-theme-preset="light">Light</button>
-                <button class="preset-btn" type="button" data-theme-preset="current">Full current CSS</button>
-                <button class="preset-btn" type="button" data-theme-preset="dark-glass">Dark clear glass</button>
-                <button class="preset-btn" type="button" data-theme-preset="light-glass">Light clear glass</button>
-                <button class="preset-btn" type="button" data-theme-preset="compact">Compact</button>
-                <button class="preset-btn" type="button" data-theme-preset="compact-glass">Compact clear glass</button>
+                <div class="preset-heading">
+                  <h3>Starting points</h3>
+                  <span id="themePresetScope">Site</span>
+                </div>
+                <div id="themePresetList" class="theme-preset-list"></div>
+                <p id="themePresetDescription" class="preset-description"></p>
               </div>
               <div>
                 <h3>Insert Token</h3>
@@ -149,6 +147,22 @@
                 <span id="themeEditorLabel">Site theme CSS</span>
                 <textarea id="themeCss" spellcheck="false" rows="12" placeholder="/* CSS overrides */"></textarea>
               </label>
+              <section id="siteThemeControls" class="site-theme-controls">
+                <div class="site-theme-control-head">
+                  <div>
+                    <h3>Site layout</h3>
+                    <p>Navigation elements expose stable <code>data-vweb-nav-item</code> selectors for custom CSS.</p>
+                  </div>
+                  <label class="mini-field site-layout-field">
+                    <span>Layout</span>
+                    <select id="siteLayoutMode">
+                      <option value="modern">Vortex Web</option>
+                      <option value="classic">Classic</option>
+                    </select>
+                  </label>
+                </div>
+                <div id="siteNavEditor" class="site-nav-editor" aria-label="Navigation order and visibility"></div>
+              </section>
               <p class="note">Saved themes apply automatically. Site themes replace the old popup light/dark mode.</p>
             </div>
           </div>

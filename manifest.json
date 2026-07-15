@@ -1,6 +1,6 @@
 {
   "name": "Vortex Web",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "manifest_version": 3,
   "description": "Unofficial Vortex browser client with native multiplayer relay support, WebGPU work, and web-first enhancements.",
   "icons": {
@@ -39,7 +39,9 @@
         "https://vortex.towerstats.com/*"
       ],
       "css": [
-        "styles/main.css"
+        "styles/main.css",
+        "styles/site-features.css",
+        "styles/site-vortex-web.css"
       ],
       "js": [
         "extension/content-scripts/base.js"

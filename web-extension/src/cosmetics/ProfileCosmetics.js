@@ -693,21 +693,52 @@
     document.body.classList.toggle("vw-profile-has-bg", !!url);
     if (!url) {
       existing?.remove();
+      document.body.classList.remove("vw-profile-bg-tone-dark", "vw-profile-bg-tone-light");
       return;
     }
-    if (existing?.dataset.vwProfileBgUrl === url) return;
+    if (existing?.dataset.vwProfileBgUrl === url) {
+      applyProfileBackgroundTone(url, existing.querySelector("video") || undefined);
+      return;
+    }
     existing?.remove();
     const layer = document.createElement("div");
     layer.id = "vortex-web-profile-background";
     layer.className = "vw-profile-bg-media";
     layer.dataset.vwProfileBgUrl = url;
+    document.body.prepend(layer);
     if (isVideoUrl(url)) {
-      layer.appendChild(createMediaElement(url, "vw-profile-bg-video"));
+      const video = createMediaElement(url, "vw-profile-bg-video");
+      layer.appendChild(video);
+      applyProfileBackgroundTone(url, video);
     } else {
       layer.style.setProperty("--vw-profile-bg-image", `url("${cssUrl(url)}")`);
       layer.classList.add("vw-profile-bg-image");
+      applyProfileBackgroundTone(url);
     }
-    document.body.prepend(layer);
+  }
+
+  function applyProfileBackgroundTone(url, media) {
+    const cachedTone = mediaToneCache.get(url);
+    const apply = (tone) => {
+      const current = document.getElementById("vortex-web-profile-background");
+      if (!current || current.dataset.vwProfileBgUrl !== url) return;
+      const light = tone === "light";
+      document.body.classList.toggle("vw-profile-bg-tone-light", light);
+      document.body.classList.toggle("vw-profile-bg-tone-dark", !light);
+    };
+    if (typeof cachedTone === "string") {
+      apply(cachedTone);
+      return;
+    }
+    apply("dark");
+    const tonePromise = cachedTone || estimateMediaTone(url, media)
+      .then((tone) => tone || "dark")
+      .catch(() => "dark");
+    if (!cachedTone) mediaToneCache.set(url, tonePromise);
+    tonePromise.then((tone) => {
+      mediaToneCache.set(url, tone);
+      apply(tone);
+    }).catch(() => apply("dark"));
   }
 
   function createMediaElement(url, className) {
