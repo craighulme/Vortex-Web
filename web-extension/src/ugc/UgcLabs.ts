@@ -45,7 +45,6 @@ type StudioState = {
 export function installUgcLabs(): void {
   if (isGamePage()) return;
   injectStyle();
-  normalizeUgcRouteRedirect();
   const drafts = new UgcDraftStore();
   const api = new UgcStoreApi();
   const state: StudioState = {
@@ -62,6 +61,13 @@ export function installUgcLabs(): void {
   };
 
   const render = () => {
+    if (isSignedOutAuthPage()) {
+      cleanUgcRouteFromAuthPage();
+      document.getElementById(NAV_ID)?.remove();
+      unmountRoute(state);
+      return;
+    }
+    normalizeUgcRouteRedirect();
     injectNav();
     if (isUgcRoute(location.pathname)) renderRoute(drafts, api, state);
     else unmountRoute(state);
@@ -1433,6 +1439,36 @@ function normalizeUgcRouteRedirect(): void {
   } catch {
     // Ignore malformed URLs; normal routing still handles standard pages.
   }
+}
+
+function cleanUgcRouteFromAuthPage(): void {
+  try {
+    const url = new URL(location.href);
+    let nextPath = "";
+    if (url.searchParams.has("VWEBUgcRoute")) {
+      url.searchParams.delete("VWEBUgcRoute");
+      nextPath = `${url.pathname}${url.search}${url.hash}`;
+    } else if (isUgcRoute(url.pathname)) {
+      nextPath = "/";
+    }
+    if (nextPath && nextPath !== `${location.pathname}${location.search}${location.hash}`) {
+      history.replaceState({}, "", nextPath);
+    }
+  } catch {
+    // Leave browser history alone if the URL cannot be parsed.
+  }
+}
+
+function isSignedOutAuthPage(): boolean {
+  if (isUgcRoute(location.pathname) && document.querySelector("nav a, .navbar a, header nav a")) return false;
+  const visiblePassword = Array.from(document.querySelectorAll<HTMLInputElement>("input[type='password']"))
+    .some((input) => input.offsetParent !== null);
+  if (!visiblePassword) return false;
+  const text = (document.body?.textContent || "").toLowerCase();
+  const hasAuthCopy = text.includes("sign in") || text.includes("create one") || text.includes("forgot password");
+  const hasSignedInNav = Array.from(document.querySelectorAll("a, button"))
+    .some((element) => (element.textContent || "").trim().toLowerCase() === "sign out");
+  return hasAuthCopy && !hasSignedInNav;
 }
 
 function isGamePage(): boolean {
