@@ -37,6 +37,12 @@ export function createMultiplayerChatCommandBridge(context: MultiplayerChatComma
     return runtimeApi.setMovementMods(patch);
   }
 
+  function licenseCommands() {
+    const launchInfo = getLaunchInfo() as Record<string, any> | null | undefined;
+    const commands = launchInfo?.licenseCommandManifest || launchInfo?.licenseLease?.commands || launchInfo?.license_lease?.commands || [];
+    return Array.isArray(commands) ? commands : [];
+  }
+
   function teleportLocalToScene(x: unknown, y: unknown, z: unknown) {
     const char = runtimeApi.getCharacter?.();
     if (!char) return false;
@@ -52,6 +58,7 @@ export function createMultiplayerChatCommandBridge(context: MultiplayerChatComma
       players: commandPlayerList,
       localPosition: () => runtimeApi.getCharacter?.()?.position || null,
       movementMods,
+      licenseCommands,
       setMovementMods,
       requireFeature: requireLicenseFeature,
       teleportLocal: teleportLocalToScene,
@@ -74,6 +81,7 @@ export function createMultiplayerChatCommandBridge(context: MultiplayerChatComma
   return {
     commandPlayerList,
     movementMods,
+    licenseCommands,
     setMovementMods,
     teleportLocalToScene,
     handleChatCommand

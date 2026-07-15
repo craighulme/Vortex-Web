@@ -150,6 +150,7 @@ function pageSafeIdentity(identity: Record<string, unknown> | null | undefined):
     const out = { ...identity };
     const lease = readRecord(out.licenseLease || out.license_lease || out.lease);
     if (Array.isArray(lease?.allowed_features)) out.licenseFeatures = [...lease.allowed_features];
+    if (Array.isArray(lease?.commands)) out.licenseCommandManifest = [...lease.commands];
     delete out.licenseLease;
     delete out.license_lease;
     delete out.lease;

@@ -21,10 +21,19 @@ export type ChatCommandContext = {
   players(): ChatCommandPlayer[];
   localPosition(): VectorLike | null;
   movementMods(): MovementMods;
+  licenseCommands?(): ChatCommandManifestItem[];
   setMovementMods(patch: Partial<MovementMods>): MovementMods;
   requireFeature(feature: string, label: string): boolean;
   teleportLocal(x: number, y: number, z: number): boolean;
   bringPlayer(player: ChatCommandPlayer): boolean;
+};
+
+export type ChatCommandManifestItem = {
+  op: string;
+  title: string;
+  usage: string;
+  aliases: string[];
+  feature?: string;
 };
 
 export type MovementCommandApi = {
@@ -47,8 +56,6 @@ type PlayerFindResult = {
   player?: ChatCommandPlayer;
   error?: string;
 };
-
-const HELP = "Commands: ::goto <player>, ::tp <x> <y> <z>, ::where [player], ::players, ::bring <player>, ::fly [on/off/speed], ::noclip [on/off], ::airwalk [on/off], ::setgravity <scale/reset>, ::movement";
 
 export class ChatCommandService {
   createMovementApi(context: Pick<ChatCommandContext, "movementMods" | "setMovementMods"> & {
@@ -102,11 +109,11 @@ export class ChatCommandService {
     const rest = parts.join(" ");
 
     if (command === "help" || command === "?") {
-      context.chat.system(HELP);
+      context.chat.system(this.helpLine(context));
       return true;
     }
 
-    if (command === "players" || command === "plr") {
+    if ((command === "players" || command === "plr") && this.commandEnabled(context, "player.list", command)) {
       const names = context.players()
         .filter((player) => !player.self)
         .map((player) => player.username)
@@ -115,7 +122,7 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "where" || command === "pos" || command === "coords") {
+    if ((command === "where" || command === "pos" || command === "coords") && this.commandEnabled(context, "player.where", command)) {
       if (!rest) {
         context.chat.system(`You are at ${this.formatPosition(context.localPosition())}.`);
         return true;
@@ -129,12 +136,12 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "movement" || command === "moves" || command === "mods") {
+    if ((command === "movement" || command === "moves" || command === "mods") && this.commandEnabled(context, "movement.status", command)) {
       context.chat.system(this.movementStatusLine(context.movementMods()));
       return true;
     }
 
-    if (command === "fly") {
+    if (command === "fly" && this.commandEnabled(context, "movement.fly", command)) {
       if (!context.requireFeature("fly-command", "::fly")) return true;
       const mods = context.movementMods();
       let enabled = this.toggleValue(parts[0], mods.fly);
@@ -150,7 +157,7 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "noclip" || command === "clip") {
+    if ((command === "noclip" || command === "clip") && this.commandEnabled(context, "movement.noclip", command)) {
       if (!context.requireFeature("noclip-command", "::noclip")) return true;
       const mods = context.movementMods();
       const enabled = command === "clip"
@@ -165,7 +172,7 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "airwalk" || command === "air") {
+    if ((command === "airwalk" || command === "air") && this.commandEnabled(context, "movement.airwalk", command)) {
       if (!context.requireFeature("airwalk-command", "::airwalk")) return true;
       const mods = context.movementMods();
       const enabled = this.toggleValue(parts[0], mods.airwalk);
@@ -178,7 +185,7 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "setgravity" || command === "gravity" || command === "fallspeed") {
+    if ((command === "setgravity" || command === "gravity" || command === "fallspeed") && this.commandEnabled(context, "movement.gravity", command)) {
       if (!context.requireFeature("gravity-command", "::setgravity")) return true;
       const value = String(parts[0] || "").trim().toLowerCase();
       if (!value || value === "reset" || value === "normal" || value === "default") {
@@ -196,7 +203,7 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "tp" || command === "teleport") {
+    if ((command === "tp" || command === "teleport") && this.commandEnabled(context, "teleport.coords", command)) {
       if (!context.requireFeature("teleport-commands", "::tp")) return true;
       const nums = parts.map(Number);
       if (nums.length < 3 || nums.slice(0, 3).some((n) => !Number.isFinite(n))) {
@@ -211,7 +218,7 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "goto" || command === "to") {
+    if ((command === "goto" || command === "to") && this.commandEnabled(context, "teleport.player", command)) {
       if (!context.requireFeature("teleport-commands", "::goto")) return true;
       const found = this.findPlayer(rest, context.players());
       if (!found.player) {
@@ -231,7 +238,7 @@ export class ChatCommandService {
       return true;
     }
 
-    if (command === "bring") {
+    if (command === "bring" && this.commandEnabled(context, "player.bring", command)) {
       if (!context.requireFeature("bring-command", "::bring")) return true;
       const found = this.findPlayer(rest, context.players());
       if (!found.player) {
@@ -314,5 +321,40 @@ export class ChatCommandService {
       .replace(/[il1|]/g, "l")
       .replace(/[o0]/g, "o")
       .replace(/[^a-z0-9_]/g, "");
+  }
+
+  private helpLine(context: Pick<ChatCommandContext, "licenseCommands">): string {
+    const manifest = this.normalizedManifest(context);
+    if (!manifest.length) return "No command manifest received for this license.";
+    const lines = manifest
+      .map((item) => item.usage || (item.aliases[0] ? `::${item.aliases[0]}` : ""))
+      .filter(Boolean);
+    return lines.length ? `Commands: ${lines.join(", ")}` : "No commands enabled on this license.";
+  }
+
+  private commandEnabled(context: Pick<ChatCommandContext, "licenseCommands">, op: string, command: string): boolean {
+    const raw = context.licenseCommands?.();
+    if (!Array.isArray(raw) || !raw.length) return true;
+    const commandKey = String(command || "").toLowerCase();
+    return this.normalizedManifest(context).some((item) =>
+      item.op === op && item.aliases.some((alias) => alias.toLowerCase() === commandKey)
+    );
+  }
+
+  private normalizedManifest(context: Pick<ChatCommandContext, "licenseCommands">): ChatCommandManifestItem[] {
+    const raw = context.licenseCommands?.();
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((item) => {
+        const normalized: ChatCommandManifestItem = {
+          op: String(item?.op || ""),
+          title: String(item?.title || ""),
+          usage: String(item?.usage || ""),
+          aliases: Array.isArray(item?.aliases) ? item.aliases.map((alias) => String(alias || "").toLowerCase()).filter(Boolean) : []
+        };
+        if (item?.feature) normalized.feature = String(item.feature);
+        return normalized;
+      })
+      .filter((item) => item.op && item.aliases.length);
   }
 }

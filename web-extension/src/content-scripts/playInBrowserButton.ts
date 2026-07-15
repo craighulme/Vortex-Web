@@ -6,20 +6,6 @@ const DEV_FEATURES_KEY = "vwebDevFeatures";
 const LAST_LICENSE_LEASE_KEY = "vwebLastLicenseLease";
 const INSTALL_ID_KEY = "vwebInstallId";
 const LICENSE_HELP_MESSAGE = "Vortex Web activation failed. Free access should work without a key; paid keys only unlock extra entitlements.";
-const REQUESTED_FEATURES = [
-    "vortex-native-bridge",
-    "teleport-commands",
-    "bring-command",
-    "fly-command",
-    "noclip-command",
-    "gravity-command",
-    "airwalk-command",
-    "packet-debug",
-    "lua"
-];
-const DEV_REQUESTED_FEATURES = [
-    "avatar-spoof"
-];
 
 type LaunchIdentity = {
     id: number;
@@ -270,12 +256,6 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
         return false;
     }
 
-    function requestedFeatures(config: Pick<StoredConfig, "devFeatures">): string[] {
-        return config?.devFeatures
-            ? [...REQUESTED_FEATURES, ...DEV_REQUESTED_FEATURES]
-            : REQUESTED_FEATURES;
-    }
-
     function isLocalRelayUrl(hubUrl: unknown): boolean {
         try {
             const parsed = new URL(String(hubUrl || ""));
@@ -435,8 +415,7 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
                 fingerprint_hash: fingerprintHash,
                 install_id: proof.installId,
                 install_public_jwk: proof.publicJwk,
-                install_signature: proof.signature,
-                features: requestedFeatures(config)
+                install_signature: proof.signature
             })
         });
         const text = await res.text();

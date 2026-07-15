@@ -27,6 +27,7 @@ export type LaunchIdentity = {
   wsEndpoint: string | null;
   licenseLease?: unknown;
   licenseFeatures?: unknown[];
+  licenseCommandManifest?: unknown[];
 };
 
 const emptyBridgeConfig: BridgeConfig = {
@@ -76,6 +77,8 @@ export class PlatformBridge {
       info.licenseLease = licenseLease;
       info.licenseFeatures = Array.isArray(value.licenseFeatures) ? value.licenseFeatures :
         (Array.isArray((licenseLease as { allowed_features?: unknown[] } | null)?.allowed_features) ? (licenseLease as { allowed_features: unknown[] }).allowed_features : []);
+      info.licenseCommandManifest = Array.isArray(value.licenseCommandManifest) ? value.licenseCommandManifest :
+        (Array.isArray((licenseLease as { commands?: unknown[] } | null)?.commands) ? (licenseLease as { commands: unknown[] }).commands : []);
     }
     return info.id ? info : null;
   }
