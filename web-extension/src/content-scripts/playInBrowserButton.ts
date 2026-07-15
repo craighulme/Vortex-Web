@@ -433,6 +433,14 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
         return raw.lease;
     }
 
+    async function fetchLaunchToken(fetcher: typeof fetch, gameId: number): Promise<string> {
+        const launchUri = await fetchLaunchUri(fetcher, gameId);
+        const launch = new URL(launchUri);
+        const token = launch.searchParams.get("token");
+        if (!token) throw new Error("launch URI did not contain a token");
+        return token;
+    }
+
     function relayHttpBase(hubUrl: string): string {
         const url = new URL(hubUrl);
         if (url.protocol === "wss:") url.protocol = "https:";
@@ -552,13 +560,13 @@ function launchLocalRelay(documentRef: Document, gameId: number): void {
             btn.textContent = "Fetching token...";
             const identity = await fetchLaunchIdentity(fetcher, gameId);
             let mergedLicense = null;
-            const launchUri = await fetchLaunchUri(fetcher, gameId);
-            const launch = new URL(launchUri);
-            const token = launch.searchParams.get("token");
-            if (!token) throw new Error("launch URI did not contain a token");
+            let token = await fetchLaunchToken(fetcher, gameId);
             if (!isLocalRelayUrl(hubUrl)) {
                 btn.textContent = "Checking access...";
                 await recoverFreeLicense(fetcher, config, token, identity);
+                if (!config.licenseKey) {
+                    token = await fetchLaunchToken(fetcher, gameId);
+                }
                 mergedLicense = await activateLicense(fetcher, config);
             }
             const merged = mergeIdentity(identity, null, gameId);
