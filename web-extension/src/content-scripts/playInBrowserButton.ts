@@ -4,6 +4,7 @@ const HOSTED_RELAY_URL = "wss://v22-relay.116.203.155.30.sslip.io/ws";
 const DEV_LOCAL_RELAY_KEY = "vwebDevLocalRelay";
 const DEV_FEATURES_KEY = "vwebDevFeatures";
 const LAST_LICENSE_LEASE_KEY = "vwebLastLicenseLease";
+const INSTALL_ID_KEY = "vwebInstallId";
 const LICENSE_HELP_MESSAGE = "Vortex Web activation failed. Free access should work without a key; paid keys only unlock extra entitlements.";
 const REQUESTED_FEATURES = [
     "vortex-native-bridge",
@@ -286,32 +287,33 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
     }
 
     async function browserFingerprintHash(): Promise<string> {
-        const api = extensionApi();
-        let installId = "";
-        if (api?.storage?.local) {
-            const stored = await api.storage.local.get({ vwebInstallId: "" });
-            installId = String(stored.vwebInstallId || "");
-            if (!installId) {
-                installId = crypto.randomUUID ? crypto.randomUUID() : randomHex(16);
-                await api.storage.local.set({ vwebInstallId: installId });
-            }
-        }
+        const installId = await stableInstallId();
         const material = `vortex-web-install\n${installId}`;
         return sha256Hex(material);
     }
 
-    async function installId(): Promise<string> {
+    async function stableInstallId(): Promise<string> {
         const api = extensionApi();
-        let id = "";
+        let installId = "";
+        try {
+            installId = String(window.localStorage?.getItem(INSTALL_ID_KEY) || "");
+        } catch {}
         if (api?.storage?.local) {
             const stored = await api.storage.local.get({ vwebInstallId: "" });
-            id = String(stored.vwebInstallId || "");
-            if (!id) {
-                id = crypto.randomUUID ? crypto.randomUUID() : randomHex(16);
-                await api.storage.local.set({ vwebInstallId: id });
-            }
+            installId ||= String(stored.vwebInstallId || "");
         }
-        return id || (crypto.randomUUID ? crypto.randomUUID() : randomHex(16));
+        if (!installId) installId = crypto.randomUUID ? crypto.randomUUID() : randomHex(16);
+        try {
+            window.localStorage?.setItem(INSTALL_ID_KEY, installId);
+        } catch {}
+        if (api?.storage?.local) {
+            await api.storage.local.set({ vwebInstallId: installId });
+        }
+        return installId;
+    }
+
+    async function installId(): Promise<string> {
+        return stableInstallId();
     }
 
     async function sha256Hex(value: string): Promise<string> {
@@ -330,6 +332,15 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
             "vweb-install-proof-v1",
             input.licenseScope,
             input.tier,
+            input.fingerprintHash,
+            input.installIdHash
+        ].join("\n");
+    }
+
+    function installRecoverySigningText(input: { userId: number; fingerprintHash: string; installIdHash: string }): string {
+        return [
+            "vweb-install-recovery-v1",
+            String(input.userId),
             input.fingerprintHash,
             input.installIdHash
         ].join("\n");
@@ -393,6 +404,19 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
         return { installId: id, publicJwk, signature: base64UrlEncode(new Uint8Array(signature)) };
     }
 
+    async function createInstallRecoveryProof(userId: number, fingerprintHash: string): Promise<InstallProof> {
+        const id = await installId();
+        const installIdHash = await sha256Hex(`install:${id}`);
+        const pair = await getInstallKeyPair();
+        const publicJwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+        const signature = await crypto.subtle.sign(
+            { name: "ECDSA", hash: "SHA-256" },
+            pair.privateKey,
+            new TextEncoder().encode(installRecoverySigningText({ userId, fingerprintHash, installIdHash }))
+        );
+        return { installId: id, publicJwk, signature: base64UrlEncode(new Uint8Array(signature)) };
+    }
+
     function randomHex(bytes: number): string {
         const values = new Uint8Array(bytes);
         crypto.getRandomValues(values);
@@ -428,6 +452,46 @@ export function installPlayInBrowserButton(documentRef: Document = document, win
         }
         await storeLastLicenseLease(raw);
         return raw.lease;
+    }
+
+    function relayHttpBase(hubUrl: string): string {
+        const url = new URL(hubUrl);
+        if (url.protocol === "wss:") url.protocol = "https:";
+        if (url.protocol === "ws:") url.protocol = "http:";
+        url.pathname = "";
+        url.search = "";
+        url.hash = "";
+        return url.toString().replace(/\/$/, "");
+    }
+
+    async function recoverFreeLicense(fetcher: typeof fetch, config: StoredConfig, launchToken: string, identity: LaunchIdentity | null): Promise<void> {
+        if (config.licenseKey || isLocalRelayUrl(config.hubUrl) || !identity?.id) return;
+        const fingerprintHash = await browserFingerprintHash();
+        const proof = await createInstallRecoveryProof(identity.id, fingerprintHash);
+        const res = await fetcher(`${relayHttpBase(config.hubUrl)}/api/free-license/recover`, {
+            method: "POST",
+            cache: "no-store",
+            headers: { "content-type": "application/json", accept: "application/json" },
+            body: JSON.stringify({
+                launchToken,
+                userId: identity.id,
+                fingerprintHash,
+                installId: proof.installId,
+                installPublicJwk: proof.publicJwk,
+                installSignature: proof.signature
+            })
+        });
+        const text = await res.text();
+        let raw: { error?: unknown; recovered?: unknown } = {};
+        try { raw = JSON.parse(text); } catch {}
+        if (!res.ok) {
+            const reason = String(raw.error || `HTTP ${res.status}`);
+            const err: LicenseError = new Error(`free license recovery failed: ${reason}`);
+            err.code = "VWEB_LICENSE_INVALID";
+            err.reason = reason;
+            err.status = res.status;
+            throw err;
+        }
     }
 
     async function storeLastLicenseLease(activation: ActivationResponse): Promise<void> {
@@ -514,6 +578,8 @@ function launchLocalRelay(documentRef: Document, gameId: number): void {
             const token = launch.searchParams.get("token");
             if (!token) throw new Error("launch URI did not contain a token");
             if (!isLocalRelayUrl(hubUrl)) {
+                btn.textContent = "Checking access...";
+                await recoverFreeLicense(fetcher, config, token, identity);
                 mergedLicense = await activateLicense(fetcher, config);
             }
             const merged = mergeIdentity(identity, null, gameId);
